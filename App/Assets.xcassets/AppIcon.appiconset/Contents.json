@@ -1,0 +1,1 @@
+{"images": [{"size": 16, "idiom": "mac", "filename": "appicon16.png"}, {"size": 32, "idiom": "mac", "filename": "appicon32.png"}, {"size": 128, "idiom": "mac", "filename": "appicon128.png"}, {"size": 256, "idiom": "mac", "filename": "appicon256.png"}, {"size": 512, "idiom": "mac", "filename": "appicon512.png"}], "info": {"version": 1, "author": "xcode"}}

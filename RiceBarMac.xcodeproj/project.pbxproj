@@ -1,0 +1,411 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 54;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		205B9A33D254D116AD48D87B /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BE3B3286B9F555650B9C7E0 /* Profile.swift */; };
+		2EB7D82C4BDA5C9361E30356 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A401FFB6BC54C621640129E /* Assets.xcassets */; };
+		57426ED2538B52588F624CC2 /* RiceBarMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD323ECE98A3065A7408FBC4 /* RiceBarMacApp.swift */; };
+		58C48961049E37C57DC65B73 /* ConfigAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2048D74F68C5ABF4B9A55B01 /* ConfigAccess.swift */; };
+		757EFE1FCF0A2BC53D15B2DC /* ProfileApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6E45AA940E92DB785461D8 /* ProfileApplier.swift */; };
+		96DE72684819AA654BA471C2 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = C605F1B125C2302857023307 /* Yams */; };
+		BA6D4F44D9137A7CA4246462 /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50CA24D7E4DEB1CBEB5FDDA /* HotKeyManager.swift */; };
+		C4F6787BF96CCEF09712724F /* ProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81BF2895D7825DEBE53739CC /* ProfileManager.swift */; };
+		F8CF6A1782A672790B8B22F9 /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = B17825F2AF40D3D8D44819F4 /* HotKey */; };
+		FF23893359EB9967E9B8387A /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12C3A7287C88E022689AEE2B /* StatusBarController.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0BE3B3286B9F555650B9C7E0 /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
+		12C3A7287C88E022689AEE2B /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
+		2048D74F68C5ABF4B9A55B01 /* ConfigAccess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigAccess.swift; sourceTree = "<group>"; };
+		3A401FFB6BC54C621640129E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		48E0071036E1D031DF38F28E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		81BF2895D7825DEBE53739CC /* ProfileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManager.swift; sourceTree = "<group>"; };
+		8E0693C0DF87522673380697 /* RiceBarMac_Debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Debug.entitlements; sourceTree = "<group>"; };
+		C64AE5299733FC31BEA181F8 /* RiceBarMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RiceBarMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CD323ECE98A3065A7408FBC4 /* RiceBarMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiceBarMacApp.swift; sourceTree = "<group>"; };
+		CD6E45AA940E92DB785461D8 /* ProfileApplier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileApplier.swift; sourceTree = "<group>"; };
+		D50CA24D7E4DEB1CBEB5FDDA /* HotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyManager.swift; sourceTree = "<group>"; };
+		EE51A9870DA9A889723D2642 /* RiceBarMac_Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Release.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		6E33C6A6D714623A199C741A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F8CF6A1782A672790B8B22F9 /* HotKey in Frameworks */,
+				96DE72684819AA654BA471C2 /* Yams in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		23B73B30AE604A6A552922ED = {
+			isa = PBXGroup;
+			children = (
+				3CDBFD6F9EB7191B69A38E54 /* App */,
+				A757EAB19785B3AAC42B67A4 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3CDBFD6F9EB7191B69A38E54 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				3A401FFB6BC54C621640129E /* Assets.xcassets */,
+				48E0071036E1D031DF38F28E /* Info.plist */,
+				AD68D5B6F84982D0DFC4D00D /* Entitlements */,
+				825165D1D4FE1E63DB75A951 /* Sources */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		825165D1D4FE1E63DB75A951 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				2048D74F68C5ABF4B9A55B01 /* ConfigAccess.swift */,
+				D50CA24D7E4DEB1CBEB5FDDA /* HotKeyManager.swift */,
+				0BE3B3286B9F555650B9C7E0 /* Profile.swift */,
+				CD6E45AA940E92DB785461D8 /* ProfileApplier.swift */,
+				81BF2895D7825DEBE53739CC /* ProfileManager.swift */,
+				CD323ECE98A3065A7408FBC4 /* RiceBarMacApp.swift */,
+				12C3A7287C88E022689AEE2B /* StatusBarController.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A757EAB19785B3AAC42B67A4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C64AE5299733FC31BEA181F8 /* RiceBarMac.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AD68D5B6F84982D0DFC4D00D /* Entitlements */ = {
+			isa = PBXGroup;
+			children = (
+				8E0693C0DF87522673380697 /* RiceBarMac_Debug.entitlements */,
+				EE51A9870DA9A889723D2642 /* RiceBarMac_Release.entitlements */,
+			);
+			path = Entitlements;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		1763D8288F4720C213D69DAF /* RiceBarMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F085766E5D295B45E0E73BC6 /* Build configuration list for PBXNativeTarget "RiceBarMac" */;
+			buildPhases = (
+				EB9AA050176851D6B73481EA /* Sources */,
+				CEACCE3FE1F95C839B75C73B /* Resources */,
+				6E33C6A6D714623A199C741A /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RiceBarMac;
+			packageProductDependencies = (
+				B17825F2AF40D3D8D44819F4 /* HotKey */,
+				C605F1B125C2302857023307 /* Yams */,
+			);
+			productName = RiceBarMac;
+			productReference = C64AE5299733FC31BEA181F8 /* RiceBarMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BA0BDB382D89D1B003F1AAD1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					1763D8288F4720C213D69DAF = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 513EEF862863A404142738A6 /* Build configuration list for PBXProject "RiceBarMac" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 23B73B30AE604A6A552922ED;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BDD41CA1C281083608D734EF /* XCRemoteSwiftPackageReference "HotKey" */,
+				A0A3119E84B48CDAB8D261F4 /* XCRemoteSwiftPackageReference "Yams" */,
+			);
+			preferredProjectObjectVersion = 54;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1763D8288F4720C213D69DAF /* RiceBarMac */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CEACCE3FE1F95C839B75C73B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2EB7D82C4BDA5C9361E30356 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		EB9AA050176851D6B73481EA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				58C48961049E37C57DC65B73 /* ConfigAccess.swift in Sources */,
+				BA6D4F44D9137A7CA4246462 /* HotKeyManager.swift in Sources */,
+				205B9A33D254D116AD48D87B /* Profile.swift in Sources */,
+				757EFE1FCF0A2BC53D15B2DC /* ProfileApplier.swift in Sources */,
+				C4F6787BF96CCEF09712724F /* ProfileManager.swift in Sources */,
+				57426ED2538B52588F624CC2 /* RiceBarMacApp.swift in Sources */,
+				FF23893359EB9967E9B8387A /* StatusBarController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		044F07B428D1E56F0874D59B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/Entitlements/RiceBarMac_Release.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ricebar.RiceBarMac;
+				PRODUCT_NAME = RiceBarMac;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		1CBEF369373C50E2936FC042 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		5A21E013D3105D64321B743B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		DECBE02B64A5F9A97871922E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_ENTITLEMENTS = App/Entitlements/RiceBarMac_Debug.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ricebar.RiceBarMac;
+				PRODUCT_NAME = RiceBarMac;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		513EEF862863A404142738A6 /* Build configuration list for PBXProject "RiceBarMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A21E013D3105D64321B743B /* Debug */,
+				1CBEF369373C50E2936FC042 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F085766E5D295B45E0E73BC6 /* Build configuration list for PBXNativeTarget "RiceBarMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DECBE02B64A5F9A97871922E /* Debug */,
+				044F07B428D1E56F0874D59B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A0A3119E84B48CDAB8D261F4 /* XCRemoteSwiftPackageReference "Yams" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jpsim/Yams";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.0.6;
+			};
+		};
+		BDD41CA1C281083608D734EF /* XCRemoteSwiftPackageReference "HotKey" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/soffes/HotKey";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.1.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		B17825F2AF40D3D8D44819F4 /* HotKey */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BDD41CA1C281083608D734EF /* XCRemoteSwiftPackageReference "HotKey" */;
+			productName = HotKey;
+		};
+		C605F1B125C2302857023307 /* Yams */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A0A3119E84B48CDAB8D261F4 /* XCRemoteSwiftPackageReference "Yams" */;
+			productName = Yams;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = BA0BDB382D89D1B003F1AAD1 /* Project object */;
+}
