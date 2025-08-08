@@ -21,12 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 struct SettingsView: View {
-    @AppStorage("devMode") private var devMode: Bool = true
-
     var body: some View {
         Form {
-            Toggle("Developer Mode (disable sandbox behaviors)", isOn: $devMode)
-                .toggleStyle(.switch)
             Button("Open Profiles Folder") {
                 ProfileManager.shared.openProfilesFolder()
             }

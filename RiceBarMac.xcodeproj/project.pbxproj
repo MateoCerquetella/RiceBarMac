@@ -7,12 +7,18 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1C961ACD86F7C04FE4385AC7 /* ProfileWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B7F07B4722BD07FA2B3E4A /* ProfileWatcher.swift */; };
 		205B9A33D254D116AD48D87B /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BE3B3286B9F555650B9C7E0 /* Profile.swift */; };
 		2EB7D82C4BDA5C9361E30356 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A401FFB6BC54C621640129E /* Assets.xcassets */; };
+		4D890C02F7B0212E2201D0DE /* ApplyRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79A6720F4EA62A43CDF4D2E /* ApplyRecord.swift */; };
 		57426ED2538B52588F624CC2 /* RiceBarMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD323ECE98A3065A7408FBC4 /* RiceBarMacApp.swift */; };
+		58997E53451F1FB5691ACFB2 /* ReloadHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 847053355E6C2E30E18114BF /* ReloadHelper.swift */; };
 		58C48961049E37C57DC65B73 /* ConfigAccess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2048D74F68C5ABF4B9A55B01 /* ConfigAccess.swift */; };
+		638A047EB8CE5964B2FB71C2 /* ActiveProfileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A679E932E1E16C9BDFBE00B2 /* ActiveProfileStore.swift */; };
+		70C51FB1354A6B2460924B67 /* TemplateEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33527AFF36DCB5F702E613A /* TemplateEngine.swift */; };
 		757EFE1FCF0A2BC53D15B2DC /* ProfileApplier.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD6E45AA940E92DB785461D8 /* ProfileApplier.swift */; };
 		96DE72684819AA654BA471C2 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = C605F1B125C2302857023307 /* Yams */; };
+		A35CFE2CE9E1E4BA8BC6A10D /* ApplyActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD339898DCE0BA183621D8E /* ApplyActivity.swift */; };
 		BA6D4F44D9137A7CA4246462 /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50CA24D7E4DEB1CBEB5FDDA /* HotKeyManager.swift */; };
 		C4F6787BF96CCEF09712724F /* ProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81BF2895D7825DEBE53739CC /* ProfileManager.swift */; };
 		F8CF6A1782A672790B8B22F9 /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = B17825F2AF40D3D8D44819F4 /* HotKey */; };
@@ -26,12 +32,18 @@
 		3A401FFB6BC54C621640129E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		48E0071036E1D031DF38F28E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		81BF2895D7825DEBE53739CC /* ProfileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManager.swift; sourceTree = "<group>"; };
+		847053355E6C2E30E18114BF /* ReloadHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReloadHelper.swift; sourceTree = "<group>"; };
 		8E0693C0DF87522673380697 /* RiceBarMac_Debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Debug.entitlements; sourceTree = "<group>"; };
+		A679E932E1E16C9BDFBE00B2 /* ActiveProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveProfileStore.swift; sourceTree = "<group>"; };
+		B33527AFF36DCB5F702E613A /* TemplateEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateEngine.swift; sourceTree = "<group>"; };
+		B8B7F07B4722BD07FA2B3E4A /* ProfileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileWatcher.swift; sourceTree = "<group>"; };
 		C64AE5299733FC31BEA181F8 /* RiceBarMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RiceBarMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD323ECE98A3065A7408FBC4 /* RiceBarMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiceBarMacApp.swift; sourceTree = "<group>"; };
 		CD6E45AA940E92DB785461D8 /* ProfileApplier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileApplier.swift; sourceTree = "<group>"; };
 		D50CA24D7E4DEB1CBEB5FDDA /* HotKeyManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotKeyManager.swift; sourceTree = "<group>"; };
+		D79A6720F4EA62A43CDF4D2E /* ApplyRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyRecord.swift; sourceTree = "<group>"; };
 		EE51A9870DA9A889723D2642 /* RiceBarMac_Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Release.entitlements; sourceTree = "<group>"; };
+		FAD339898DCE0BA183621D8E /* ApplyActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyActivity.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -69,13 +81,19 @@
 		825165D1D4FE1E63DB75A951 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
+				A679E932E1E16C9BDFBE00B2 /* ActiveProfileStore.swift */,
+				FAD339898DCE0BA183621D8E /* ApplyActivity.swift */,
+				D79A6720F4EA62A43CDF4D2E /* ApplyRecord.swift */,
 				2048D74F68C5ABF4B9A55B01 /* ConfigAccess.swift */,
 				D50CA24D7E4DEB1CBEB5FDDA /* HotKeyManager.swift */,
 				0BE3B3286B9F555650B9C7E0 /* Profile.swift */,
 				CD6E45AA940E92DB785461D8 /* ProfileApplier.swift */,
 				81BF2895D7825DEBE53739CC /* ProfileManager.swift */,
+				B8B7F07B4722BD07FA2B3E4A /* ProfileWatcher.swift */,
+				847053355E6C2E30E18114BF /* ReloadHelper.swift */,
 				CD323ECE98A3065A7408FBC4 /* RiceBarMacApp.swift */,
 				12C3A7287C88E022689AEE2B /* StatusBarController.swift */,
+				B33527AFF36DCB5F702E613A /* TemplateEngine.swift */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -175,13 +193,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				638A047EB8CE5964B2FB71C2 /* ActiveProfileStore.swift in Sources */,
+				A35CFE2CE9E1E4BA8BC6A10D /* ApplyActivity.swift in Sources */,
+				4D890C02F7B0212E2201D0DE /* ApplyRecord.swift in Sources */,
 				58C48961049E37C57DC65B73 /* ConfigAccess.swift in Sources */,
 				BA6D4F44D9137A7CA4246462 /* HotKeyManager.swift in Sources */,
 				205B9A33D254D116AD48D87B /* Profile.swift in Sources */,
 				757EFE1FCF0A2BC53D15B2DC /* ProfileApplier.swift in Sources */,
 				C4F6787BF96CCEF09712724F /* ProfileManager.swift in Sources */,
+				1C961ACD86F7C04FE4385AC7 /* ProfileWatcher.swift in Sources */,
+				58997E53451F1FB5691ACFB2 /* ReloadHelper.swift in Sources */,
 				57426ED2538B52588F624CC2 /* RiceBarMacApp.swift in Sources */,
 				FF23893359EB9967E9B8387A /* StatusBarController.swift in Sources */,
+				70C51FB1354A6B2460924B67 /* TemplateEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
