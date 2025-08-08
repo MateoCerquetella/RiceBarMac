@@ -140,6 +140,7 @@ final class ProfileApplier {
                 try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
             } catch {
                 lastError = error
+                LoggerService.error("Wallpaper set failed for screen: \(error.localizedDescription)")
             }
         }
         if lastError != nil {
@@ -154,6 +155,7 @@ final class ProfileApplier {
             var errorDict: NSDictionary?
             if let appleScript = NSAppleScript(source: script) {
                 appleScript.executeAndReturnError(&errorDict)
+                if let errorDict { LoggerService.error("AppleScript wallpaper error: \(errorDict)") }
             }
         }
     }
@@ -218,13 +220,13 @@ final class ProfileApplier {
 
     private func touchIfNeededForReload(_ destination: URL) {
         let path = destination.path
-        guard path.contains("/.config/alacritty/") else { return }
+        guard path.contains("/\(AppConstants.alacrittyDirRelative)/") else { return }
         let now = Date()
         try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: path)
         // Nudge both common config filenames so Alacritty notices
         let home = URL(fileURLWithPath: NSHomeDirectory())
-        let ymlPath = home.appendingPathComponent(".config/alacritty/alacritty.yml").path
-        let tomlPath = home.appendingPathComponent(".config/alacritty/alacritty.toml").path
+        let ymlPath = home.appendingPathComponent("\(AppConstants.alacrittyDirRelative)/\(AppConstants.alacrittyYml)").path
+        let tomlPath = home.appendingPathComponent("\(AppConstants.alacrittyDirRelative)/\(AppConstants.alacrittyToml)").path
         if FileManager.default.fileExists(atPath: ymlPath) {
             try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: ymlPath)
         }

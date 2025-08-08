@@ -21,7 +21,9 @@
 		A35CFE2CE9E1E4BA8BC6A10D /* ApplyActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAD339898DCE0BA183621D8E /* ApplyActivity.swift */; };
 		BA6D4F44D9137A7CA4246462 /* HotKeyManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D50CA24D7E4DEB1CBEB5FDDA /* HotKeyManager.swift */; };
 		C4F6787BF96CCEF09712724F /* ProfileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81BF2895D7825DEBE53739CC /* ProfileManager.swift */; };
+		E0CE31B39BB49C69259D0623 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8748BB032A75ACBA0BABC685 /* AppConstants.swift */; };
 		F8CF6A1782A672790B8B22F9 /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = B17825F2AF40D3D8D44819F4 /* HotKey */; };
+		F98753C84D06D18877F839B5 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F8B3FAB76ED4CBD9B9F387 /* Logger.swift */; };
 		FF23893359EB9967E9B8387A /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12C3A7287C88E022689AEE2B /* StatusBarController.swift */; };
 /* End PBXBuildFile section */
 
@@ -33,7 +35,9 @@
 		48E0071036E1D031DF38F28E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		81BF2895D7825DEBE53739CC /* ProfileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileManager.swift; sourceTree = "<group>"; };
 		847053355E6C2E30E18114BF /* ReloadHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReloadHelper.swift; sourceTree = "<group>"; };
+		8748BB032A75ACBA0BABC685 /* AppConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConstants.swift; sourceTree = "<group>"; };
 		8E0693C0DF87522673380697 /* RiceBarMac_Debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Debug.entitlements; sourceTree = "<group>"; };
+		A1F8B3FAB76ED4CBD9B9F387 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		A679E932E1E16C9BDFBE00B2 /* ActiveProfileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveProfileStore.swift; sourceTree = "<group>"; };
 		B33527AFF36DCB5F702E613A /* TemplateEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateEngine.swift; sourceTree = "<group>"; };
 		B8B7F07B4722BD07FA2B3E4A /* ProfileWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileWatcher.swift; sourceTree = "<group>"; };
@@ -82,10 +86,12 @@
 			isa = PBXGroup;
 			children = (
 				A679E932E1E16C9BDFBE00B2 /* ActiveProfileStore.swift */,
+				8748BB032A75ACBA0BABC685 /* AppConstants.swift */,
 				FAD339898DCE0BA183621D8E /* ApplyActivity.swift */,
 				D79A6720F4EA62A43CDF4D2E /* ApplyRecord.swift */,
 				2048D74F68C5ABF4B9A55B01 /* ConfigAccess.swift */,
 				D50CA24D7E4DEB1CBEB5FDDA /* HotKeyManager.swift */,
+				A1F8B3FAB76ED4CBD9B9F387 /* Logger.swift */,
 				0BE3B3286B9F555650B9C7E0 /* Profile.swift */,
 				CD6E45AA940E92DB785461D8 /* ProfileApplier.swift */,
 				81BF2895D7825DEBE53739CC /* ProfileManager.swift */,
@@ -194,10 +200,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				638A047EB8CE5964B2FB71C2 /* ActiveProfileStore.swift in Sources */,
+				E0CE31B39BB49C69259D0623 /* AppConstants.swift in Sources */,
 				A35CFE2CE9E1E4BA8BC6A10D /* ApplyActivity.swift in Sources */,
 				4D890C02F7B0212E2201D0DE /* ApplyRecord.swift in Sources */,
 				58C48961049E37C57DC65B73 /* ConfigAccess.swift in Sources */,
 				BA6D4F44D9137A7CA4246462 /* HotKeyManager.swift in Sources */,
+				F98753C84D06D18877F839B5 /* Logger.swift in Sources */,
 				205B9A33D254D116AD48D87B /* Profile.swift in Sources */,
 				757EFE1FCF0A2BC53D15B2DC /* ProfileApplier.swift in Sources */,
 				C4F6787BF96CCEF09712724F /* ProfileManager.swift in Sources */,

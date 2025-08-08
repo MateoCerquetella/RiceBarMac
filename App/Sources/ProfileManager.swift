@@ -149,8 +149,7 @@ final class ProfileManager {
     }
 
     private func loadProfile(at directory: URL) -> Profile? {
-        let candidates = ["profile.yml", "profile.yaml", "profile.json"]
-        for name in candidates {
+        for name in AppConstants.profileFileCandidates {
             let url = directory.appendingPathComponent(name)
             if FileManager.default.fileExists(atPath: url.path) {
                 do {
@@ -197,10 +196,10 @@ final class ProfileManager {
 
     private func firstImage(in directory: URL) -> URL? {
         let fm = FileManager.default
-        let exts = ["png", "jpg", "jpeg", "heic"]
+        let exts = Array(AppConstants.wallpaperExtensions)
         guard let items = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil, options: []) else { return nil }
         // Prefer files named like wallpaper/background/bg first
-        let preferredPrefixes = ["wallpaper", "background", "bg"]
+        let preferredPrefixes = AppConstants.preferredWallpaperPrefixes
         if let preferred = items.first(where: { url in
             let name = url.deletingPathExtension().lastPathComponent.lowercased()
             return exts.contains(url.pathExtension.lowercased()) && preferredPrefixes.contains(where: { name.hasPrefix($0) })

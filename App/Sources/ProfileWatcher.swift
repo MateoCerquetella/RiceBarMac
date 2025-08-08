@@ -25,7 +25,7 @@ final class ProfileWatcher {
                 if let cstr = evPaths[Int(i)] {
                     let path = String(cString: cstr)
                     // Ignore events under ~/.config/alacritty to avoid apply-trigger loops
-                    if path.contains("/.config/alacritty/") { continue }
+                    if path.contains("/\(AppConstants.alacrittyDirRelative)/") { continue }
                     changed.append(path)
                 }
             }
