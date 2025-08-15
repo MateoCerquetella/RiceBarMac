@@ -24,7 +24,7 @@ enum ApplyRecordStore {
             let data = try JSONEncoder().encode(record)
             try data.write(to: url, options: .atomic)
         } catch {
-            print("Failed saving apply record: \(error)")
+            LoggerService.error("Failed saving apply record: \(error)")
         }
     }
 

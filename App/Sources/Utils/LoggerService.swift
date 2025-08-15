@@ -18,5 +18,3 @@ enum LoggerService {
         logger.debug("\(message, privacy: .public)")
     }
 }
-
-

@@ -1,0 +1,339 @@
+import Foundation
+import AppKit
+
+// MARK: - Application Constants
+
+/// Centralized constants and shared values used across the app
+enum Constants {
+    
+    // MARK: - Application Info
+    
+    static let appName = "RiceBarMac"
+    static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.ricebar.RiceBarMac"
+    
+    // MARK: - Profile Configuration
+    
+    /// Supported profile configuration file names in priority order
+    static let profileFileCandidates: [String] = [
+        "profile.yml",
+        "profile.yaml", 
+        "profile.json"
+    ]
+    
+    /// Supported wallpaper file extensions
+    static let wallpaperExtensions: Set<String> = [
+        "png", "jpg", "jpeg", "heic", "gif", "bmp", "tiff"
+    ]
+    
+    /// Preferred wallpaper filename prefixes for auto-detection
+    static let preferredWallpaperPrefixes: [String] = [
+        "wallpaper", "background", "bg", "desktop"
+    ]
+    
+    // MARK: - Directory Structure
+    
+    /// Root directory for RiceBarMac configuration
+    private static let ricebarRoot = URL(fileURLWithPath: NSHomeDirectory())
+        .appendingPathComponent(".ricebar", isDirectory: true)
+    
+    /// Root directory for profiles
+    static let profilesRoot = ricebarRoot
+        .appendingPathComponent("profiles", isDirectory: true)
+    
+    /// Directory for backup files
+    static let backupsRoot = ricebarRoot
+        .appendingPathComponent("backups", isDirectory: true)
+    
+    /// Directory for cache files
+    static let cacheRoot = ricebarRoot
+        .appendingPathComponent("cache", isDirectory: true)
+    
+    /// Directory for temporary files
+    static let tempRoot = ricebarRoot
+        .appendingPathComponent("temp", isDirectory: true)
+    
+    /// All managed directories
+    static let managedDirectories = [
+        ricebarRoot, profilesRoot, backupsRoot, cacheRoot, tempRoot
+    ]
+    
+    // MARK: - Terminal Integration
+    
+    /// Relative path to Alacritty configuration directory
+    static let alacrittyDirRelative = ".config/alacritty"
+    
+    /// Alacritty YAML configuration filename
+    static let alacrittyYml = "alacritty.yml"
+    
+    /// Alacritty TOML configuration filename
+    static let alacrittyToml = "alacritty.toml"
+    
+    /// Supported terminal types
+    enum TerminalType: String, CaseIterable {
+        case alacritty = "alacritty"
+        case terminalApp = "terminal"
+        case iterm2 = "iterm2"
+        case kitty = "kitty"
+        case wezterm = "wezterm"
+        
+        var displayName: String {
+            switch self {
+            case .alacritty: return "Alacritty"
+            case .terminalApp: return "Terminal.app"
+            case .iterm2: return "iTerm2"
+            case .kitty: return "Kitty"
+            case .wezterm: return "WezTerm"
+            }
+        }
+    }
+    
+    // MARK: - File System Patterns
+    
+    /// Files to skip when creating snapshots
+    static let snapshotSkipPatterns: [String] = [
+        ".DS_Store",
+        "*.bak",
+        "*.tmp",
+        "*.log",
+        "alacritty.ricebar-backup-*",
+        ".ricebar-*"
+    ]
+    
+    /// Directories to skip when creating snapshots
+    static let snapshotSkipDirectories: [String] = [
+        ".git",
+        "node_modules",
+        ".cache",
+        ".npm",
+        ".yarn"
+    ]
+    
+    /// System-critical paths that should never be modified
+    static let unsafeWritePaths: [String] = [
+        "/System",
+        "/Library/System",
+        "/usr/bin",
+        "/usr/sbin",
+        "/bin",
+        "/sbin",
+        "/Applications/Utilities",
+        "/private/etc"
+    ]
+    
+    // MARK: - Performance Configuration
+    
+    /// Maximum cache age in seconds
+    static let maxCacheAge: TimeInterval = 300 // 5 minutes
+    
+    /// File system event debounce interval
+    static let fileWatchDebounceInterval: TimeInterval = 0.4
+    
+    /// Recent apply window to prevent loops
+    static let recentApplyWindow: TimeInterval = 2.0
+    
+    /// Maximum number of backup files to keep
+    static let maxBackupFiles = 10
+    
+    /// Template rendering timeout
+    static let templateRenderTimeout: TimeInterval = 30.0
+    
+    // MARK: - UI Configuration
+    
+    /// Default menu item key equivalents
+    enum MenuKeyEquivalents {
+        static let newEmptyProfile = "e"
+        static let newFromCurrent = "n"
+        static let reloadProfiles = "r"
+        static let openFolder = "o"
+        static let quit = "q"
+    }
+    
+    /// Status bar icon configuration
+    enum StatusBarIcon {
+        static let systemName = "switch.2"
+        static let accessibilityDescription = "RiceBar"
+        static let menuBarLength = NSStatusItem.squareLength
+    }
+    
+    // MARK: - Hotkey Configuration
+    
+    /// Supported modifier keys for hotkeys
+    enum HotkeyModifiers {
+        static let control = ["ctrl", "control"]
+        static let command = ["cmd", "command"]
+        static let option = ["opt", "option", "alt"]
+        static let shift = ["shift"]
+    }
+    
+    /// Supported special keys
+    enum SpecialKeys {
+        static let arrows = ["left", "right", "up", "down"]
+        static let function = ["f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12"]
+        static let control = ["space", "tab", "return", "enter", "escape", "esc", "delete"]
+    }
+    
+    // MARK: - Validation Rules
+    
+    /// Maximum profile name length
+    static let maxProfileNameLength = 50
+    
+    /// Invalid characters for profile names
+    static let invalidProfileNameCharacters: CharacterSet = {
+        var set = CharacterSet(charactersIn: "/\\:*?\"<>|")
+        set.insert(charactersIn: "\0\u{1}\u{2}\u{3}\u{4}\u{5}\u{6}\u{7}\u{8}\u{9}\u{10}\u{11}\u{12}\u{13}\u{14}\u{15}\u{16}\u{17}\u{18}\u{19}\u{20}\u{21}\u{22}\u{23}\u{24}\u{25}\u{26}\u{27}\u{28}\u{29}\u{30}\u{31}")
+        return set
+    }()
+    
+    /// Reserved profile names
+    static let reservedProfileNames: Set<String> = [
+        "default", "system", "temp", "backup", "cache", "current", "active"
+    ]
+    
+    // MARK: - Error Messages
+    
+    enum ErrorMessages {
+        static let profileNotFound = "Profile not found"
+        static let profileAlreadyExists = "A profile with this name already exists"
+        static let invalidProfileName = "Invalid profile name"
+        static let cannotDeleteActiveProfile = "Cannot delete the currently active profile"
+        static let fileNotFound = "File not found"
+        static let permissionDenied = "Permission denied"
+        static let templateRenderingFailed = "Template rendering failed"
+        static let wallpaperSetFailed = "Failed to set wallpaper"
+        static let hotKeyRegistrationFailed = "Failed to register hotkey"
+        static let launchAtLoginFailed = "Failed to configure launch at login"
+    }
+    
+    // MARK: - Success Messages
+    
+    enum SuccessMessages {
+        static let profileCreated = "Profile created successfully"
+        static let profileDeleted = "Profile deleted successfully"
+        static let profileApplied = "Profile applied successfully"
+        static let wallpaperUpdated = "Wallpaper updated successfully"
+        static let settingsUpdated = "Settings updated successfully"
+    }
+    
+    // MARK: - Template System
+    
+    /// Template file extension
+    static let templateExtension = ".template"
+    
+    /// Template variable syntax
+    enum TemplateVariables {
+        static let variablePrefix = "{{"
+        static let variableSuffix = "}}"
+        
+        /// Standard template variables
+        static let standardVariables = [
+            "wallpaperPath",
+            "profileName",
+            "homeDirectory",
+            "configDirectory"
+        ]
+        
+        /// Palette color variables (palette0 through palette9)
+        static let paletteVariableCount = 10
+    }
+    
+    // MARK: - File Format Support
+    
+    /// Supported configuration file formats
+    enum ConfigFormat: String, CaseIterable {
+        case json = "json"
+        case yaml = "yaml"
+        case yml = "yml"
+        case toml = "toml"
+        
+        var displayName: String {
+            switch self {
+            case .json: return "JSON"
+            case .yaml, .yml: return "YAML"
+            case .toml: return "TOML"
+            }
+        }
+        
+        var fileExtension: String {
+            return rawValue
+        }
+    }
+    
+    // MARK: - Utility Functions
+    
+    /// Ensures all required directories exist
+    static func ensureDirectoriesExist() throws {
+        let fileManager = FileManager.default
+        
+        for directory in managedDirectories {
+            if !fileManager.fileExists(atPath: directory.path) {
+                try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+                LoggerService.info("Created directory: \(directory.path)")
+            }
+        }
+    }
+    
+    /// Validates a profile name
+    /// - Parameter name: Profile name to validate
+    /// - Returns: True if the name is valid
+    static func isValidProfileName(_ name: String) -> Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Check length
+        guard !trimmed.isEmpty && trimmed.count <= maxProfileNameLength else {
+            return false
+        }
+        
+        // Check for invalid characters
+        guard trimmed.rangeOfCharacter(from: invalidProfileNameCharacters) == nil else {
+            return false
+        }
+        
+        // Check for reserved names
+        guard !reservedProfileNames.contains(trimmed.lowercased()) else {
+            return false
+        }
+        
+        return true
+    }
+    
+    /// Sanitizes a profile name for safe use as a directory name
+    /// - Parameter name: Raw profile name
+    /// - Returns: Sanitized profile name
+    static func sanitizeProfileName(_ name: String) -> String {
+        return name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: "\\", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: "*", with: "-")
+            .replacingOccurrences(of: "?", with: "-")
+            .replacingOccurrences(of: "\"", with: "-")
+            .replacingOccurrences(of: "<", with: "-")
+            .replacingOccurrences(of: ">", with: "-")
+            .replacingOccurrences(of: "|", with: "-")
+    }
+}
+
+// MARK: - Configuration Access (Backward Compatibility)
+
+@available(*, deprecated, message: "Use Constants.profilesRoot, Constants.backupsRoot, etc. instead")
+enum ConfigAccess {
+    static let defaultRoot = Constants.profilesRoot
+    static let backupsRoot = Constants.backupsRoot
+    static let cacheRoot = Constants.cacheRoot
+    
+    static func ensureDirectoriesExist() throws {
+        try Constants.ensureDirectoriesExist()
+    }
+}
+
+// MARK: - App Constants (Backward Compatibility)
+
+@available(*, deprecated, message: "Use Constants instead")
+enum AppConstants {
+    static let profileFileCandidates = Constants.profileFileCandidates
+    static let wallpaperExtensions = Constants.wallpaperExtensions
+    static let preferredWallpaperPrefixes = Constants.preferredWallpaperPrefixes
+    static let alacrittyDirRelative = Constants.alacrittyDirRelative
+    static let alacrittyYml = Constants.alacrittyYml
+    static let alacrittyToml = Constants.alacrittyToml
+}

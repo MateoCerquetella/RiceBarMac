@@ -39,7 +39,19 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "8A1DE398718AF5D4F010F225"
+               BuildableName = "RiceBarMacTests.xctest"
+               BlueprintName = "RiceBarMacTests"
+               ReferencedContainer = "container:RiceBarMac.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
+      <CommandLineArguments>
+      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

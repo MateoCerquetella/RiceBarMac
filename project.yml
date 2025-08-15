@@ -54,6 +54,17 @@ targets:
         dependencies:
             - package: HotKey
             - package: Yams
+    RiceBarMacTests:
+        type: bundle.unit-test
+        platform: macOS
+        sources:
+            - path: Tests
+        settings:
+            base:
+                GENERATE_INFOPLIST_FILE: YES
+                PRODUCT_BUNDLE_IDENTIFIER: com.ricebar.RiceBarMacTests
+        dependencies:
+            - target: RiceBarMac
 schemes:
     RiceBarMac:
         build:
@@ -63,3 +74,7 @@ schemes:
             config: Debug
         archive:
             config: Release
+        test:
+            targets:
+                - RiceBarMacTests
+            config: Debug

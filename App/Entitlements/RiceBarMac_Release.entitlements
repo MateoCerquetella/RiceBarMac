@@ -8,5 +8,9 @@
 	<true/>
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>$(TeamIdentifierPrefix)com.ricebarmac.shared</string>
+	</array>
 </dict>
 </plist>
