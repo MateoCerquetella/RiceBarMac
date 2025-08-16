@@ -42,7 +42,10 @@ final class StatusBarController {
 
         // Title item
         let titleItem = NSMenuItem()
-        titleItem.view = NSHostingView(rootView: TitleMenuView(activeName: viewModel.activeProfileName))
+        titleItem.view = NSHostingView(rootView: TitleMenuView(
+            activeName: viewModel.activeProfileName,
+            isApplying: viewModel.isApplying
+        ))
         titleItem.isEnabled = false
         menu.addItem(titleItem)
         menu.addItem(.separator())
@@ -169,6 +172,12 @@ final class StatusBarController {
 
     @objc private func applyProfileMenu(_ sender: NSMenuItem) {
         guard let descriptor = sender.representedObject as? ProfileDescriptor else { return }
+        
+        // Only apply if not already applying (prevent race condition)
+        guard !viewModel.isApplying else {
+            LoggerService.info("Profile application already in progress, ignoring click")
+            return
+        }
         
         // Immediate visual feedback while the menu is open
         if let items = statusItem.menu?.items {
@@ -306,10 +315,19 @@ final class StatusBarController {
 
 private struct TitleMenuView: View {
     var activeName: String?
+    var isApplying: Bool = false
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("RiceBarMac")
-                .font(.headline)
+            HStack {
+                Text("RiceBarMac")
+                    .font(.headline)
+                if isApplying {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .frame(width: 12, height: 12)
+                }
+            }
             if let activeName, !activeName.isEmpty {
                 Text("Active: \(activeName)")
                     .font(.subheadline)

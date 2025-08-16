@@ -330,9 +330,19 @@ final class FileSystemService: ObservableObject {
         let templateVars = TemplateVariables(profile: descriptor)
         
         // Do not skip hidden files so templates for dotfiles are rendered
-        guard let enumerator = fm.enumerator(at: templatesRoot, includingPropertiesForKeys: [.isDirectoryKey], options: []) else { return }
+        guard let enumerator = fm.enumerator(at: templatesRoot, includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey], options: []) else { return }
+        
+        var processedCount = 0
+        let maxTemplates = 100 // Prevent runaway processing
         
         for case let tplURL as URL in enumerator {
+            // Safety check to prevent infinite processing
+            processedCount += 1
+            if processedCount > maxTemplates {
+                LoggerService.warning("Template processing limit reached (\(maxTemplates)), stopping early")
+                break
+            }
+            
             var isDir: ObjCBool = false
             if fm.fileExists(atPath: tplURL.path, isDirectory: &isDir), isDir.boolValue { continue }
             
@@ -340,6 +350,19 @@ final class FileSystemService: ObservableObject {
             let outURL = outputRoot.appendingPathComponent(rel)
             
             do {
+                // Check if template is newer than output before processing
+                if let templateModDate = try? tplURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                   let outputModDate = try? outURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
+                   templateModDate <= outputModDate {
+                    // Template is older than output, skip unless content changed
+                    let content = try String(contentsOf: tplURL, encoding: .utf8)
+                    let rendered = renderTemplate(content: content, with: templateVars.variables)
+                    
+                    if let existing = try? String(contentsOf: outURL, encoding: .utf8), existing == rendered {
+                        continue // No changes needed
+                    }
+                }
+                
                 try fm.createDirectory(at: outURL.deletingLastPathComponent(), withIntermediateDirectories: true)
                 let content = try String(contentsOf: tplURL, encoding: .utf8)
                 let rendered = renderTemplate(content: content, with: templateVars.variables)
@@ -350,10 +373,14 @@ final class FileSystemService: ObservableObject {
                 }
                 
                 try rendered.write(to: outURL, atomically: true, encoding: .utf8)
-                LoggerService.info("Rendered template: \(tplURL.lastPathComponent) -> \(outURL.lastPathComponent)")
+                LoggerService.debug("Rendered template: \(tplURL.lastPathComponent) -> \(outURL.lastPathComponent)")
             } catch {
                 LoggerService.error("Template render error for \(tplURL.lastPathComponent): \(error)")
             }
+        }
+        
+        if processedCount > 0 {
+            LoggerService.info("Template rendering completed: \(processedCount) templates processed")
         }
     }
     

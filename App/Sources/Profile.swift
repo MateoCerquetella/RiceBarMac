@@ -38,6 +38,14 @@ struct Profile: Codable, Equatable, Hashable {
         var theme: String? // relative path or theme name
     }
     var terminal: Terminal?
+    
+    struct IDE: Codable, Equatable, Hashable {
+        enum Kind: String, Codable, Equatable, Hashable { case vscode, cursor }
+        var kind: Kind
+        var theme: String? // relative path to settings.json or theme name
+        var extensions: [String]? // list of extension IDs to install
+    }
+    var ide: IDE?
 
     struct Replacement: Codable, Equatable, Hashable {
         var source: String // relative path within profile dir

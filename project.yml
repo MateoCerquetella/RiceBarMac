@@ -49,7 +49,7 @@ targets:
                 CFBundleShortVersionString: '0.1.0'
                 LSMinimumSystemVersion: '14.0'
                 LSUIElement: true
-                NSAppleEventsUsageDescription: RiceBarMac uses Apple Events to control Terminal/iTerm and apply themes.
+                NSAppleEventsUsageDescription: RiceBarMac uses Apple Events to control Terminal/Alacritty and apply themes.
                 NSDesktopFolderUsageDescription: RiceBarMac needs access to change your desktop wallpaper.
         dependencies:
             - package: HotKey

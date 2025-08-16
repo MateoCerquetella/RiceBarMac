@@ -136,6 +136,7 @@ final class ProfileService: ObservableObject {
         
         DispatchQueue.main.async {
             self.profiles = loaded
+            self.restoreActiveProfileFromDefaults()
         }
     }
     
@@ -184,12 +185,25 @@ final class ProfileService: ObservableObject {
         }
         
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        let descriptor = ProfileDescriptor(profile: Profile(name: sanitized), directory: dest)
+        var profile = Profile(name: sanitized)
+        
+        // Capture current wallpaper
+        if let currentWallpaper = getCurrentWallpaper() {
+            let wallpaperDest = dest.appendingPathComponent("wallpaper.\(currentWallpaper.pathExtension)")
+            try fm.copyItem(at: currentWallpaper, to: wallpaperDest)
+            profile.wallpaper = wallpaperDest.lastPathComponent
+            LoggerService.info("Copied current wallpaper to new profile: \(wallpaperDest.lastPathComponent)")
+        }
+        
+        let descriptor = ProfileDescriptor(profile: profile, directory: dest)
+        
+        // Capture VS Code/Cursor settings and extensions
+        try captureCodeEditorSettings(to: descriptor)
         
         // Snapshot current ~/.config into home/.config
         try snapshotCurrentConfiguration(to: descriptor)
         
-        // Save a minimal profile.json for clarity
+        // Save profile.json with wallpaper info
         let jsonURL = dest.appendingPathComponent("profile.json")
         try saveProfileToJSON(descriptor.profile, at: jsonURL)
         
@@ -264,17 +278,20 @@ final class ProfileService: ObservableObject {
     
     /// Applies a profile to the system
     func applyProfile(_ descriptor: ProfileDescriptor, cleanConfig: Bool = false) throws {
-        // Allow reentrant calls from the same profile to avoid deadlocks
-        if isApplying && activeProfile?.directory == descriptor.directory {
-            LoggerService.info("Skipping redundant apply for already active profile: \(descriptor.profile.name)")
-            return
+        // Wait for any current apply operation to complete
+        while ApplyActivity.isApplying {
+            Thread.sleep(forTimeInterval: 0.1)
         }
+        
+        // Use ApplyActivity to prevent conflicts
+        ApplyActivity.begin()
         
         DispatchQueue.main.async {
             self.isApplying = true
         }
         
         defer {
+            ApplyActivity.end()
             DispatchQueue.main.async {
                 self.isApplying = false
             }
@@ -283,14 +300,14 @@ final class ProfileService: ObservableObject {
         var actions: [ApplyAction] = []
         let profile = descriptor.profile
         
-        // Mark active early so file watcher reacts to the correct directory
-        setActiveProfile(descriptor)
-        
         // Apply wallpaper if specified
         if let wallpaperRel = profile.wallpaper {
             let url = descriptor.directory.appendingPathComponent(wallpaperRel)
             try applyWallpaper(url: url)
         }
+        
+        // Apply VS Code/Cursor settings
+        try applyCodeEditorSettings(from: descriptor)
         
         // Render templates into home/ first
         fileSystemService.renderTemplates(for: descriptor)
@@ -322,6 +339,11 @@ final class ProfileService: ObservableObject {
             try applyTerminalConfig(term, base: descriptor.directory)
         }
         
+        // Apply IDE configuration
+        if let ide = profile.ide {
+            try applyIDEConfig(ide, base: descriptor.directory)
+        }
+        
         // Run startup script if specified
         if let scriptRel = profile.startupScript {
             let scriptURL = descriptor.directory.appendingPathComponent(scriptRel)
@@ -330,6 +352,104 @@ final class ProfileService: ObservableObject {
         
         // Save apply record
         ApplyRecordStore.save(ApplyRecord(timestamp: Date(), actions: actions), to: descriptor.directory)
+        
+        // Mark as active only after successful completion
+        setActiveProfile(descriptor)
+    }
+    
+    /// Async version of applyProfile that runs heavy operations on background queue
+    func applyProfileAsync(_ descriptor: ProfileDescriptor, cleanConfig: Bool = false) async throws {
+        // Wait for any current apply operation to complete
+        while ApplyActivity.isApplying {
+            try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        }
+        
+        // Set applying state immediately on main thread for responsive UI
+        await MainActor.run {
+            self.isApplying = true
+        }
+        
+        // Use ApplyActivity to prevent conflicts
+        ApplyActivity.begin()
+        
+        defer {
+            ApplyActivity.end()
+            Task { @MainActor in
+                self.isApplying = false
+            }
+        }
+        
+        // Run heavy operations on background queue but coordinate properly with main thread
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    var actions: [ApplyAction] = []
+                    let profile = descriptor.profile
+                    
+                    // Apply wallpaper if specified
+                    if let wallpaperRel = profile.wallpaper {
+                        let url = descriptor.directory.appendingPathComponent(wallpaperRel)
+                        try self.applyWallpaper(url: url)
+                    }
+                    
+                    // Apply VS Code/Cursor settings
+                    try self.applyCodeEditorSettings(from: descriptor)
+                    
+                    // Render templates into home/ first
+                    self.fileSystemService.renderTemplates(for: descriptor)
+                    
+                    let targetHome = URL(fileURLWithPath: NSHomeDirectory())
+                    
+                    if cleanConfig {
+                        try self.backupAndCleanConfig(atHome: targetHome)
+                    }
+                    
+                    // Handle file replacements or overlays
+                    if let replacements = profile.replacements, !replacements.isEmpty {
+                        for repl in replacements {
+                            let src = descriptor.directory.appendingPathComponent(repl.source)
+                            let dst = URL(fileURLWithPath: repl.destination.expandingTildeInPath)
+                            let action = try self.replaceFile(source: src, destination: dst)
+                            actions.append(action)
+                        }
+                    } else {
+                        let homeOverlay = descriptor.directory.appendingPathComponent("home", isDirectory: true)
+                        if FileManager.default.fileExists(atPath: homeOverlay.path) {
+                            let overlayActions = try self.overlayDirectory(from: homeOverlay, to: targetHome)
+                            actions.append(contentsOf: overlayActions)
+                        }
+                    }
+                    
+                    // Apply terminal configuration
+                    if let term = profile.terminal {
+                        try self.applyTerminalConfig(term, base: descriptor.directory)
+                    }
+                    
+                    // Apply IDE configuration
+                    if let ide = profile.ide {
+                        try self.applyIDEConfig(ide, base: descriptor.directory)
+                    }
+                    
+                    // Run startup script if specified
+                    if let scriptRel = profile.startupScript {
+                        let scriptURL = descriptor.directory.appendingPathComponent(scriptRel)
+                        try self.runScript(scriptURL)
+                    }
+                    
+                    // Save apply record
+                    ApplyRecordStore.save(ApplyRecord(timestamp: Date(), actions: actions), to: descriptor.directory)
+                    
+                    // Mark as active only after successful completion
+                    DispatchQueue.main.sync {
+                        self.setActiveProfile(descriptor)
+                    }
+                    
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
     
     /// Reverts the last profile application
@@ -451,12 +571,12 @@ final class ProfileService: ObservableObject {
         if let activeDir, changedPaths.contains(where: { $0.hasPrefix(activeDir) }) {
             // Auto-apply when files inside the active profile change
             // Use longer window to prevent interference with manual switches
-            guard !isApplying && !ApplyActivity.recentlyApplied(within: 2.0) else { return }
+            guard !ApplyActivity.isApplying && !ApplyActivity.recentlyApplied(within: 2.0) else { return }
             guard let active = activeProfile else { return }
             
-            DispatchQueue.global(qos: .userInitiated).async {
+            Task {
                 do {
-                    try self.applyProfile(active, cleanConfig: false)
+                    try await self.applyProfileAsync(active, cleanConfig: false)
                 } catch {
                     LoggerService.error("Auto-apply failed: \(error)")
                 }
@@ -549,12 +669,27 @@ private extension ProfileService {
     }
     
     func loadActiveProfileFromDefaults() {
+        // During init, just validate the path exists
+        // Actual restoration happens after profiles are loaded
         if let path = UserDefaults.standard.string(forKey: userDefaultsKey) {
             let url = URL(fileURLWithPath: path)
-            if FileManager.default.fileExists(atPath: url.path) {
-                // Will be loaded when profiles are reloaded
-                // This is deferred to avoid circular dependencies during init
+            if !FileManager.default.fileExists(atPath: url.path) {
+                // Clean up invalid path
+                UserDefaults.standard.removeObject(forKey: userDefaultsKey)
             }
+        }
+    }
+    
+    private func restoreActiveProfileFromDefaults() {
+        guard let path = UserDefaults.standard.string(forKey: userDefaultsKey) else { return }
+        let url = URL(fileURLWithPath: path)
+        
+        // Find the matching profile descriptor
+        if let descriptor = profiles.first(where: { $0.directory == url }) {
+            activeProfile = descriptor
+        } else {
+            // Profile no longer exists, clear the setting
+            UserDefaults.standard.removeObject(forKey: userDefaultsKey)
         }
     }
     
@@ -653,6 +788,54 @@ private extension ProfileService {
         
         if FileManager.default.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
             try copyDirectoryRecursively(from: src, to: dst)
+        }
+        
+        // Snapshot IDE configurations
+        try snapshotIDEConfigurations(to: descriptor, home: home)
+    }
+    
+    func snapshotIDEConfigurations(to descriptor: ProfileDescriptor, home: URL) throws {
+        let fm = FileManager.default
+        
+        // Snapshot VS Code configuration
+        let vscodeConfigDir = home.appendingPathComponent(Constants.vscodeConfigDir, isDirectory: true)
+        if fm.fileExists(atPath: vscodeConfigDir.path) {
+            let vscodeSnapshotDir = descriptor.directory.appendingPathComponent("vscode", isDirectory: true)
+            try copyIDEConfigForSnapshot(from: vscodeConfigDir, to: vscodeSnapshotDir, ideType: .vscode)
+        }
+        
+        // Snapshot Cursor configuration
+        let cursorConfigDir = home.appendingPathComponent(Constants.cursorConfigDir, isDirectory: true)
+        if fm.fileExists(atPath: cursorConfigDir.path) {
+            let cursorSnapshotDir = descriptor.directory.appendingPathComponent("cursor", isDirectory: true)
+            try copyIDEConfigForSnapshot(from: cursorConfigDir, to: cursorSnapshotDir, ideType: .cursor)
+        }
+    }
+    
+    func copyIDEConfigForSnapshot(from srcDir: URL, to dstDir: URL, ideType: Constants.IDEType) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: dstDir, withIntermediateDirectories: true)
+        
+        // Copy essential files
+        let essentialFiles = [
+            ideType.settingsFile,
+            ideType.keybindingsFile
+        ]
+        
+        for fileName in essentialFiles {
+            let src = srcDir.appendingPathComponent(fileName)
+            let dst = dstDir.appendingPathComponent(fileName)
+            
+            if fm.fileExists(atPath: src.path) {
+                try fileSystemService.copyFile(from: src, to: dst, createBackup: false)
+            }
+        }
+        
+        // Copy snippets directory if it exists
+        let snippetsDir = srcDir.appendingPathComponent(ideType.snippetsDirectory, isDirectory: true)
+        if fm.fileExists(atPath: snippetsDir.path) {
+            let snippetsDst = dstDir.appendingPathComponent(ideType.snippetsDirectory, isDirectory: true)
+            try copyDirectoryRecursively(from: snippetsDir, to: snippetsDst)
         }
     }
     
@@ -884,6 +1067,420 @@ private extension ProfileService {
         try? fm.moveItem(at: alt, to: backup)
     }
     
+    func applyIDEConfig(_ ide: Profile.IDE, base: URL) throws {
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        
+        switch ide.kind {
+        case .vscode:
+            try applyVSCodeConfig(ide, base: base, home: home)
+        case .cursor:
+            try applyCursorConfig(ide, base: base, home: home)
+        }
+    }
+    
+    func applyVSCodeConfig(_ ide: Profile.IDE, base: URL, home: URL) throws {
+        let ideType = Constants.IDEType.vscode
+        let configDir = home.appendingPathComponent(ideType.configDirectory, isDirectory: true)
+        
+        // Check if theme is a built-in theme ID (starts with @id:)
+        if let themeSpec = ide.theme {
+            if themeSpec.hasPrefix("@id:") {
+                let themeId = String(themeSpec.dropFirst(4))
+                try applyBuiltInTheme(themeId: themeId, ideType: ideType, configDir: configDir)
+            } else {
+                // Handle as file path
+                let src = base.appendingPathComponent(themeSpec)
+                try applyIDESettings(from: src, to: configDir, ideType: ideType)
+            }
+        } else {
+            // Auto-detect default IDE configuration files
+            if let defaultConfig = findDefaultIDEConfig(in: base, for: ideType) {
+                try applyIDESettings(from: defaultConfig, to: configDir, ideType: ideType)
+            }
+        }
+        
+        // Install extensions if specified
+        if let extensions = ide.extensions, !extensions.isEmpty {
+            try installVSCodeExtensions(extensions)
+        }
+    }
+    
+    func applyCursorConfig(_ ide: Profile.IDE, base: URL, home: URL) throws {
+        let ideType = Constants.IDEType.cursor
+        let configDir = home.appendingPathComponent(ideType.configDirectory, isDirectory: true)
+        
+        // Check if theme is a built-in theme ID (starts with @id:)
+        if let themeSpec = ide.theme {
+            if themeSpec.hasPrefix("@id:") {
+                let themeId = String(themeSpec.dropFirst(4))
+                try applyBuiltInTheme(themeId: themeId, ideType: ideType, configDir: configDir)
+            } else {
+                // Handle as file path
+                let src = base.appendingPathComponent(themeSpec)
+                try applyIDESettings(from: src, to: configDir, ideType: ideType)
+            }
+        } else {
+            // Auto-detect default IDE configuration files
+            if let defaultConfig = findDefaultIDEConfig(in: base, for: ideType) {
+                try applyIDESettings(from: defaultConfig, to: configDir, ideType: ideType)
+            }
+        }
+        
+        // Install extensions if specified
+        if let extensions = ide.extensions, !extensions.isEmpty {
+            try installCursorExtensions(extensions)
+        }
+    }
+    
+    func applyBuiltInTheme(themeId: String, ideType: Constants.IDEType, configDir: URL) throws {
+        // Discover available themes from the actual IDE installation
+        let availableThemes = try discoverAvailableThemes(for: ideType)
+        
+        guard let theme = availableThemes.first(where: { $0.name == themeId }) else {
+            throw ProfileServiceError.fileNotFound("Theme '\(themeId)' not found in installed \(ideType.displayName) themes")
+        }
+        
+        let fm = FileManager.default
+        try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
+        
+        // Create or update settings.json with the theme
+        try applyDiscoveredThemeToSettings(theme: theme, configDir: configDir, ideType: ideType)
+        
+        LoggerService.info("Applied theme '\(theme.displayName)' to \(ideType.displayName)")
+    }
+    
+    func discoverAvailableThemes(for ideType: Constants.IDEType) throws -> [Constants.DiscoveredTheme] {
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        let configDir = home.appendingPathComponent(ideType.configDirectory, isDirectory: true)
+        
+        var themes: [Constants.DiscoveredTheme] = []
+        
+        // Add built-in themes (these are always available)
+        themes.append(contentsOf: getBuiltInThemes())
+        
+        // Discover themes from installed extensions
+        let extensionsDir = configDir.appendingPathComponent("extensions", isDirectory: true)
+        if FileManager.default.fileExists(atPath: extensionsDir.path) {
+            themes.append(contentsOf: try discoverExtensionThemes(in: extensionsDir))
+        }
+        
+        return themes
+    }
+    
+    func getBuiltInThemes() -> [Constants.DiscoveredTheme] {
+        return [
+            Constants.DiscoveredTheme(
+                name: "Default Dark+",
+                displayName: "Dark+ (default dark)",
+                extensionId: nil,
+                source: .builtin
+            ),
+            Constants.DiscoveredTheme(
+                name: "Default Light+",
+                displayName: "Light+ (default light)",
+                extensionId: nil,
+                source: .builtin
+            ),
+            Constants.DiscoveredTheme(
+                name: "Red",
+                displayName: "Red",
+                extensionId: nil,
+                source: .builtin
+            ),
+            Constants.DiscoveredTheme(
+                name: "Solarized Dark",
+                displayName: "Solarized Dark",
+                extensionId: nil,
+                source: .builtin
+            ),
+            Constants.DiscoveredTheme(
+                name: "Solarized Light",
+                displayName: "Solarized Light",
+                extensionId: nil,
+                source: .builtin
+            )
+        ]
+    }
+    
+    func discoverExtensionThemes(in extensionsDir: URL) throws -> [Constants.DiscoveredTheme] {
+        let fm = FileManager.default
+        var themes: [Constants.DiscoveredTheme] = []
+        
+        guard let extensionDirs = try? fm.contentsOfDirectory(at: extensionsDir, includingPropertiesForKeys: [.isDirectoryKey], options: []) else {
+            return themes
+        }
+        
+        for extensionDir in extensionDirs {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: extensionDir.path, isDirectory: &isDir), isDir.boolValue else { continue }
+            
+            // Look for package.json to get extension info
+            let packageJsonPath = extensionDir.appendingPathComponent("package.json")
+            guard fm.fileExists(atPath: packageJsonPath.path) else { continue }
+            
+            do {
+                let packageData = try Data(contentsOf: packageJsonPath)
+                guard let packageJson = try JSONSerialization.jsonObject(with: packageData) as? [String: Any] else { continue }
+                
+                // Extract themes from the extension
+                if let contributes = packageJson["contributes"] as? [String: Any],
+                   let extensionThemes = contributes["themes"] as? [[String: Any]] {
+                    
+                    let extensionId = packageJson["name"] as? String ?? extensionDir.lastPathComponent
+                    
+                    for themeInfo in extensionThemes {
+                        if let label = themeInfo["label"] as? String {
+                            themes.append(Constants.DiscoveredTheme(
+                                name: label,
+                                displayName: label,
+                                extensionId: extensionId,
+                                source: .extensionSource(path: extensionDir.path)
+                            ))
+                        }
+                    }
+                }
+            } catch {
+                LoggerService.warning("Failed to parse package.json for \(extensionDir.lastPathComponent): \(error)")
+            }
+        }
+        
+        return themes
+    }
+    
+    func applyDiscoveredThemeToSettings(theme: Constants.DiscoveredTheme, configDir: URL, ideType: Constants.IDEType) throws {
+        let settingsFile = configDir.appendingPathComponent(ideType.settingsFile)
+        
+        // Load existing settings or create new ones
+        var settings: [String: Any] = [:]
+        
+        if FileManager.default.fileExists(atPath: settingsFile.path) {
+            do {
+                let data = try Data(contentsOf: settingsFile)
+                if let existingSettings = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    settings = existingSettings
+                }
+            } catch {
+                LoggerService.warning("Failed to load existing settings, creating new ones: \(error)")
+            }
+        }
+        
+        // Update theme setting
+        settings["workbench.colorTheme"] = theme.name
+        
+        // Write updated settings
+        do {
+            let data = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: settingsFile, options: .atomic)
+        } catch {
+            throw ProfileServiceError.fileOperationFailed("write settings", error)
+        }
+    }
+    
+    /// Lists all available themes for an IDE (useful for debugging and user reference)
+    func getAvailableThemes(for ideType: Constants.IDEType) -> [Constants.DiscoveredTheme] {
+        do {
+            let themes = try discoverAvailableThemes(for: ideType)
+            LoggerService.info("Found \(themes.count) themes for \(ideType.displayName):")
+            for theme in themes {
+                LoggerService.info("  - \(theme.name) (\(theme.source))")
+            }
+            return themes
+        } catch {
+            LoggerService.error("Failed to discover themes for \(ideType.displayName): \(error)")
+            return []
+        }
+    }
+    
+    func findDefaultIDEConfig(in base: URL, for ideType: Constants.IDEType) -> URL? {
+        let fm = FileManager.default
+        let candidates = [
+            base.appendingPathComponent(ideType.settingsFile),
+            base.appendingPathComponent("vscode/\(ideType.settingsFile)"),
+            base.appendingPathComponent("ide/\(ideType.settingsFile)"),
+            base.appendingPathComponent("settings/\(ideType.settingsFile)")
+        ]
+        
+        return candidates.first { fm.fileExists(atPath: $0.path) }
+    }
+    
+    func applyIDESettings(from src: URL, to configDir: URL, ideType: Constants.IDEType) throws {
+        let fm = FileManager.default
+        
+        // Ensure config directory exists
+        try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
+        
+        // Copy settings file
+        let settingsDst = configDir.appendingPathComponent(ideType.settingsFile)
+        _ = try replaceFile(source: src, destination: settingsDst)
+        
+        // Check if source is a directory (multiple config files)
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
+            // Copy all files from source directory
+            try copyIDEConfigDirectory(from: src, to: configDir, ideType: ideType)
+        }
+    }
+    
+    func copyIDEConfigDirectory(from srcDir: URL, to dstDir: URL, ideType: Constants.IDEType) throws {
+        let fm = FileManager.default
+        
+        guard let enumerator = fm.enumerator(at: srcDir, includingPropertiesForKeys: [.isDirectoryKey], options: []) else { return }
+        
+        for case let fileURL as URL in enumerator {
+            let relativePath = fileURL.path.replacingOccurrences(of: srcDir.path + "/", with: "")
+            let dstURL = dstDir.appendingPathComponent(relativePath)
+            
+            var isDir: ObjCBool = false
+            _ = fm.fileExists(atPath: fileURL.path, isDirectory: &isDir)
+            
+            if isDir.boolValue {
+                try fm.createDirectory(at: dstURL, withIntermediateDirectories: true)
+            } else {
+                // Skip certain files that shouldn't be copied
+                let fileName = fileURL.lastPathComponent
+                if shouldSkipIDEFile(fileName) { continue }
+                
+                _ = try replaceFile(source: fileURL, destination: dstURL)
+            }
+        }
+    }
+    
+    func shouldSkipIDEFile(_ fileName: String) -> Bool {
+        let skipPatterns = [
+            ".DS_Store",
+            "*.bak",
+            "*.tmp",
+            "*.log",
+            "workspace.json",  // VS Code workspace-specific settings
+            "tasks.json"       // VS Code tasks (usually project-specific)
+        ]
+        
+        for pattern in skipPatterns {
+            if pattern.hasPrefix("*") {
+                let suffix = String(pattern.dropFirst())
+                if fileName.hasSuffix(suffix) { return true }
+            } else if fileName == pattern {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    func installVSCodeExtensions(_ extensions: [String]) throws {
+        guard isVSCodeInstalled() else {
+            LoggerService.warning("VS Code not found, skipping extension installation")
+            return
+        }
+        
+        // Install each extension
+        for extensionId in extensions {
+            try installVSCodeExtension(extensionId)
+        }
+    }
+    
+    func isVSCodeInstalled() -> Bool {
+        let fm = FileManager.default
+        let commonPaths = [
+            "/Applications/Visual Studio Code.app",
+            "/usr/local/bin/code"
+        ]
+        
+        return commonPaths.contains { fm.fileExists(atPath: $0) }
+    }
+    
+    func installVSCodeExtension(_ extensionId: String) throws {
+        guard let codePath = findVSCodeCLI() else {
+            LoggerService.warning("VS Code CLI not found, cannot install extension: \(extensionId)")
+            return
+        }
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: codePath)
+        process.arguments = ["--install-extension", extensionId]
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            if process.terminationStatus == 0 {
+                LoggerService.info("Successfully installed VS Code extension: \(extensionId)")
+            } else {
+                LoggerService.warning("Failed to install VS Code extension: \(extensionId)")
+            }
+        } catch {
+            LoggerService.warning("Failed to install VS Code extension \(extensionId): \(error)")
+        }
+    }
+    
+    func findVSCodeCLI() -> String? {
+        let fm = FileManager.default
+        let paths = [
+            "/usr/local/bin/code",
+            "/opt/homebrew/bin/code",
+            "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+        ]
+        
+        return paths.first { fm.fileExists(atPath: $0) }
+    }
+    
+    func installCursorExtensions(_ extensions: [String]) throws {
+        guard isCursorInstalled() else {
+            LoggerService.warning("Cursor not found, skipping extension installation")
+            return
+        }
+        
+        // Install each extension
+        for extensionId in extensions {
+            try installCursorExtension(extensionId)
+        }
+    }
+    
+    func isCursorInstalled() -> Bool {
+        let fm = FileManager.default
+        let commonPaths = [
+            "/Applications/Cursor.app",
+            "/usr/local/bin/cursor"
+        ]
+        
+        return commonPaths.contains { fm.fileExists(atPath: $0) }
+    }
+    
+    func installCursorExtension(_ extensionId: String) throws {
+        guard let cursorPath = findCursorCLI() else {
+            LoggerService.warning("Cursor CLI not found, cannot install extension: \(extensionId)")
+            return
+        }
+        
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: cursorPath)
+        process.arguments = ["--install-extension", extensionId]
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            if process.terminationStatus == 0 {
+                LoggerService.info("Successfully installed Cursor extension: \(extensionId)")
+            } else {
+                LoggerService.warning("Failed to install Cursor extension: \(extensionId)")
+            }
+        } catch {
+            LoggerService.warning("Failed to install Cursor extension \(extensionId): \(error)")
+        }
+    }
+    
+    func findCursorCLI() -> String? {
+        let fm = FileManager.default
+        let paths = [
+            "/usr/local/bin/cursor",
+            "/opt/homebrew/bin/cursor",
+            "/Applications/Cursor.app/Contents/Resources/app/bin/cursor"
+        ]
+        
+        return paths.first { fm.fileExists(atPath: $0) }
+    }
+    
     func runScript(_ url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { 
             throw ProfileServiceError.fileNotFound(url.path) 
@@ -896,6 +1493,351 @@ private extension ProfileService {
         let quotedPath = "'\(url.path.replacingOccurrences(of: "'", with: "'\\''"))'"
         process.arguments = ["-lc", quotedPath]
         try process.run()
+    }
+    
+    /// Gets the current desktop wallpaper URL
+    func getCurrentWallpaper() -> URL? {
+        guard let mainScreen = NSScreen.main else { return nil }
+        
+        do {
+            guard let wallpaperURL = try NSWorkspace.shared.desktopImageURL(for: mainScreen) else {
+                LoggerService.warning("Desktop image URL returned nil for main screen")
+                return nil
+            }
+            
+            // Verify the file exists and is accessible
+            if FileManager.default.fileExists(atPath: wallpaperURL.path) {
+                LoggerService.info("Found current wallpaper: \(wallpaperURL.path)")
+                return wallpaperURL
+            } else {
+                LoggerService.warning("Current wallpaper file not accessible: \(wallpaperURL.path)")
+                return nil
+            }
+        } catch {
+            LoggerService.error("Failed to get current wallpaper: \(error)")
+            
+            // Fallback: Try to get via AppleScript
+            return getCurrentWallpaperViaAppleScript()
+        }
+    }
+    
+    /// Fallback method to get wallpaper via AppleScript
+    private func getCurrentWallpaperViaAppleScript() -> URL? {
+        let script = """
+        tell application "System Events"
+            tell current desktop
+                get picture
+            end tell
+        end tell
+        """
+        
+        var errorDict: NSDictionary?
+        guard let appleScript = NSAppleScript(source: script) else { return nil }
+        
+        let result = appleScript.executeAndReturnError(&errorDict)
+        
+        if let errorDict = errorDict {
+            LoggerService.error("AppleScript wallpaper error: \(errorDict)")
+            return nil
+        }
+        
+        guard let wallpaperPath = result.stringValue, !wallpaperPath.isEmpty else {
+            LoggerService.warning("No wallpaper path returned from AppleScript")
+            return nil
+        }
+        
+        let wallpaperURL = URL(fileURLWithPath: wallpaperPath)
+        if FileManager.default.fileExists(atPath: wallpaperURL.path) {
+            LoggerService.info("Found current wallpaper via AppleScript: \(wallpaperPath)")
+            return wallpaperURL
+        } else {
+            LoggerService.warning("Wallpaper from AppleScript not accessible: \(wallpaperPath)")
+            return nil
+        }
+    }
+    
+    // MARK: - VS Code/Cursor Settings Capture
+    
+    /// Captures current VS Code and Cursor settings and extensions
+    private func captureCodeEditorSettings(to descriptor: ProfileDescriptor) throws {
+        let fm = FileManager.default
+        let homeURL = URL(fileURLWithPath: NSHomeDirectory())
+        
+        // Create vscode directory in profile
+        let vscodeDir = descriptor.directory.appendingPathComponent("vscode", isDirectory: true)
+        try fm.createDirectory(at: vscodeDir, withIntermediateDirectories: true)
+        
+        // VS Code paths
+        let vscodeAppSupportPath = homeURL.appendingPathComponent("Library/Application Support/Code")
+        let vscodeExtensionsPath = homeURL.appendingPathComponent(".vscode/extensions")
+        
+        // Cursor paths  
+        let cursorAppSupportPath = homeURL.appendingPathComponent("Library/Application Support/Cursor")
+        
+        // Capture VS Code settings
+        if fm.fileExists(atPath: vscodeAppSupportPath.path) {
+            try captureEditorSettings(
+                from: vscodeAppSupportPath,
+                extensionsPath: vscodeExtensionsPath,
+                to: vscodeDir.appendingPathComponent("vscode", isDirectory: true),
+                editorName: "VS Code"
+            )
+        }
+        
+        // Capture Cursor settings
+        if fm.fileExists(atPath: cursorAppSupportPath.path) {
+            try captureEditorSettings(
+                from: cursorAppSupportPath,
+                extensionsPath: nil, // Cursor extensions are in Application Support
+                to: vscodeDir.appendingPathComponent("cursor", isDirectory: true),
+                editorName: "Cursor"
+            )
+        }
+        
+        LoggerService.info("Captured VS Code/Cursor settings for profile: \(descriptor.profile.name)")
+    }
+    
+    /// Helper method to capture settings from a specific code editor
+    private func captureEditorSettings(from appSupportPath: URL, extensionsPath: URL?, to destination: URL, editorName: String) throws {
+        let fm = FileManager.default
+        
+        try fm.createDirectory(at: destination, withIntermediateDirectories: true)
+        
+        // Copy user settings
+        let userPath = appSupportPath.appendingPathComponent("User")
+        if fm.fileExists(atPath: userPath.path) {
+            let userDest = destination.appendingPathComponent("User")
+            
+            // Copy settings.json
+            let settingsFile = userPath.appendingPathComponent("settings.json")
+            if fm.fileExists(atPath: settingsFile.path) {
+                let settingsDest = userDest.appendingPathComponent("settings.json")
+                try fm.createDirectory(at: userDest, withIntermediateDirectories: true)
+                try fm.copyItem(at: settingsFile, to: settingsDest)
+                LoggerService.info("Captured \(editorName) settings.json")
+            }
+            
+            // Copy keybindings.json
+            let keybindingsFile = userPath.appendingPathComponent("keybindings.json")
+            if fm.fileExists(atPath: keybindingsFile.path) {
+                let keybindingsDest = userDest.appendingPathComponent("keybindings.json")
+                try fm.createDirectory(at: userDest, withIntermediateDirectories: true)
+                try fm.copyItem(at: keybindingsFile, to: keybindingsDest)
+                LoggerService.info("Captured \(editorName) keybindings.json")
+            }
+            
+            // Copy snippets directory
+            let snippetsPath = userPath.appendingPathComponent("snippets")
+            if fm.fileExists(atPath: snippetsPath.path) {
+                let snippetsDest = userDest.appendingPathComponent("snippets")
+                try fm.copyItem(at: snippetsPath, to: snippetsDest)
+                LoggerService.info("Captured \(editorName) snippets")
+            }
+        }
+        
+        // Generate extensions list
+        if let extensionsPath = extensionsPath, fm.fileExists(atPath: extensionsPath.path) {
+            try captureExtensionsList(from: extensionsPath, to: destination, editorName: editorName)
+        } else {
+            // For Cursor, look for cached extensions
+            let cachedExtensions = appSupportPath.appendingPathComponent("CachedExtensionVSIXs")
+            if fm.fileExists(atPath: cachedExtensions.path) {
+                try captureExtensionsList(from: cachedExtensions, to: destination, editorName: editorName)
+            }
+        }
+        
+        // Extract theme information from settings
+        try extractThemeInfo(from: appSupportPath, to: destination, editorName: editorName)
+    }
+    
+    /// Captures the list of installed extensions
+    private func captureExtensionsList(from extensionsPath: URL, to destination: URL, editorName: String) throws {
+        let fm = FileManager.default
+        
+        guard let extensionDirs = try? fm.contentsOfDirectory(at: extensionsPath, includingPropertiesForKeys: nil) else {
+            LoggerService.warning("Could not read \(editorName) extensions directory")
+            return
+        }
+        
+        var extensions: [String] = []
+        
+        for extensionDir in extensionDirs {
+            let dirName = extensionDir.lastPathComponent
+            
+            // Skip system files
+            guard !dirName.hasPrefix(".") && !dirName.hasSuffix(".json") else { continue }
+            
+            // Extract extension ID (format: publisher.name-version)
+            let components = dirName.components(separatedBy: "-")
+            if components.count >= 2 {
+                let versionIndex = components.count - 1
+                let extensionId = components[0..<versionIndex].joined(separator: "-")
+                extensions.append(extensionId)
+            }
+        }
+        
+        // Write extensions list to file
+        let extensionsFile = destination.appendingPathComponent("extensions.txt")
+        let extensionsContent = extensions.sorted().joined(separator: "\n")
+        try extensionsContent.write(to: extensionsFile, atomically: true, encoding: .utf8)
+        
+        LoggerService.info("Captured \(extensions.count) \(editorName) extensions")
+    }
+    
+    /// Extracts theme information from settings
+    private func extractThemeInfo(from appSupportPath: URL, to destination: URL, editorName: String) throws {
+        let settingsFile = appSupportPath.appendingPathComponent("User/settings.json")
+        
+        guard let settingsData = try? Data(contentsOf: settingsFile),
+              let settingsDict = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any] else {
+            LoggerService.warning("Could not read \(editorName) settings for theme extraction")
+            return
+        }
+        
+        var themeInfo: [String: Any] = [:]
+        
+        // Extract theme-related settings
+        if let colorTheme = settingsDict["workbench.colorTheme"] as? String {
+            themeInfo["colorTheme"] = colorTheme
+        }
+        
+        if let iconTheme = settingsDict["workbench.iconTheme"] as? String {
+            themeInfo["iconTheme"] = iconTheme
+        }
+        
+        if let productIconTheme = settingsDict["workbench.productIconTheme"] as? String {
+            themeInfo["productIconTheme"] = productIconTheme
+        }
+        
+        // Extract font settings
+        if let fontFamily = settingsDict["editor.fontFamily"] as? String {
+            themeInfo["fontFamily"] = fontFamily
+        }
+        
+        if let fontSize = settingsDict["editor.fontSize"] as? Int {
+            themeInfo["fontSize"] = fontSize
+        }
+        
+        // Write theme info to file
+        if !themeInfo.isEmpty {
+            let themeFile = destination.appendingPathComponent("theme-info.json")
+            let themeData = try JSONSerialization.data(withJSONObject: themeInfo, options: .prettyPrinted)
+            try themeData.write(to: themeFile)
+            
+            LoggerService.info("Captured \(editorName) theme info: \(themeInfo)")
+        }
+    }
+    
+    // MARK: - VS Code/Cursor Settings Application
+    
+    /// Applies VS Code and Cursor settings from the profile
+    private func applyCodeEditorSettings(from descriptor: ProfileDescriptor) throws {
+        let vscodeDir = descriptor.directory.appendingPathComponent("vscode", isDirectory: true)
+        let fm = FileManager.default
+        
+        guard fm.fileExists(atPath: vscodeDir.path) else {
+            LoggerService.info("No VS Code/Cursor settings found in profile: \(descriptor.profile.name)")
+            return
+        }
+        
+        let homeURL = URL(fileURLWithPath: NSHomeDirectory())
+        
+        // Apply VS Code settings
+        let vscodeProfileDir = vscodeDir.appendingPathComponent("vscode", isDirectory: true)
+        if fm.fileExists(atPath: vscodeProfileDir.path) {
+            try applyEditorSettingsToSystem(
+                from: vscodeProfileDir,
+                to: homeURL.appendingPathComponent("Library/Application Support/Code"),
+                extensionsTo: homeURL.appendingPathComponent(".vscode/extensions"),
+                editorName: "VS Code"
+            )
+        }
+        
+        // Apply Cursor settings
+        let cursorProfileDir = vscodeDir.appendingPathComponent("cursor", isDirectory: true)
+        if fm.fileExists(atPath: cursorProfileDir.path) {
+            try applyEditorSettingsToSystem(
+                from: cursorProfileDir,
+                to: homeURL.appendingPathComponent("Library/Application Support/Cursor"),
+                extensionsTo: nil, // Cursor extensions are handled differently
+                editorName: "Cursor"
+            )
+        }
+        
+        LoggerService.info("Applied VS Code/Cursor settings from profile: \(descriptor.profile.name)")
+    }
+    
+    /// Applies settings from profile to the system editor configuration
+    private func applyEditorSettingsToSystem(from profileDir: URL, to appSupportPath: URL, extensionsTo: URL?, editorName: String) throws {
+        let fm = FileManager.default
+        
+        // Apply user settings
+        let userProfileDir = profileDir.appendingPathComponent("User")
+        if fm.fileExists(atPath: userProfileDir.path) {
+            let userSystemDir = appSupportPath.appendingPathComponent("User")
+            
+            // Create User directory if it doesn't exist
+            try fm.createDirectory(at: userSystemDir, withIntermediateDirectories: true)
+            
+            // Apply settings.json
+            let profileSettings = userProfileDir.appendingPathComponent("settings.json")
+            if fm.fileExists(atPath: profileSettings.path) {
+                let systemSettings = userSystemDir.appendingPathComponent("settings.json")
+                
+                // Remove existing settings and copy profile settings
+                if fm.fileExists(atPath: systemSettings.path) {
+                    try fm.removeItem(at: systemSettings)
+                }
+                try fm.copyItem(at: profileSettings, to: systemSettings)
+                LoggerService.info("Applied \(editorName) settings.json")
+                
+                // Small delay to allow editor to detect file changes
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            
+            // Apply keybindings.json
+            let profileKeybindings = userProfileDir.appendingPathComponent("keybindings.json")
+            if fm.fileExists(atPath: profileKeybindings.path) {
+                let systemKeybindings = userSystemDir.appendingPathComponent("keybindings.json")
+                
+                // Remove existing keybindings and copy profile keybindings
+                if fm.fileExists(atPath: systemKeybindings.path) {
+                    try fm.removeItem(at: systemKeybindings)
+                }
+                try fm.copyItem(at: profileKeybindings, to: systemKeybindings)
+                LoggerService.info("Applied \(editorName) keybindings.json")
+            }
+            
+            // Apply snippets
+            let profileSnippets = userProfileDir.appendingPathComponent("snippets")
+            if fm.fileExists(atPath: profileSnippets.path) {
+                let systemSnippets = userSystemDir.appendingPathComponent("snippets")
+                
+                // Remove existing snippets and copy profile snippets
+                if fm.fileExists(atPath: systemSnippets.path) {
+                    try fm.removeItem(at: systemSnippets)
+                }
+                try fm.copyItem(at: profileSnippets, to: systemSnippets)
+                LoggerService.info("Applied \(editorName) snippets")
+            }
+        }
+        
+        // Show extension installation instructions
+        let extensionsFile = profileDir.appendingPathComponent("extensions.txt")
+        if fm.fileExists(atPath: extensionsFile.path) {
+            if let extensionsContent = try? String(contentsOf: extensionsFile) {
+                let extensions = extensionsContent.components(separatedBy: .newlines).filter { !$0.isEmpty }
+                if !extensions.isEmpty {
+                    LoggerService.info("\(editorName) Extensions to install manually:")
+                    for ext in extensions.prefix(10) { // Log first 10
+                        LoggerService.info("  - \(ext)")
+                    }
+                    if extensions.count > 10 {
+                        LoggerService.info("  ... and \(extensions.count - 10) more extensions")
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -80,7 +80,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 /// Settings view with dependency injection support
 struct SettingsView: View {
-    @StateObject private var viewModel = StatusBarViewModel()
+    @StateObject private var viewModel = StatusBarViewModel(
+        profileService: ProfileService.shared,
+        systemService: SystemService.shared,
+        fileSystemService: FileSystemService.shared
+    )
     
     var body: some View {
         Form {

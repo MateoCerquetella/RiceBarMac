@@ -87,6 +87,88 @@ enum Constants {
         }
     }
     
+    // MARK: - IDE Integration
+    
+    /// VS Code configuration directory relative path
+    static let vscodeConfigDir = "Library/Application Support/Code/User"
+    
+    /// VS Code settings filename
+    static let vscodeSettings = "settings.json"
+    
+    /// VS Code keybindings filename
+    static let vscodeKeybindings = "keybindings.json"
+    
+    /// VS Code snippets directory
+    static let vscodeSnippetsDir = "snippets"
+    
+    /// Cursor configuration directory relative path
+    static let cursorConfigDir = "Library/Application Support/Cursor/User"
+    
+    /// Cursor settings filename (same as VS Code)
+    static let cursorSettings = "settings.json"
+    
+    /// Cursor keybindings filename (same as VS Code)
+    static let cursorKeybindings = "keybindings.json"
+    
+    /// Cursor snippets directory (same as VS Code)
+    static let cursorSnippetsDir = "snippets"
+    
+    /// Supported IDE types
+    enum IDEType: String, CaseIterable {
+        case vscode = "vscode"
+        case cursor = "cursor"
+        
+        var displayName: String {
+            switch self {
+            case .vscode: return "Visual Studio Code"
+            case .cursor: return "Cursor"
+            }
+        }
+        
+        var configDirectory: String {
+            switch self {
+            case .vscode: return Constants.vscodeConfigDir
+            case .cursor: return Constants.cursorConfigDir
+            }
+        }
+        
+        var settingsFile: String {
+            switch self {
+            case .vscode: return Constants.vscodeSettings
+            case .cursor: return Constants.cursorSettings
+            }
+        }
+        
+        var keybindingsFile: String {
+            switch self {
+            case .vscode: return Constants.vscodeKeybindings
+            case .cursor: return Constants.cursorKeybindings
+            }
+        }
+        
+        var snippetsDirectory: String {
+            switch self {
+            case .vscode: return Constants.vscodeSnippetsDir
+            case .cursor: return Constants.cursorSnippetsDir
+            }
+        }
+    }
+    
+    // MARK: - IDE Theme Discovery
+    
+    /// Discovered theme definition from installed extensions
+    struct DiscoveredTheme {
+        let name: String
+        let displayName: String
+        let extensionId: String?
+        let source: ThemeSource
+        
+        enum ThemeSource {
+            case builtin
+            case extensionSource(path: String)
+        }
+    }
+    
     // MARK: - File System Patterns
     
     /// Files to skip when creating snapshots
@@ -150,7 +232,7 @@ enum Constants {
     
     /// Status bar icon configuration
     enum StatusBarIcon {
-        static let systemName = "switch.2"
+        static let systemName = "paintbrush.pointed"  // Icono de pincel para personalización
         static let accessibilityDescription = "RiceBar"
         static let menuBarLength = NSStatusItem.squareLength
     }

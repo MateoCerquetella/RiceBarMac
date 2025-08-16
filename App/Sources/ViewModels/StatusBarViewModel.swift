@@ -104,12 +104,20 @@ final class StatusBarViewModel: ObservableObject {
     /// Applies a profile to the system
     /// - Parameter descriptor: Profile descriptor to apply
     func applyProfile(_ descriptor: ProfileDescriptor) {
-        Task { @MainActor in
+        // Prevent concurrent applications
+        guard !isApplying else {
+            LoggerService.info("Profile application already in progress, skipping")
+            return
+        }
+        
+        Task {
             do {
-                try await profileService.applyProfile(descriptor, cleanConfig: false)
+                try await profileService.applyProfileAsync(descriptor, cleanConfig: false)
             } catch {
                 LoggerService.error("Profile apply failed: \(error)")
-                await showError(error)
+                _ = await MainActor.run {
+                    Task { await showError(error) }
+                }
             }
         }
     }

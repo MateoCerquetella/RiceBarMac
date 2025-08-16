@@ -25,7 +25,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>RiceBarMac uses Apple Events to control Terminal/iTerm and apply themes.</string>
+	<string>RiceBarMac uses Apple Events to control Terminal/Alacritty and apply themes.</string>
 	<key>NSDesktopFolderUsageDescription</key>
 	<string>RiceBarMac needs access to change your desktop wallpaper.</string>
 </dict>
