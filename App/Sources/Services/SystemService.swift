@@ -52,6 +52,7 @@ final class SystemService: ObservableObject {
     
     private init() {
         updateLaunchAtLoginStatus()
+        syncConfigWithSystem()
     }
     
     
@@ -211,7 +212,13 @@ final class SystemService: ObservableObject {
         }
         
         DispatchQueue.main.async {
+            let wasEnabled = self.isLaunchAtLoginEnabled
             self.isLaunchAtLoginEnabled = enabled
+            
+            // Sync config if status changed
+            if wasEnabled != enabled {
+                ConfigService.shared.updateGeneralSetting(\.launchAtLogin, to: enabled)
+            }
         }
     }
     
@@ -252,6 +259,19 @@ final class SystemService: ObservableObject {
     func setLaunchAtLogin(enabled: Bool) throws {
         if enabled != isLaunchAtLoginEnabled {
             try toggleLaunchAtLogin()
+        }
+    }
+    
+    private func syncConfigWithSystem() {
+        // Sync the config with the actual system status
+        ConfigService.shared.updateGeneralSetting(\.launchAtLogin, to: isLaunchAtLoginEnabled)
+    }
+    
+    func setDockVisibility(visible: Bool) {
+        if visible {
+            NSApp.setActivationPolicy(.regular)
+        } else {
+            NSApp.setActivationPolicy(.accessory)
         }
     }
 }

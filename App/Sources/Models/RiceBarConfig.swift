@@ -93,13 +93,11 @@ struct AppearanceConfig: Codable {
 enum MenuItemStyle: String, Codable, CaseIterable {
     case compact = "compact"
     case detailed = "detailed"
-    case minimal = "minimal"
     
     var displayName: String {
         switch self {
         case .compact: return "Compact"
         case .detailed: return "Detailed"
-        case .minimal: return "Minimal"
         }
     }
 }

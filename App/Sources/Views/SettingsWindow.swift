@@ -21,14 +21,8 @@ struct SettingsWindow: View {
                 }
                 .tag(1)
             
-            AppearanceSettingsView()
-                .tabItem {
-                    Image(systemName: "paintbrush")
-                    Text("Appearance")
-                }
-                .tag(2)
         }
-        .frame(width: 500, height: 400)
+        .frame(minWidth: 480, idealWidth: 520, maxWidth: 800, minHeight: 400, idealHeight: 450, maxHeight: 800)
     }
 }
 
@@ -39,17 +33,24 @@ struct ShortcutsSettingsView: View {
     @State private var tempShortcut = ""
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Keyboard Shortcuts")
-                .font(.title2)
-                .fontWeight(.semibold)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Keyboard Shortcuts")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Set up keyboard shortcuts for quick profile switching and navigation.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             
-            GroupBox("Profile Shortcuts") {
-                VStack(spacing: 8) {
-                    ForEach(1...9, id: \.self) { number in
-                        HStack {
-                            Text("Profile \(number):")
-                                .frame(width: 100, alignment: .leading)
+                GroupBox {
+                    VStack(spacing: 12) {
+                        ForEach(1...9, id: \.self) { number in
+                            HStack(spacing: 12) {
+                                Text("Profile \(number)")
+                                    .font(.system(.body, weight: .medium))
+                                    .frame(width: 80, alignment: .leading)
                             
                             if editingShortcut == "profile\(number)" {
                                 ShortcutCaptureView(shortcut: $tempShortcut, onCapture: { capturedShortcut in
@@ -64,33 +65,40 @@ struct ShortcutsSettingsView: View {
                                 .buttonStyle(.bordered)
                             } else {
                                 let currentShortcut = configService.config.shortcuts.profileShortcuts["profile\(number)"] ?? ""
-                                if currentShortcut.isEmpty {
-                                    Text("No shortcut")
-                                        .font(.system(.body, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                        .italic()
-                                } else {
-                                    Text(currentShortcut)
-                                        .font(.system(.body, design: .monospaced))
-                                        .foregroundColor(.secondary)
-                                }
                                 
-                                Spacer()
-                                
-                                HStack(spacing: 8) {
-                                    if !currentShortcut.isEmpty {
-                                        Button("Remove") {
-                                            configService.updateShortcut(for: "profile\(number)", to: "")
-                                        }
-                                        .buttonStyle(.borderless)
-                                        .foregroundColor(.red)
+                                HStack {
+                                    if currentShortcut.isEmpty {
+                                        Text("Not set")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .italic()
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.gray.opacity(0.1))
+                                            .cornerRadius(6)
+                                    } else {
+                                        ShortcutBadge(shortcut: currentShortcut)
                                     }
                                     
-                                    Button("Edit") {
-                                        editingShortcut = "profile\(number)"
-                                        tempShortcut = currentShortcut
+                                    Spacer()
+                                    
+                                    HStack(spacing: 4) {
+                                        if !currentShortcut.isEmpty {
+                                            Button("Remove") {
+                                                configService.updateShortcut(for: "profile\(number)", to: "")
+                                            }
+                                            .buttonStyle(.borderless)
+                                            .foregroundColor(.red)
+                                            .font(.caption)
+                                        }
+                                        
+                                        Button("Edit") {
+                                            editingShortcut = "profile\(number)"
+                                            tempShortcut = currentShortcut
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .font(.caption)
                                     }
-                                    .buttonStyle(.borderless)
                                 }
                             }
                         }
@@ -99,8 +107,8 @@ struct ShortcutsSettingsView: View {
                 .padding(.vertical, 8)
             }
             
-            GroupBox("Navigation Shortcuts") {
-                VStack(spacing: 8) {
+                GroupBox {
+                    VStack(spacing: 12) {
                     ShortcutRow(title: "Next Profile", 
                               value: configService.config.shortcuts.navigationShortcuts.nextProfile,
                               isEditing: editingShortcut == "nextProfile",
@@ -145,21 +153,29 @@ struct ShortcutsSettingsView: View {
                     } onRemove: {
                         configService.updateNavigationShortcut(\.reloadProfiles, to: "")
                     }
+                    }
+                    .padding(.vertical, 12)
+                } label: {
+                    HStack {
+                        Text("Navigation Shortcuts")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.bottom, 4)
                 }
-                .padding(.vertical, 8)
-            }
-            
-            HStack {
-                Spacer()
-                Button("Reset to Defaults") {
-                    configService.resetToDefaults()
+                
+                HStack {
+                    Spacer()
+                    Button("Reset to Defaults") {
+                        configService.resetToDefaults()
+                    }
+                    .buttonStyle(.bordered)
+                    .foregroundColor(.red)
                 }
-                .buttonStyle(.bordered)
             }
-            
-            Spacer()
+            .padding(20)
         }
-        .padding()
     }
     
     private func saveShortcut(for key: String) {
@@ -181,8 +197,9 @@ struct ShortcutRow: View {
     let onRemove: () -> Void
     
     var body: some View {
-        HStack {
-            Text("\(title):")
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.system(.body, weight: .medium))
                 .frame(width: 120, alignment: .leading)
             
             if isEditing {
@@ -195,28 +212,34 @@ struct ShortcutRow: View {
                 Button("Cancel", action: onCancel)
                     .buttonStyle(.bordered)
             } else {
-                if value.isEmpty {
-                    Text("No shortcut")
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.secondary)
-                        .italic()
-                } else {
-                    Text(value)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                HStack(spacing: 8) {
-                    if !value.isEmpty {
-                        Button("Remove", action: onRemove)
-                            .buttonStyle(.borderless)
-                            .foregroundColor(.red)
+                HStack {
+                    if value.isEmpty {
+                        Text("Not set")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .italic()
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(6)
+                    } else {
+                        ShortcutBadge(shortcut: value)
                     }
                     
-                    Button("Edit", action: onEdit)
-                        .buttonStyle(.borderless)
+                    Spacer()
+                    
+                    HStack(spacing: 4) {
+                        if !value.isEmpty {
+                            Button("Remove", action: onRemove)
+                                .buttonStyle(.borderless)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                        
+                        Button("Edit", action: onEdit)
+                            .buttonStyle(.borderless)
+                            .font(.caption)
+                    }
                 }
             }
         }
@@ -228,102 +251,100 @@ struct GeneralSettingsView: View {
     @ObservedObject var systemService = SystemService.shared
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("General Settings")
-                .font(.title2)
-                .fontWeight(.semibold)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("General Settings")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                    Text("Configure general app behavior and startup options.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             
-            GroupBox("Startup") {
-                VStack(alignment: .leading, spacing: 12) {
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 12) {
                     Toggle("Launch at login", isOn: Binding(
                         get: { systemService.isLaunchAtLoginEnabled },
                         set: { newValue in
-                            try? systemService.setLaunchAtLogin(enabled: newValue)
+                            do {
+                                try systemService.setLaunchAtLogin(enabled: newValue)
+                                configService.updateGeneralSetting(\.launchAtLogin, to: newValue)
+                            } catch {
+                                print("Failed to set launch at login: \(error)")
+                            }
                         }
                     ))
                     
-                    Toggle("Show in Dock", isOn: Binding(
-                        get: { configService.config.general.showInDock },
-                        set: { configService.updateGeneralSetting(\.showInDock, to: $0) }
-                    ))
+                        Toggle("Show in Dock", isOn: Binding(
+                            get: { configService.config.general.showInDock },
+                            set: { newValue in
+                                configService.updateGeneralSetting(\.showInDock, to: newValue)
+                                systemService.setDockVisibility(visible: newValue)
+                            }
+                        ))
+                    }
+                    .padding(.vertical, 12)
+                } label: {
+                    HStack {
+                        Text("Startup")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    .padding(.bottom, 4)
                 }
-                .padding(.vertical, 8)
-            }
             
-            GroupBox("Behavior") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Toggle("Auto-reload profiles", isOn: Binding(
-                        get: { configService.config.general.autoReloadProfiles },
-                        set: { configService.updateGeneralSetting(\.autoReloadProfiles, to: $0) }
-                    ))
-                    
-                    Toggle("Show notifications", isOn: Binding(
-                        get: { configService.config.general.showNotifications },
-                        set: { configService.updateGeneralSetting(\.showNotifications, to: $0) }
-                    ))
-                }
-                .padding(.vertical, 8)
             }
-            
-            Spacer()
+            .padding(20)
         }
-        .padding()
     }
 }
 
-struct AppearanceSettingsView: View {
-    @ObservedObject var configService = ConfigService.shared
-    @State private var customIcon = ""
+
+struct ShortcutBadge: View {
+    let shortcut: String
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Appearance Settings")
-                .font(.title2)
-                .fontWeight(.semibold)
-            
-            GroupBox("Menu Bar") {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Menu bar icon:")
-                        TextField("Icon", text: Binding(
-                            get: { configService.config.appearance.menuBarIcon },
-                            set: { configService.updateAppearanceSetting(\.menuBarIcon, to: $0) }
-                        ))
-                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                        .frame(width: 60)
-                    }
-                    
-                    Toggle("Show profile count in menu", isOn: Binding(
-                        get: { configService.config.appearance.showProfileCountInMenu },
-                        set: { configService.updateAppearanceSetting(\.showProfileCountInMenu, to: $0) }
-                    ))
-                    
-                    Toggle("Show shortcuts in menu", isOn: Binding(
-                        get: { configService.config.appearance.showShortcutsInMenu },
-                        set: { configService.updateAppearanceSetting(\.showShortcutsInMenu, to: $0) }
-                    ))
-                }
-                .padding(.vertical, 8)
+        HStack(spacing: 2) {
+            ForEach(shortcutKeys, id: \.self) { key in
+                Text(key)
+                    .font(.system(.caption, design: .default, weight: .medium))
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(Color.accentColor.opacity(0.15))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(Color.accentColor.opacity(0.3), lineWidth: 1)
+                            )
+                    )
             }
-            
-            GroupBox("Menu Style") {
-                VStack(alignment: .leading, spacing: 12) {
-                    Picker("Menu item style:", selection: Binding(
-                        get: { configService.config.appearance.menuItemStyle },
-                        set: { configService.updateAppearanceSetting(\.menuItemStyle, to: $0) }
-                    )) {
-                        ForEach(MenuItemStyle.allCases, id: \.self) { style in
-                            Text(style.displayName).tag(style)
-                        }
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                }
-                .padding(.vertical, 8)
-            }
-            
-            Spacer()
         }
-        .padding()
+    }
+    
+    private var shortcutKeys: [String] {
+        shortcut.split(separator: "+").map { key in
+            let keyString = String(key).trimmingCharacters(in: .whitespaces)
+            switch keyString.lowercased() {
+            case "cmd": return "⌘"
+            case "ctrl": return "⌃"
+            case "opt", "option": return "⌥"
+            case "shift": return "⇧"
+            case "return": return "↩"
+            case "tab": return "⇥"
+            case "space": return "␣"
+            case "delete": return "⌫"
+            case "escape": return "⎋"
+            case "left": return "←"
+            case "right": return "→"
+            case "up": return "↑"
+            case "down": return "↓"
+            default: return keyString.uppercased()
+            }
+        }
     }
 }
 

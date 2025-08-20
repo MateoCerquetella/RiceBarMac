@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let systemService = SystemService.shared
     private let fileSystemService = FileSystemService.shared
     private let backupService = BackupService.shared
+    private let configService = ConfigService.shared
     
     
     private lazy var statusBarViewModel = StatusBarViewModel(
@@ -67,6 +68,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupInitialState() {
         statusBarViewModel.refreshData()
+        
+        // Apply dock visibility setting
+        let config = configService.config
+        systemService.setDockVisibility(visible: config.general.showInDock)
+        
+        // Initialize launch at login based on config if different from system
+        if config.general.launchAtLogin != systemService.isLaunchAtLoginEnabled {
+            try? systemService.setLaunchAtLogin(enabled: config.general.launchAtLogin)
+        }
     }
     
     private func cleanupServices() {
