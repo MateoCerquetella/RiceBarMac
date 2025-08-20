@@ -1,14 +1,12 @@
 import XCTest
 @testable import RiceBarMac
 
-/// Unit tests for FileSystemUtilities
 final class FileSystemUtilitiesTests: XCTestCase {
     
     private var tempDirectory: URL!
     
     override func setUp() {
         super.setUp()
-        // Create a temporary directory for testing
         tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("RiceBarMacTests-\(UUID().uuidString)")
         
@@ -17,11 +15,9 @@ final class FileSystemUtilitiesTests: XCTestCase {
     
     override func tearDown() {
         super.tearDown()
-        // Clean up temporary directory
         try? FileManager.default.removeItem(at: tempDirectory)
     }
     
-    // MARK: - Directory Operations Tests
     
     func testCreateDirectoryIfNeeded() {
         let testDir = tempDirectory.appendingPathComponent("testDir")
@@ -31,7 +27,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
         XCTAssertNoThrow(try FileSystemUtilities.createDirectoryIfNeeded(at: testDir))
         XCTAssertTrue(FileManager.default.fileExists(atPath: testDir.path))
         
-        // Should not throw when directory already exists
         XCTAssertNoThrow(try FileSystemUtilities.createDirectoryIfNeeded(at: testDir))
     }
     
@@ -48,26 +43,21 @@ final class FileSystemUtilitiesTests: XCTestCase {
     func testRemoveItemIfExists() {
         let testFile = tempDirectory.appendingPathComponent("testFile.txt")
         
-        // Create a test file
         try? "test content".write(to: testFile, atomically: true, encoding: .utf8)
         XCTAssertTrue(FileManager.default.fileExists(atPath: testFile.path))
         
-        // Remove it
         XCTAssertNoThrow(try FileSystemUtilities.removeItemIfExists(at: testFile))
         XCTAssertFalse(FileManager.default.fileExists(atPath: testFile.path))
         
-        // Should not throw when file doesn't exist
         XCTAssertNoThrow(try FileSystemUtilities.removeItemIfExists(at: testFile))
     }
     
-    // MARK: - File Operations Tests
     
     func testCopyFile() {
         let sourceFile = tempDirectory.appendingPathComponent("source.txt")
         let destFile = tempDirectory.appendingPathComponent("dest.txt")
         let testContent = "test content"
         
-        // Create source file
         try? testContent.write(to: sourceFile, atomically: true, encoding: .utf8)
         
         XCTAssertNoThrow(try FileSystemUtilities.copyFile(from: sourceFile, to: destFile))
@@ -85,17 +75,14 @@ final class FileSystemUtilitiesTests: XCTestCase {
         let sourceContent = "new content"
         let existingContent = "existing content"
         
-        // Create files
         try? sourceContent.write(to: sourceFile, atomically: true, encoding: .utf8)
         try? existingContent.write(to: destFile, atomically: true, encoding: .utf8)
         
         XCTAssertNoThrow(try FileSystemUtilities.copyFile(from: sourceFile, to: destFile, createBackup: true))
         
-        // Check that destination has new content
         let newContent = try? String(contentsOf: destFile, encoding: .utf8)
         XCTAssertEqual(newContent, sourceContent)
         
-        // Check that backup was created with old content
         let backupContent = try? String(contentsOf: backupFile, encoding: .utf8)
         XCTAssertEqual(backupContent, existingContent)
     }
@@ -111,7 +98,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
             XCTAssertEqual(content, testContent)
         })
         
-        // Test file not found
         let nonExistentFile = tempDirectory.appendingPathComponent("nonexistent.txt")
         XCTAssertThrowsError(try FileSystemUtilities.readString(from: nonExistentFile))
     }
@@ -127,24 +113,20 @@ final class FileSystemUtilitiesTests: XCTestCase {
         XCTAssertEqual(readContent, testContent)
     }
     
-    // MARK: - JSON Operations Tests
     
     func testJSONOperations() {
         let testFile = tempDirectory.appendingPathComponent("test.json")
         let testProfile = TestProfileFactory.createTestProfile(name: "JSONTestProfile")
         
-        // Test writing JSON
         XCTAssertNoThrow(try FileSystemUtilities.writeJSON(testProfile, to: testFile))
         XCTAssertTrue(FileManager.default.fileExists(atPath: testFile.path))
         
-        // Test reading JSON
         XCTAssertNoThrow({
             let readProfile = try FileSystemUtilities.readJSON(Profile.self, from: testFile)
             XCTAssertEqual(readProfile, testProfile)
         })
     }
     
-    // MARK: - Validation Tests
     
     func testSafeWritePath() {
         let homeDirectory = URL(fileURLWithPath: NSHomeDirectory())
@@ -154,7 +136,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
         XCTAssertTrue(FileSystemUtilities.isSafeWritePath(safeFile))
         XCTAssertTrue(FileSystemUtilities.isSafeWritePath(tmpFile))
         
-        // Test unsafe paths
         let systemFile = URL(fileURLWithPath: "/System/test.txt")
         let binFile = URL(fileURLWithPath: "/usr/bin/test")
         
@@ -162,7 +143,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
         XCTAssertFalse(FileSystemUtilities.isSafeWritePath(binFile))
     }
     
-    // MARK: - URL Extension Tests
     
     func testURLExpandingTildeInPath() {
         let homeDirectory = NSHomeDirectory()
@@ -172,7 +152,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
         XCTAssertTrue(expandedURL.path.hasPrefix(homeDirectory))
         XCTAssertTrue(expandedURL.path.hasSuffix("test.txt"))
         
-        // Test non-tilde path
         let regularURL = URL(fileURLWithPath: "/tmp/test.txt")
         XCTAssertEqual(regularURL.expandingTildeInPath, regularURL)
     }
@@ -183,7 +162,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
         
         XCTAssertEqual(parentDir, tempDirectory)
         
-        // Test deeply nested path
         let deepFile = tempDirectory
             .appendingPathComponent("non")
             .appendingPathComponent("existent")
@@ -194,7 +172,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
         XCTAssertEqual(existingParent, tempDirectory)
     }
     
-    // MARK: - Performance Tests
     
     func testFileOperationPerformance() {
         let files = (0..<100).map { tempDirectory.appendingPathComponent("file\($0).txt") }
@@ -205,7 +182,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
             }
         }
         
-        // Clean up
         for file in files {
             try? FileSystemUtilities.removeItemIfExists(at: file)
         }

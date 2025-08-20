@@ -2,7 +2,6 @@ import Foundation
 import AppKit
 import Combine
 
-// MARK: - File System Service Errors
 
 enum FileSystemServiceError: LocalizedError {
     case fileNotFound(String)
@@ -36,7 +35,6 @@ enum FileSystemServiceError: LocalizedError {
     }
 }
 
-// MARK: - Template Variables
 
 private struct TemplateVariables {
     let variables: [String: String]
@@ -45,7 +43,6 @@ private struct TemplateVariables {
     init(profile: ProfileDescriptor) {
         var vars: [String: String] = [:]
         
-        // Load variables.json if present
         let varsURL = profile.directory.appendingPathComponent("variables.json")
         if let data = try? Data(contentsOf: varsURL),
            let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -54,7 +51,6 @@ private struct TemplateVariables {
             }
         }
         
-        // Add wallpaper path and palette if present
         var palette: [String] = []
         if let wallpaperRel = profile.profile.wallpaper {
             let wpURL = profile.directory.appendingPathComponent(wallpaperRel)
@@ -70,7 +66,6 @@ private struct TemplateVariables {
     }
 }
 
-// MARK: - Palette Extractor
 
 private enum PaletteExtractor {
     
@@ -103,12 +98,10 @@ private enum PaletteExtractor {
             let g = buffer[base + 1]
             let b = buffer[base + 2]
             
-            // Quantize to 4 bits per channel to reduce distinct colors
             let rq = UInt32(r) >> 4
             let gq = UInt32(g) >> 4
             let bq = UInt32(b) >> 4
             
-            // Skip near-white and near-black buckets to avoid extremes
             let brightness = (0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)) / 255.0
             if brightness > 0.98 || brightness < 0.05 { continue }
             
@@ -116,7 +109,6 @@ private enum PaletteExtractor {
             histogram[key, default: 0] += 1
         }
         
-        // Sort buckets by frequency and map to hex color strings
         let sorted = histogram.sorted { $0.value > $1.value }
         var hexColors: [String] = []
         
@@ -126,13 +118,11 @@ private enum PaletteExtractor {
             let gq = (key >> 4) & 0xF
             let bq = key & 0xF
             
-            // Map bucket center back to 8-bit
             let r = UInt8((rq << 4) | 0x8)
             let g = UInt8((gq << 4) | 0x8)
             let b = UInt8((bq << 4) | 0x8)
             let hex = String(format: "#%02X%02X%02X", r, g, b)
             
-            // Avoid near-duplicates
             if !hexColors.contains(hex) { 
                 hexColors.append(hex) 
             }
@@ -142,27 +132,18 @@ private enum PaletteExtractor {
     }
 }
 
-// MARK: - File System Service
 
-/// Consolidated service for file system operations including file I/O, 
-/// template rendering, and terminal integration.
 final class FileSystemService: ObservableObject {
     
-    // MARK: - Properties
     
     private let operationQueue = DispatchQueue(label: "com.ricebar.filesystem", qos: .userInitiated)
     
-    // MARK: - Singleton
     
     static let shared = FileSystemService()
     
     init() {}
     
-    // MARK: - Directory Operations
     
-    /// Safely creates a directory if it doesn't exist
-    /// - Parameter url: The directory URL to create
-    /// - Throws: FileSystemServiceError if creation fails
     func createDirectoryIfNeeded(at url: URL) throws {
         let fileManager = FileManager.default
         if !fileManager.fileExists(atPath: url.path) {
@@ -175,16 +156,10 @@ final class FileSystemService: ObservableObject {
         }
     }
     
-    /// Ensures parent directory exists for a file path
-    /// - Parameter fileURL: The file URL whose parent directory should exist
-    /// - Throws: FileSystemServiceError if creation fails
     func ensureParentDirectoryExists(for fileURL: URL) throws {
         try createDirectoryIfNeeded(at: fileURL.deletingLastPathComponent())
     }
     
-    /// Safely removes a file or directory if it exists
-    /// - Parameter url: The URL to remove
-    /// - Throws: FileSystemServiceError if removal fails
     func removeItemIfExists(at url: URL) throws {
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: url.path) {
@@ -193,32 +168,21 @@ final class FileSystemService: ObservableObject {
         }
     }
     
-    // MARK: - File Operations
     
-    /// Safely copies a file with backup support
-    /// - Parameters:
-    ///   - source: Source file URL
-    ///   - destination: Destination file URL
-    ///   - createBackup: Whether to create a backup if destination exists
-    /// - Throws: FileSystemServiceError if operation fails
     func copyFile(from source: URL, to destination: URL, createBackup: Bool = true) throws {
         let fileManager = FileManager.default
         
-        // Ensure source exists
         guard fileManager.fileExists(atPath: source.path) else {
             throw FileSystemServiceError.fileNotFound(source.path)
         }
         
-        // Validate destination path is safe
         guard isSafeWritePath(destination) else {
             throw FileSystemServiceError.unsafeWritePath(destination.path)
         }
         
-        // Create parent directory if needed
         try ensureParentDirectoryExists(for: destination)
         
         do {
-            // Create backup if destination exists and backup is requested
             if createBackup && fileManager.fileExists(atPath: destination.path) {
                 let backupURL = destination.appendingPathExtension("bak")
                 try removeItemIfExists(at: backupURL) // Remove old backup
@@ -228,7 +192,6 @@ final class FileSystemService: ObservableObject {
                 try removeItemIfExists(at: destination)
             }
             
-            // Perform the copy
             try fileManager.copyItem(at: source, to: destination)
             LoggerService.info("Copied file: \(source.path) -> \(destination.path)")
         } catch {
@@ -236,12 +199,6 @@ final class FileSystemService: ObservableObject {
         }
     }
     
-    /// Safely reads string content from a file
-    /// - Parameters:
-    ///   - url: File URL to read from
-    ///   - encoding: Text encoding to use
-    /// - Returns: String content of the file
-    /// - Throws: FileSystemServiceError if reading fails
     func readString(from url: URL, encoding: String.Encoding = .utf8) throws -> String {
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw FileSystemServiceError.fileNotFound(url.path)
@@ -254,12 +211,6 @@ final class FileSystemService: ObservableObject {
         }
     }
     
-    /// Safely writes string content to a file
-    /// - Parameters:
-    ///   - content: String content to write
-    ///   - url: Destination file URL
-    ///   - encoding: Text encoding to use
-    /// - Throws: FileSystemServiceError if writing fails
     func writeString(_ content: String, to url: URL, encoding: String.Encoding = .utf8) throws {
         guard isSafeWritePath(url) else {
             throw FileSystemServiceError.unsafeWritePath(url.path)
@@ -270,14 +221,7 @@ final class FileSystemService: ObservableObject {
         LoggerService.info("Wrote file: \(url.path)")
     }
     
-    // MARK: - JSON Operations
     
-    /// Safely reads and decodes JSON from a file
-    /// - Parameters:
-    ///   - type: The type to decode to
-    ///   - url: File URL to read from
-    /// - Returns: Decoded object
-    /// - Throws: FileSystemServiceError if reading or decoding fails
     func readJSON<T: Codable>(_ type: T.Type, from url: URL) throws -> T {
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw FileSystemServiceError.fileNotFound(url.path)
@@ -291,12 +235,6 @@ final class FileSystemService: ObservableObject {
         }
     }
     
-    /// Safely encodes and writes JSON to a file
-    /// - Parameters:
-    ///   - object: Object to encode
-    ///   - url: Destination file URL
-    ///   - prettyPrinted: Whether to format JSON with indentation
-    /// - Throws: FileSystemServiceError if encoding or writing fails
     func writeJSON<T: Codable>(_ object: T, to url: URL, prettyPrinted: Bool = true) throws {
         guard isSafeWritePath(url) else {
             throw FileSystemServiceError.unsafeWritePath(url.path)
@@ -316,10 +254,7 @@ final class FileSystemService: ObservableObject {
         }
     }
     
-    // MARK: - Template Engine
     
-    /// Renders templates for a profile descriptor
-    /// - Parameter descriptor: Profile descriptor containing templates
     func renderTemplates(for descriptor: ProfileDescriptor) {
         let templatesRoot = descriptor.directory.appendingPathComponent("templates/home", isDirectory: true)
         let outputRoot = descriptor.directory.appendingPathComponent("home", isDirectory: true)
@@ -329,14 +264,12 @@ final class FileSystemService: ObservableObject {
         
         let templateVars = TemplateVariables(profile: descriptor)
         
-        // Do not skip hidden files so templates for dotfiles are rendered
         guard let enumerator = fm.enumerator(at: templatesRoot, includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey], options: []) else { return }
         
         var processedCount = 0
         let maxTemplates = 100 // Prevent runaway processing
         
         for case let tplURL as URL in enumerator {
-            // Safety check to prevent infinite processing
             processedCount += 1
             if processedCount > maxTemplates {
                 LoggerService.warning("Template processing limit reached (\(maxTemplates)), stopping early")
@@ -350,11 +283,9 @@ final class FileSystemService: ObservableObject {
             let outURL = outputRoot.appendingPathComponent(rel)
             
             do {
-                // Check if template is newer than output before processing
                 if let templateModDate = try? tplURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
                    let outputModDate = try? outURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate,
                    templateModDate <= outputModDate {
-                    // Template is older than output, skip unless content changed
                     let content = try String(contentsOf: tplURL, encoding: .utf8)
                     let rendered = renderTemplate(content: content, with: templateVars.variables)
                     
@@ -367,7 +298,6 @@ final class FileSystemService: ObservableObject {
                 let content = try String(contentsOf: tplURL, encoding: .utf8)
                 let rendered = renderTemplate(content: content, with: templateVars.variables)
                 
-                // Skip unnecessary write if content hasn't changed
                 if let existing = try? String(contentsOf: outURL, encoding: .utf8), existing == rendered {
                     continue
                 }
@@ -384,11 +314,6 @@ final class FileSystemService: ObservableObject {
         }
     }
     
-    /// Renders a template string with variables
-    /// - Parameters:
-    ///   - content: Template content with {{variable}} placeholders
-    ///   - variables: Dictionary of variables to substitute
-    /// - Returns: Rendered template content
     private func renderTemplate(content: String, with variables: [String: String]) -> String {
         var result = content
         for (key, value) in variables {
@@ -397,9 +322,7 @@ final class FileSystemService: ObservableObject {
         return result
     }
     
-    // MARK: - Terminal Integration
     
-    /// Reloads Alacritty configuration
     func reloadAlacritty() {
         let cmd = """
         ( /opt/homebrew/bin/alacritty msg config reload \
@@ -424,21 +347,15 @@ final class FileSystemService: ObservableObject {
         }
     }
     
-    // MARK: - File System Validation
     
-    /// Checks if a path is safe to write to (not system directories)
-    /// - Parameter url: URL to validate
-    /// - Returns: True if the path is safe for writing
     func isSafeWritePath(_ url: URL) -> Bool {
         let path = url.path
         let homeDirectory = NSHomeDirectory()
         
-        // Must be within home directory or user-controlled paths
         guard path.hasPrefix(homeDirectory) || path.hasPrefix("/tmp") || path.hasPrefix("/var/tmp") else {
             return false
         }
         
-        // Avoid system-critical directories
         let unsafePaths = [
             "/System",
             "/Library/System",
@@ -451,32 +368,20 @@ final class FileSystemService: ObservableObject {
         return !unsafePaths.contains { path.hasPrefix($0) }
     }
     
-    /// Checks if a file exists at the given URL
-    /// - Parameter url: URL to check
-    /// - Returns: True if file exists
     func fileExists(at url: URL) -> Bool {
         return FileManager.default.fileExists(atPath: url.path)
     }
     
-    /// Gets the modification date of a file
-    /// - Parameter url: File URL
-    /// - Returns: Modification date or nil if file doesn't exist
     func modificationDate(for url: URL) -> Date? {
         guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else { return nil }
         return attributes[.modificationDate] as? Date
     }
     
-    /// Sets the modification date of a file
-    /// - Parameters:
-    ///   - date: New modification date
-    ///   - url: File URL
-    /// - Throws: Error if setting the date fails
     func setModificationDate(_ date: Date, for url: URL) throws {
         try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
     }
 }
 
-// MARK: - Template Engine (Deprecated - kept for compatibility)
 
 enum TemplateEngine {
     @available(*, deprecated, message: "Use FileSystemService.shared.renderTemplates(for:) instead")
@@ -485,7 +390,6 @@ enum TemplateEngine {
     }
 }
 
-// MARK: - File System Utilities (Deprecated - kept for compatibility)
 
 @available(*, deprecated, message: "Use FileSystemService.shared methods instead")
 enum FileSystemUtilities {
@@ -526,7 +430,6 @@ enum FileSystemUtilities {
     }
 }
 
-// MARK: - Reload Helper (Deprecated - kept for compatibility)
 
 @available(*, deprecated, message: "Use FileSystemService.shared.reloadAlacritty() instead")
 enum ReloadHelper {
@@ -535,10 +438,8 @@ enum ReloadHelper {
     }
 }
 
-// MARK: - URL Extensions
 
 extension URL {
-    /// Safely expands tilde paths
     var expandingTildeInPath: URL {
         if path.hasPrefix("~") {
             return URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
@@ -546,7 +447,6 @@ extension URL {
         return self
     }
     
-    /// Returns the first existing parent directory
     var existingParentDirectory: URL? {
         var current = self.deletingLastPathComponent()
         while current.path != "/" && current.path != current.deletingLastPathComponent().path {

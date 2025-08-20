@@ -1,6 +1,5 @@
 import Foundation
 
-// MARK: - Profile Validation Errors
 
 enum ProfileValidationError: LocalizedError {
     case invalidProfileName
@@ -22,7 +21,6 @@ enum ProfileValidationError: LocalizedError {
 struct Profile: Codable, Equatable, Hashable {
     var name: String {
         didSet {
-            // Ensure profile names are filesystem-safe
             name = name.trimmingCharacters(in: .whitespacesAndNewlines)
                 .replacingOccurrences(of: "/", with: "-")
         }
@@ -55,13 +53,11 @@ struct Profile: Codable, Equatable, Hashable {
 
     var startupScript: String? // relative path
     
-    /// Validates the profile configuration
     func validate() throws {
         guard !name.isEmpty else {
             throw ProfileValidationError.invalidProfileName
         }
         
-        // Validate hotkey format if provided
         if let hotkey = hotkey {
             let parts = hotkey.lowercased().split(separator: "+")
             guard parts.count >= 2 else {
@@ -70,7 +66,6 @@ struct Profile: Codable, Equatable, Hashable {
         }
     }
     
-    /// Creates a profile with safe defaults
     init(name: String) {
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "/", with: "-")
@@ -81,21 +76,17 @@ struct ProfileDescriptor: Hashable, Equatable {
     let profile: Profile
     let directory: URL
     
-    /// The display name for the profile
     var displayName: String {
         return profile.name.isEmpty ? directory.lastPathComponent : profile.name
     }
     
-    /// The profile's unique identifier
     var id: String {
         return directory.lastPathComponent
     }
     
-    /// Validates the profile descriptor
     func validate() throws {
         try profile.validate()
         
-        // Ensure directory exists
         guard FileManager.default.fileExists(atPath: directory.path) else {
             throw ProfileValidationError.directoryNotFound(directory.path)
         }

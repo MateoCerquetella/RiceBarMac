@@ -1,20 +1,16 @@
 import XCTest
 @testable import RiceBarMac
 
-/// Unit tests for Profile and ProfileDescriptor
 final class ProfileTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        // Reset any shared state
     }
     
     override func tearDown() {
         super.tearDown()
-        // Clean up after tests
     }
     
-    // MARK: - Profile Tests
     
     func testProfileInitialization() {
         let profile = Profile(name: "TestProfile")
@@ -64,7 +60,6 @@ final class ProfileTests: XCTestCase {
         })
     }
     
-    // MARK: - ProfileDescriptor Tests
     
     func testProfileDescriptorInitialization() {
         let profile = TestProfileFactory.createTestProfile()
@@ -85,7 +80,6 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(descriptor.displayName, "TestDirectory")
     }
     
-    // MARK: - Terminal Configuration Tests
     
     func testTerminalConfiguration() {
         let terminal = Profile.Terminal(kind: .alacritty, theme: "dark-theme")
@@ -106,7 +100,6 @@ final class ProfileTests: XCTestCase {
         }
     }
     
-    // MARK: - Replacement Tests
     
     func testReplacement() {
         let replacement = Profile.Replacement(source: "source.txt", destination: "~/destination.txt")
@@ -115,7 +108,6 @@ final class ProfileTests: XCTestCase {
         XCTAssertEqual(replacement.destination, "~/destination.txt")
     }
     
-    // MARK: - Performance Tests
     
     func testProfileCreationPerformance() {
         measure {

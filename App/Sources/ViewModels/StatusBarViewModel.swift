@@ -6,13 +6,9 @@ import Combine
 import UniformTypeIdentifiers
 #endif
 
-// MARK: - Status Bar View Model
 
-/// MVVM ViewModel for the status bar controller
-/// Manages state and business logic for the menu bar interface
 final class StatusBarViewModel: ObservableObject {
     
-    // MARK: - Published Properties
     
     @Published private(set) var profiles: [ProfileDescriptor] = []
     @Published private(set) var activeProfile: ProfileDescriptor?
@@ -20,17 +16,14 @@ final class StatusBarViewModel: ObservableObject {
     @Published private(set) var isLaunchAtLoginEnabled = false
     @Published private(set) var registeredHotKeys: [String] = []
     
-    // MARK: - Services
     
     private let profileService: ProfileService
     private let systemService: SystemService
     private let fileSystemService: FileSystemService
     
-    // MARK: - Private Properties
     
     private var cancellables = Set<AnyCancellable>()
     
-    // MARK: - Initialization
     
     init(
         profileService: ProfileService = .shared,
@@ -46,10 +39,8 @@ final class StatusBarViewModel: ObservableObject {
         registerHotKeys()
     }
     
-    // MARK: - Data Binding
     
     private func setupBindings() {
-        // Bind profile service state
         profileService.$profiles
             .receive(on: DispatchQueue.main)
             .assign(to: \.profiles, on: self)
@@ -65,7 +56,6 @@ final class StatusBarViewModel: ObservableObject {
             .assign(to: \.isApplying, on: self)
             .store(in: &cancellables)
         
-        // Bind system service state
         systemService.$isLaunchAtLoginEnabled
             .receive(on: DispatchQueue.main)
             .assign(to: \.isLaunchAtLoginEnabled, on: self)
@@ -76,7 +66,6 @@ final class StatusBarViewModel: ObservableObject {
             .assign(to: \.registeredHotKeys, on: self)
             .store(in: &cancellables)
         
-        // Re-register hotkeys when profiles change
         profileService.$profiles
             .sink { [weak self] _ in
                 self?.registerHotKeys()
@@ -84,52 +73,82 @@ final class StatusBarViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
-    // MARK: - Data Management
     
-    /// Refreshes all data from services
     func refreshData() {
+        LoggerService.info("ViewModel: Starting data refresh")
         profileService.reload()
         systemService.updateLaunchAtLoginStatus()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if let active = self.activeProfile {
+                LoggerService.info("ViewModel: Re-applying active profile after reload: \(active.profile.name)")
+                if let updatedProfile = self.profiles.first(where: { $0.directory == active.directory }) {
+                    LoggerService.info("ViewModel: Found updated profile, applying changes")
+                    self.applyProfile(updatedProfile)
+                } else {
+                    LoggerService.warning("ViewModel: Could not find updated profile after reload")
+                }
+            } else {
+                LoggerService.info("ViewModel: No active profile to re-apply after reload")
+            }
+        }
     }
     
-    /// Registers hotkeys for all profiles
     private func registerHotKeys() {
         systemService.registerHotKeys(profiles: profiles) { [weak self] descriptor in
             self?.applyProfile(descriptor)
         }
     }
     
-    // MARK: - Profile Operations
     
-    /// Applies a profile to the system
-    /// - Parameter descriptor: Profile descriptor to apply
+    private var currentApplicationTask: Task<Void, Never>?
+    
     func applyProfile(_ descriptor: ProfileDescriptor) {
-        // Prevent concurrent applications
-        guard !isApplying else {
-            LoggerService.info("Profile application already in progress, skipping")
-            return
+        LoggerService.info("ViewModel: applyProfile called for '\(descriptor.profile.name)'")
+        
+        if let current = activeProfile, current.directory == descriptor.directory {
+            if ApplyActivity.recentlyApplied(within: 2.0) {
+                LoggerService.info("Skipping duplicate application of active profile '\(descriptor.profile.name)'")
+                return
+            }
         }
         
-        Task {
+        currentApplicationTask?.cancel()
+        
+        LoggerService.info("ViewModel: Setting active profile immediately for UI")
+        profileService.setActiveProfile(descriptor)
+        
+        DispatchQueue.main.async {
+            LoggerService.info("ViewModel: Forcing objectWillChange after profile set")
+            self.objectWillChange.send()
+        }
+        
+        LoggerService.info("Profile '\(descriptor.profile.name)' activated instantly for UI")
+        
+        currentApplicationTask = Task.detached(priority: .userInitiated) {
             do {
-                try await profileService.applyProfileAsync(descriptor, cleanConfig: false)
+                try await self.profileService.applyProfileAsync(descriptor, cleanConfig: false)
+                LoggerService.info("Profile '\(descriptor.profile.name)' applied successfully in background")
             } catch {
-                LoggerService.error("Profile apply failed: \(error)")
-                _ = await MainActor.run {
-                    Task { await showError(error) }
+                if Task.isCancelled {
+                    LoggerService.info("Profile application cancelled: \(descriptor.profile.name)")
+                } else {
+                    LoggerService.error("Profile apply failed: \(error)")
+                    await self.showError(error)
                 }
+            }
+            
+            await MainActor.run {
+                self.currentApplicationTask = nil
             }
         }
     }
     
-    /// Reapplies the currently active profile
     func reapplyActiveProfile() {
         guard let active = activeProfile else { return }
         applyProfile(active)
     }
     
-    /// Creates a new profile from the current system configuration
-    /// - Parameter name: Name for the new profile
     func createProfileFromCurrent(name: String) async throws -> ProfileDescriptor {
         return try await withCheckedThrowingContinuation { continuation in
             Task {
@@ -144,8 +163,6 @@ final class StatusBarViewModel: ObservableObject {
         }
     }
     
-    /// Creates a new empty profile
-    /// - Parameter name: Name for the new profile
     func createEmptyProfile(name: String) async throws -> ProfileDescriptor {
         return try await withCheckedThrowingContinuation { continuation in
             Task {
@@ -160,10 +177,6 @@ final class StatusBarViewModel: ObservableObject {
         }
     }
     
-    /// Copies an existing profile
-    /// - Parameters:
-    ///   - descriptor: Profile to copy
-    ///   - newName: Name for the copied profile
     func copyProfile(_ descriptor: ProfileDescriptor, to newName: String) async throws -> ProfileDescriptor {
         return try await withCheckedThrowingContinuation { continuation in
             Task {
@@ -177,8 +190,6 @@ final class StatusBarViewModel: ObservableObject {
         }
     }
     
-    /// Deletes a profile
-    /// - Parameter descriptor: Profile to delete
     func deleteProfile(_ descriptor: ProfileDescriptor) async throws {
         return try await withCheckedThrowingContinuation { continuation in
             Task {
@@ -192,10 +203,6 @@ final class StatusBarViewModel: ObservableObject {
         }
     }
     
-    /// Updates wallpaper for a profile
-    /// - Parameters:
-    ///   - descriptor: Profile to update
-    ///   - sourceURL: Source wallpaper file URL
     func updateWallpaper(for descriptor: ProfileDescriptor, from sourceURL: URL) async throws -> ProfileDescriptor {
         return try await withCheckedThrowingContinuation { continuation in
             Task {
@@ -209,20 +216,15 @@ final class StatusBarViewModel: ObservableObject {
         }
     }
     
-    // MARK: - System Operations
     
-    /// Opens the profiles folder in Finder
     func openProfilesFolder() {
         profileService.openProfilesFolder()
     }
     
-    /// Opens a specific profile folder in Finder
-    /// - Parameter descriptor: Profile descriptor
     func openProfileFolder(_ descriptor: ProfileDescriptor) {
         NSWorkspace.shared.open(descriptor.directory)
     }
     
-    /// Toggles launch at login setting
     func toggleLaunchAtLogin() async {
         do {
             try systemService.toggleLaunchAtLogin()
@@ -232,34 +234,34 @@ final class StatusBarViewModel: ObservableObject {
         }
     }
     
-    // MARK: - UI Helpers
     
-    /// Returns sorted profiles for display
     var sortedProfiles: [ProfileDescriptor] {
         return profiles.sorted { $0.profile.order < $1.profile.order }
     }
     
-    /// Checks if a profile is currently active
-    /// - Parameter descriptor: Profile to check
-    /// - Returns: True if the profile is active
     func isProfileActive(_ descriptor: ProfileDescriptor) -> Bool {
-        return activeProfile?.directory == descriptor.directory
+        guard let active = activeProfile else {
+            LoggerService.info("Profile '\(descriptor.profile.name)' active check: false (no active profile)")
+            return false
+        }
+        
+        let pathMatch = active.directory.path == descriptor.directory.path
+        let nameMatch = active.profile.name == descriptor.profile.name
+        let isActive = pathMatch && nameMatch
+        
+        LoggerService.info("Profile '\(descriptor.profile.name)' active check: \(isActive) (current: \(active.profile.name), pathMatch: \(pathMatch), nameMatch: \(nameMatch))")
+        return isActive
     }
     
-    /// Returns the active profile name for display
     var activeProfileName: String? {
         return activeProfile?.profile.name
     }
     
-    /// Returns display title for the menu
     var menuTitle: String {
         return activeProfileName ?? "Select a profile"
     }
     
-    // MARK: - File Operations
     
-    /// Shows a file picker for wallpaper selection
-    /// - Parameter completion: Completion handler with selected URL
     func pickWallpaperFile(completion: @escaping (URL?) -> Void) {
         let panel = NSOpenPanel()
         
@@ -278,17 +280,13 @@ final class StatusBarViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Alert Helpers
     
-    /// Shows an error alert
-    /// - Parameter error: Error to display
     @MainActor
     private func showError(_ error: Error) async {
         let alert = NSAlert()
         alert.messageText = "Error"
         alert.informativeText = error.localizedDescription
         
-        // Add recovery suggestion if available
         if let localizableError = error as? LocalizedError,
            let suggestion = localizableError.recoverySuggestion {
             alert.informativeText += "\n\n\(suggestion)"
@@ -299,12 +297,8 @@ final class StatusBarViewModel: ObservableObject {
         alert.runModal()
     }
     
-    /// Shows a confirmation dialog for profile deletion
-    /// - Parameter profileName: Name of the profile to delete
-    /// - Returns: True if user confirmed deletion
     @MainActor
     func confirmDeleteProfile(_ profileName: String) async -> Bool {
-        // First confirmation dialog
         let firstAlert = NSAlert()
         firstAlert.messageText = "Delete Profile"
         firstAlert.informativeText = "Are you sure you want to delete the profile '\(profileName)'?\n\nThis action cannot be undone. The profile folder will be moved to the Trash."
@@ -315,7 +309,6 @@ final class StatusBarViewModel: ObservableObject {
         let firstResponse = firstAlert.runModal()
         guard firstResponse == .alertFirstButtonReturn else { return false }
         
-        // Second confirmation dialog - more explicit
         let secondAlert = NSAlert()
         secondAlert.messageText = "Confirm Deletion"
         secondAlert.informativeText = "This will permanently move the profile '\(profileName)' and all its contents to the Trash.\n\n⚠️ This action cannot be undone.\n\nAre you absolutely sure you want to continue?"
@@ -327,12 +320,6 @@ final class StatusBarViewModel: ObservableObject {
         return secondResponse == .alertFirstButtonReturn
     }
     
-    /// Shows a dialog to get profile name from user
-    /// - Parameters:
-    ///   - title: Dialog title
-    ///   - message: Dialog message
-    ///   - placeholder: Placeholder text for input field
-    /// - Returns: User input string or nil if cancelled
     @MainActor
     func promptForProfileName(title: String, message: String, placeholder: String) async -> String? {
         let alert = NSAlert()
@@ -350,10 +337,6 @@ final class StatusBarViewModel: ObservableObject {
         return response == .alertFirstButtonReturn ? input.stringValue : nil
     }
     
-    /// Shows a success message
-    /// - Parameters:
-    ///   - title: Alert title
-    ///   - message: Alert message
     @MainActor
     func showSuccess(title: String, message: String) async {
         let alert = NSAlert()
@@ -365,11 +348,9 @@ final class StatusBarViewModel: ObservableObject {
     }
 }
 
-// MARK: - Menu Construction Helpers
 
 extension StatusBarViewModel {
     
-    /// Creates menu items for profile management
     func createProfileMenuItems() -> [NSMenuItem] {
         var items: [NSMenuItem] = []
         
@@ -387,7 +368,6 @@ extension StatusBarViewModel {
         return items
     }
     
-    /// Creates a menu item for a specific profile
     private func createProfileMenuItem(for descriptor: ProfileDescriptor) -> NSMenuItem {
         let title = descriptor.profile.name
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
@@ -402,11 +382,9 @@ extension StatusBarViewModel {
             item.state = .on
         }
         
-        // Add submenu with profile actions
         let submenu = NSMenu()
         
         if isActive {
-            // Active profile specific actions
             let reapply = NSMenuItem(title: "Reapply", action: nil, keyEquivalent: "")
             submenu.addItem(reapply)
             
@@ -416,7 +394,6 @@ extension StatusBarViewModel {
             submenu.addItem(.separator())
         }
         
-        // Common actions for all profiles
         let openFolder = NSMenuItem(title: "Open Profile Folder", action: nil, keyEquivalent: "")
         openFolder.representedObject = descriptor
         submenu.addItem(openFolder)
@@ -431,11 +408,9 @@ extension StatusBarViewModel {
         return item
     }
     
-    /// Creates general action menu items
     func createActionMenuItems() -> [NSMenuItem] {
         var items: [NSMenuItem] = []
         
-        // Profile creation actions
         let newEmpty = NSMenuItem(title: "Create Empty Profile…", action: nil, keyEquivalent: "e")
         items.append(newEmpty)
         
@@ -444,7 +419,6 @@ extension StatusBarViewModel {
         
         items.append(.separator())
         
-        // General actions
         let reload = NSMenuItem(title: "Reload Profiles", action: nil, keyEquivalent: "r")
         items.append(reload)
         
@@ -453,14 +427,12 @@ extension StatusBarViewModel {
         
         items.append(.separator())
         
-        // Settings
         let launchAtLogin = NSMenuItem(title: "Launch at Login", action: nil, keyEquivalent: "")
         launchAtLogin.state = isLaunchAtLoginEnabled ? .on : .off
         items.append(launchAtLogin)
         
         items.append(.separator())
         
-        // Quit
         let quit = NSMenuItem(title: "Quit RiceBarMac", action: nil, keyEquivalent: "q")
         items.append(quit)
         

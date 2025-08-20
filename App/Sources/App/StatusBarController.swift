@@ -5,8 +5,6 @@ import UniformTypeIdentifiers
 import SwiftUI
 import Combine
 
-/// Controls the menu bar interface and user interactions
-/// Refactored to use MVVM architecture with StatusBarViewModel
 final class StatusBarController {
     private let statusItem: NSStatusItem
     private let viewModel: StatusBarViewModel
@@ -22,35 +20,47 @@ final class StatusBarController {
     }
 
     private func setupBindings() {
-        // Rebuild menu when profiles or state changes
-        Publishers.CombineLatest4(
-            viewModel.$profiles,
-            viewModel.$activeProfile,
-            viewModel.$isApplying,
-            viewModel.$isLaunchAtLoginEnabled
-        )
-        .receive(on: DispatchQueue.main)
-        .sink { [weak self] _, _, _, _ in
-            self?.constructMenu()
-        }
-        .store(in: &cancellables)
+        viewModel.$profiles
+            .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
+            .removeDuplicates { $0.count == $1.count && $0.map(\.directory) == $1.map(\.directory) }
+            .sink { [weak self] profiles in
+                LoggerService.info("Menu: Profiles changed, reconstructing menu")
+                self?.constructMenu()
+            }
+            .store(in: &cancellables)
+        
+        viewModel.$activeProfile
+            .removeDuplicates { 
+                if $0 == nil && $1 == nil { return true }
+                if $0 == nil || $1 == nil { return false }
+                return $0!.directory == $1!.directory
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] activeProfile in
+                LoggerService.info("Menu: Active profile changed to: \(activeProfile?.profile.name ?? "nil")")
+                self?.updateActiveProfileCheckmarks()
+            }
+            .store(in: &cancellables)
+        
+        viewModel.$isLaunchAtLoginEnabled
+            .debounce(for: .milliseconds(50), scheduler: DispatchQueue.main)
+            .removeDuplicates()
+            .sink { [weak self] _ in
+                self?.updateLaunchAtLoginCheckmark()
+            }
+            .store(in: &cancellables)
     }
     
     private func constructMenu() {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
-        // Title item
         let titleItem = NSMenuItem()
-        titleItem.view = NSHostingView(rootView: TitleMenuView(
-            activeName: viewModel.activeProfileName,
-            isApplying: viewModel.isApplying
-        ))
+        titleItem.view = NSHostingView(rootView: TitleMenuView(viewModel: viewModel))
         titleItem.isEnabled = false
         menu.addItem(titleItem)
         menu.addItem(.separator())
 
-        // Profile items
         let profileItems = createProfileMenuItems()
         for item in profileItems {
             menu.addItem(item)
@@ -58,13 +68,53 @@ final class StatusBarController {
 
         menu.addItem(.separator())
         
-        // Action items
         let actionItems = createActionMenuItems()
         for item in actionItems {
             menu.addItem(item)
         }
 
         statusItem.menu = menu
+        
+        DispatchQueue.main.async {
+            self.updateActiveProfileCheckmarks()
+        }
+    }
+    
+    private func updateActiveProfileCheckmarks() {
+        guard let menu = statusItem.menu else { 
+            LoggerService.error("Menu: No menu available for checkmark update")
+            return 
+        }
+        
+        LoggerService.info("Menu: Starting checkmark update for \(menu.items.count) items")
+        var profileItemsFound = 0
+        
+        for (index, item) in menu.items.enumerated() {
+            if let descriptor = item.representedObject as? ProfileDescriptor {
+                profileItemsFound += 1
+                let isActive = viewModel.isProfileActive(descriptor)
+                let currentState = item.state
+                let newState: NSControl.StateValue = isActive ? .on : .off
+                
+                LoggerService.info("Menu: Item[\(index)] '\(descriptor.profile.name)' - current: \(currentState.rawValue), new: \(newState.rawValue), isActive: \(isActive)")
+                
+                item.state = newState
+                LoggerService.info("Menu: FORCED update checkmark for '\(descriptor.profile.name)' to \(isActive ? "ON" : "OFF")")
+            }
+        }
+        
+        LoggerService.info("Menu: Checkmark update complete - found \(profileItemsFound) profile items")
+    }
+    
+    private func updateLaunchAtLoginCheckmark() {
+        guard let menu = statusItem.menu else { return }
+        
+        for item in menu.items {
+            if item.title == "Launch at Login" {
+                item.state = viewModel.isLaunchAtLoginEnabled ? .on : .off
+                break
+            }
+        }
     }
     
     private func createProfileMenuItems() -> [NSMenuItem] {
@@ -74,22 +124,27 @@ final class StatusBarController {
             return [empty]
         }
         
-        return viewModel.sortedProfiles.map { descriptor in
+        return viewModel.sortedProfiles.enumerated().map { (index, descriptor) in
             let title = descriptor.profile.name
-            let item = NSMenuItem(title: title, action: #selector(applyProfileMenu(_:)), keyEquivalent: "")
+            let keyEquivalent = index < 9 ? "\(index + 1)" : ""
+            let item = NSMenuItem(title: title, action: #selector(applyProfileMenu(_:)), keyEquivalent: keyEquivalent)
             item.target = self
             item.representedObject = descriptor
             
+            if index < 9 {
+                item.keyEquivalentModifierMask = .command
+            }
+            
             if let hotkeyText = descriptor.profile.hotkey {
-                item.toolTip = "Hotkey: \(hotkeyText)"
+                item.toolTip = "Hotkey: \(hotkeyText) | Shortcut: ⌘\(index + 1)"
+            } else if index < 9 {
+                item.toolTip = "Shortcut: ⌘\(index + 1)"
             }
             
             let isActive = viewModel.isProfileActive(descriptor)
-            if isActive {
-                item.state = .on
-            }
+            item.state = isActive ? .on : .off
+            LoggerService.info("Menu: Profile '\(descriptor.profile.name)' initial state: \(isActive ? "ON" : "OFF")")
             
-            // Add submenu with profile actions
             let submenu = createProfileSubmenu(for: descriptor, isActive: isActive)
             item.submenu = submenu
             
@@ -101,7 +156,6 @@ final class StatusBarController {
         let submenu = NSMenu()
         
         if isActive {
-            // Active profile specific actions
             let reapply = NSMenuItem(title: "Reapply", action: #selector(reapplyActive), keyEquivalent: "")
             reapply.target = self
             submenu.addItem(reapply)
@@ -113,7 +167,6 @@ final class StatusBarController {
             submenu.addItem(.separator())
         }
         
-        // Common actions for all profiles
         let openFolder = NSMenuItem(title: "Open Profile Folder", action: #selector(openProfileFolder(_:)), keyEquivalent: "")
         openFolder.target = self
         openFolder.representedObject = descriptor
@@ -132,18 +185,34 @@ final class StatusBarController {
     private func createActionMenuItems() -> [NSMenuItem] {
         var items: [NSMenuItem] = []
         
-        // Profile creation actions
-        let newEmpty = NSMenuItem(title: "Create Empty Profile…", action: #selector(promptCreateEmpty), keyEquivalent: Constants.MenuKeyEquivalents.newEmptyProfile)
-        newEmpty.target = self
-        items.append(newEmpty)
+        let createProfileMenu = NSMenuItem(title: "Create Profile", action: nil, keyEquivalent: "")
+        let createSubmenu = NSMenu()
         
-        let snapshot = NSMenuItem(title: "Create Profile From Current…", action: #selector(promptCreateFromCurrent), keyEquivalent: Constants.MenuKeyEquivalents.newFromCurrent)
+        let newEmpty = NSMenuItem(title: "Empty Profile…", action: #selector(promptCreateEmpty), keyEquivalent: Constants.MenuKeyEquivalents.newEmptyProfile)
+        newEmpty.target = self
+        createSubmenu.addItem(newEmpty)
+        
+        let snapshot = NSMenuItem(title: "From Current Setup…", action: #selector(promptCreateFromCurrent), keyEquivalent: Constants.MenuKeyEquivalents.newFromCurrent)
         snapshot.target = self
-        items.append(snapshot)
+        createSubmenu.addItem(snapshot)
+        
+        createProfileMenu.submenu = createSubmenu
+        items.append(createProfileMenu)
         
         items.append(.separator())
         
-        // General actions
+        let nextProfile = NSMenuItem(title: "Next Profile", action: #selector(switchToNextProfile), keyEquivalent: "]")
+        nextProfile.target = self
+        nextProfile.keyEquivalentModifierMask = .command
+        items.append(nextProfile)
+        
+        let prevProfile = NSMenuItem(title: "Previous Profile", action: #selector(switchToPreviousProfile), keyEquivalent: "[")
+        prevProfile.target = self
+        prevProfile.keyEquivalentModifierMask = .command
+        items.append(prevProfile)
+        
+        items.append(.separator())
+        
         let reload = NSMenuItem(title: "Reload Profiles", action: #selector(reloadProfiles), keyEquivalent: Constants.MenuKeyEquivalents.reloadProfiles)
         reload.target = self
         items.append(reload)
@@ -154,7 +223,6 @@ final class StatusBarController {
         
         items.append(.separator())
         
-        // Settings
         let launchAtLogin = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLogin.target = self
         launchAtLogin.state = viewModel.isLaunchAtLoginEnabled ? .on : .off
@@ -162,7 +230,6 @@ final class StatusBarController {
         
         items.append(.separator())
         
-        // Quit
         let quit = NSMenuItem(title: "Quit \(Constants.appName)", action: #selector(quit), keyEquivalent: Constants.MenuKeyEquivalents.quit)
         quit.target = self
         items.append(quit)
@@ -173,20 +240,15 @@ final class StatusBarController {
     @objc private func applyProfileMenu(_ sender: NSMenuItem) {
         guard let descriptor = sender.representedObject as? ProfileDescriptor else { return }
         
-        // Only apply if not already applying (prevent race condition)
-        guard !viewModel.isApplying else {
-            LoggerService.info("Profile application already in progress, ignoring click")
-            return
-        }
+        LoggerService.info("Menu: Clicked profile '\(descriptor.profile.name)'")
         
-        // Immediate visual feedback while the menu is open
-        if let items = statusItem.menu?.items {
-            for item in items where item.action == #selector(applyProfileMenu(_:)) {
-                item.state = (item === sender) ? .on : .off
-            }
-        }
-        
+        LoggerService.info("Menu: Starting profile application for '\(descriptor.profile.name)'")
         viewModel.applyProfile(descriptor)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            LoggerService.info("Menu: Force checkmark update after profile click")
+            self.updateActiveProfileCheckmarks()
+        }
     }
 
     @objc private func reloadProfiles() {
@@ -311,27 +373,68 @@ final class StatusBarController {
             }
         }
     }
+    
+    @objc private func switchToNextProfile() {
+        let profiles = viewModel.sortedProfiles
+        guard !profiles.isEmpty else { return }
+        
+        if let currentIndex = profiles.firstIndex(where: { viewModel.isProfileActive($0) }) {
+            let nextIndex = (currentIndex + 1) % profiles.count
+            let nextProfile = profiles[nextIndex]
+            LoggerService.info("Switching to next profile: \(nextProfile.profile.name)")
+            viewModel.applyProfile(nextProfile)
+        } else {
+            LoggerService.info("No active profile, selecting first: \(profiles[0].profile.name)")
+            viewModel.applyProfile(profiles[0])
+        }
+    }
+    
+    @objc private func switchToPreviousProfile() {
+        let profiles = viewModel.sortedProfiles
+        guard !profiles.isEmpty else { return }
+        
+        if let currentIndex = profiles.firstIndex(where: { viewModel.isProfileActive($0) }) {
+            let prevIndex = currentIndex == 0 ? profiles.count - 1 : currentIndex - 1
+            let prevProfile = profiles[prevIndex]
+            LoggerService.info("Switching to previous profile: \(prevProfile.profile.name)")
+            viewModel.applyProfile(prevProfile)
+        } else {
+            LoggerService.info("No active profile, selecting last: \(profiles.last!.profile.name)")
+            viewModel.applyProfile(profiles.last!)
+        }
+    }
 }
 
 private struct TitleMenuView: View {
-    var activeName: String?
-    var isApplying: Bool = false
+    @ObservedObject var viewModel: StatusBarViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("RiceBarMac")
                     .font(.headline)
-                if isApplying {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                        .frame(width: 12, height: 12)
+                if viewModel.isApplying {
+                    HStack(spacing: 4) {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .frame(width: 12, height: 12)
+                        Text("Applying...")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                    }
                 }
             }
-            if let activeName, !activeName.isEmpty {
-                Text("Active: \(activeName)")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+            if let activeName = viewModel.activeProfileName, !activeName.isEmpty {
+                HStack {
+                    Text("Active: \(activeName)")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    if viewModel.isApplying {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                    }
+                }
             } else {
                 Text("Select a profile")
                     .font(.subheadline)

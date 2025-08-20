@@ -6,7 +6,6 @@ import Combine
 import Yams
 #endif
 
-// MARK: - Profile Service Errors
 
 enum ProfileServiceError: LocalizedError {
     case invalidProfileName
@@ -57,7 +56,6 @@ enum ProfileServiceError: LocalizedError {
     }
 }
 
-// MARK: - Profile Cache
 
 private struct CachedProfile {
     let profile: Profile
@@ -70,33 +68,25 @@ private struct CachedProfile {
     }
 }
 
-// MARK: - Profile Service
 
-/// Consolidated service for all profile-related operations including management, 
-/// application, caching, and file system watching.
 final class ProfileService: ObservableObject {
     
-    // MARK: - Published Properties
     
     @Published private(set) var profiles: [ProfileDescriptor] = []
     @Published private(set) var activeProfile: ProfileDescriptor?
     @Published private(set) var isApplying = false
     
-    // MARK: - Private Properties
     
     private let userDefaultsKey = "ActiveProfileDirectoryPath"
     private let cacheQueue = DispatchQueue(label: "com.ricebar.profile-cache", qos: .userInitiated)
     private var profileCache: [URL: CachedProfile] = [:]
     private var lastModificationDates: [URL: Date] = [:]
     
-    // File System Watching
     private var stream: FSEventStreamRef?
     private var debounceTimer: Timer?
     
-    // Profile Application
     private let fileSystemService: FileSystemService
     
-    // MARK: - Singleton
     
     static let shared = ProfileService()
     
@@ -113,39 +103,48 @@ final class ProfileService: ObservableObject {
         stopWatching()
     }
     
-    // MARK: - Profile Management
     
-    /// Reloads all profiles from the file system
     func reload() {
+        LoggerService.info("ProfileService: Starting reload of all profiles")
         let root = profilesRoot()
         let fm = FileManager.default
         var loaded: [ProfileDescriptor] = []
         
+        cacheQueue.async { [weak self] in
+            self?.profileCache.removeAll()
+            self?.lastModificationDates.removeAll()
+        }
+        
         if let items = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: []) {
+            LoggerService.info("ProfileService: Found \(items.count) items in profiles directory")
             for url in items {
                 guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false else { continue }
                 
+                LoggerService.info("ProfileService: Loading profile from: \(url.lastPathComponent)")
                 if let profile = loadProfile(at: url) {
                     loaded.append(ProfileDescriptor(profile: profile, directory: url))
+                    LoggerService.info("ProfileService: Loaded profile '\(profile.name)' with wallpaper: \(profile.wallpaper ?? "none")")
                 } else {
                     let defaults = defaultProfile(for: url)
                     loaded.append(ProfileDescriptor(profile: defaults, directory: url))
+                    LoggerService.info("ProfileService: Created default profile '\(defaults.name)' with wallpaper: \(defaults.wallpaper ?? "none")")
                 }
             }
         }
         
+        LoggerService.info("ProfileService: Loaded \(loaded.count) profiles total")
+        
         DispatchQueue.main.async {
             self.profiles = loaded
             self.restoreActiveProfileFromDefaults()
+            LoggerService.info("ProfileService: Reload complete, active profile restored")
         }
     }
     
-    /// Opens the profiles folder in Finder
     func openProfilesFolder() {
         NSWorkspace.shared.open(profilesRoot())
     }
     
-    /// Creates a copy of an existing profile
     func copyProfile(_ descriptor: ProfileDescriptor, to newName: String) throws -> ProfileDescriptor {
         let fm = FileManager.default
         let sanitized = sanitizeProfileName(newName)
@@ -158,7 +157,6 @@ final class ProfileService: ObservableObject {
         
         try fm.copyItem(at: descriptor.directory, to: dest)
         
-        // Remove transient files in the copy
         let transient = [".ricebar-last-apply.json"]
         for name in transient {
             let p = dest.appendingPathComponent(name)
@@ -173,7 +171,6 @@ final class ProfileService: ObservableObject {
         return ProfileDescriptor(profile: defaultProfile(for: dest), directory: dest)
     }
     
-    /// Creates a new profile from the current system configuration
     func createProfileFromCurrent(name: String) throws -> ProfileDescriptor {
         let fm = FileManager.default
         let sanitized = sanitizeProfileName(name)
@@ -187,7 +184,6 @@ final class ProfileService: ObservableObject {
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
         var profile = Profile(name: sanitized)
         
-        // Capture current wallpaper
         if let currentWallpaper = getCurrentWallpaper() {
             let wallpaperDest = dest.appendingPathComponent("wallpaper.\(currentWallpaper.pathExtension)")
             try fm.copyItem(at: currentWallpaper, to: wallpaperDest)
@@ -197,13 +193,10 @@ final class ProfileService: ObservableObject {
         
         let descriptor = ProfileDescriptor(profile: profile, directory: dest)
         
-        // Capture VS Code/Cursor settings and extensions
         try captureCodeEditorSettings(to: descriptor)
         
-        // Snapshot current ~/.config into home/.config
         try snapshotCurrentConfiguration(to: descriptor)
         
-        // Save profile.json with wallpaper info
         let jsonURL = dest.appendingPathComponent("profile.json")
         try saveProfileToJSON(descriptor.profile, at: jsonURL)
         
@@ -215,7 +208,6 @@ final class ProfileService: ObservableObject {
         return descriptor
     }
     
-    /// Creates a new empty profile
     func createEmptyProfile(name: String) throws -> ProfileDescriptor {
         let fm = FileManager.default
         let sanitized = sanitizeProfileName(name)
@@ -227,10 +219,8 @@ final class ProfileService: ObservableObject {
         }
         
         try fm.createDirectory(at: dest, withIntermediateDirectories: true)
-        // Create empty home dir
         try fm.createDirectory(at: dest.appendingPathComponent("home", isDirectory: true), withIntermediateDirectories: true)
         
-        // Save minimal profile.json
         let descriptor = ProfileDescriptor(profile: Profile(name: sanitized), directory: dest)
         let jsonURL = dest.appendingPathComponent("profile.json")
         try saveProfileToJSON(descriptor.profile, at: jsonURL)
@@ -243,29 +233,23 @@ final class ProfileService: ObservableObject {
         return descriptor
     }
     
-    /// Deletes a profile and its directory
     func deleteProfile(_ descriptor: ProfileDescriptor) throws {
         let fm = FileManager.default
         
-        // Verify the profile directory exists
         guard fm.fileExists(atPath: descriptor.directory.path) else {
             throw ProfileServiceError.profileNotFound(descriptor.profile.name)
         }
         
-        // Invalidate cache for this profile
         invalidateCache(directory: descriptor.directory)
         
         do {
-            // Move to trash instead of permanent deletion for safety
             var trashURL: NSURL?
             try fm.trashItem(at: descriptor.directory, resultingItemURL: &trashURL)
             
-            // Clear the active profile if it was the one deleted
             if activeProfile?.directory == descriptor.directory {
                 setActiveProfile(nil)
             }
             
-            // Reload profiles to update the list
             reload()
             
             LoggerService.info("Profile '\(descriptor.profile.name)' moved to trash successfully")
@@ -274,16 +258,12 @@ final class ProfileService: ObservableObject {
         }
     }
     
-    // MARK: - Profile Application
     
-    /// Applies a profile to the system
     func applyProfile(_ descriptor: ProfileDescriptor, cleanConfig: Bool = false) throws {
-        // Wait for any current apply operation to complete
         while ApplyActivity.isApplying {
             Thread.sleep(forTimeInterval: 0.1)
         }
         
-        // Use ApplyActivity to prevent conflicts
         ApplyActivity.begin()
         
         DispatchQueue.main.async {
@@ -300,16 +280,16 @@ final class ProfileService: ObservableObject {
         var actions: [ApplyAction] = []
         let profile = descriptor.profile
         
-        // Apply wallpaper if specified
         if let wallpaperRel = profile.wallpaper {
             let url = descriptor.directory.appendingPathComponent(wallpaperRel)
+            LoggerService.info("Profile specifies wallpaper: '\(wallpaperRel)' -> Full path: \(url.path)")
             try applyWallpaper(url: url)
+        } else {
+            LoggerService.info("Profile has no wallpaper specified")
         }
         
-        // Apply VS Code/Cursor settings
         try applyCodeEditorSettings(from: descriptor)
         
-        // Render templates into home/ first
         fileSystemService.renderTemplates(for: descriptor)
         
         let targetHome = URL(fileURLWithPath: NSHomeDirectory())
@@ -318,7 +298,6 @@ final class ProfileService: ObservableObject {
             try backupAndCleanConfig(atHome: targetHome)
         }
         
-        // Handle file replacements or overlays
         if let replacements = profile.replacements, !replacements.isEmpty {
             for repl in replacements {
                 let src = descriptor.directory.appendingPathComponent(repl.source)
@@ -334,42 +313,33 @@ final class ProfileService: ObservableObject {
             }
         }
         
-        // Apply terminal configuration
         if let term = profile.terminal {
             try applyTerminalConfig(term, base: descriptor.directory)
         }
         
-        // Apply IDE configuration
         if let ide = profile.ide {
             try applyIDEConfig(ide, base: descriptor.directory)
         }
         
-        // Run startup script if specified
         if let scriptRel = profile.startupScript {
             let scriptURL = descriptor.directory.appendingPathComponent(scriptRel)
             try runScript(scriptURL)
         }
         
-        // Save apply record
         ApplyRecordStore.save(ApplyRecord(timestamp: Date(), actions: actions), to: descriptor.directory)
         
-        // Mark as active only after successful completion
         setActiveProfile(descriptor)
     }
     
-    /// Async version of applyProfile that runs heavy operations on background queue
     func applyProfileAsync(_ descriptor: ProfileDescriptor, cleanConfig: Bool = false) async throws {
-        // Wait for any current apply operation to complete
         while ApplyActivity.isApplying {
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         }
         
-        // Set applying state immediately on main thread for responsive UI
         await MainActor.run {
             self.isApplying = true
         }
         
-        // Use ApplyActivity to prevent conflicts
         ApplyActivity.begin()
         
         defer {
@@ -379,24 +349,38 @@ final class ProfileService: ObservableObject {
             }
         }
         
-        // Run heavy operations on background queue but coordinate properly with main thread
-        try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
+                    if Task.isCancelled {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
+                    
                     var actions: [ApplyAction] = []
                     let profile = descriptor.profile
                     
-                    // Apply wallpaper if specified
                     if let wallpaperRel = profile.wallpaper {
                         let url = descriptor.directory.appendingPathComponent(wallpaperRel)
+                        LoggerService.info("Profile specifies wallpaper: '\(wallpaperRel)' -> Full path: \(url.path)")
                         try self.applyWallpaper(url: url)
+                    } else {
+                        LoggerService.info("Profile has no wallpaper specified")
                     }
                     
-                    // Apply VS Code/Cursor settings
+                    if Task.isCancelled {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
+                    
                     try self.applyCodeEditorSettings(from: descriptor)
                     
-                    // Render templates into home/ first
                     self.fileSystemService.renderTemplates(for: descriptor)
+                    
+                    if Task.isCancelled {
+                        continuation.resume(throwing: CancellationError())
+                        return
+                    }
                     
                     let targetHome = URL(fileURLWithPath: NSHomeDirectory())
                     
@@ -404,7 +388,6 @@ final class ProfileService: ObservableObject {
                         try self.backupAndCleanConfig(atHome: targetHome)
                     }
                     
-                    // Handle file replacements or overlays
                     if let replacements = profile.replacements, !replacements.isEmpty {
                         for repl in replacements {
                             let src = descriptor.directory.appendingPathComponent(repl.source)
@@ -420,31 +403,24 @@ final class ProfileService: ObservableObject {
                         }
                     }
                     
-                    // Apply terminal configuration
                     if let term = profile.terminal {
                         try self.applyTerminalConfig(term, base: descriptor.directory)
                     }
                     
-                    // Apply IDE configuration
                     if let ide = profile.ide {
                         try self.applyIDEConfig(ide, base: descriptor.directory)
                     }
                     
-                    // Run startup script if specified
                     if let scriptRel = profile.startupScript {
                         let scriptURL = descriptor.directory.appendingPathComponent(scriptRel)
                         try self.runScript(scriptURL)
                     }
                     
-                    // Save apply record
                     ApplyRecordStore.save(ApplyRecord(timestamp: Date(), actions: actions), to: descriptor.directory)
                     
-                    // Mark as active only after successful completion
-                    DispatchQueue.main.sync {
-                        self.setActiveProfile(descriptor)
-                    }
+                    self.setActiveProfile(descriptor)
                     
-                    continuation.resume()
+                    continuation.resume(returning: ())
                 } catch {
                     continuation.resume(throwing: error)
                 }
@@ -452,7 +428,6 @@ final class ProfileService: ObservableObject {
         }
     }
     
-    /// Reverts the last profile application
     func revertLastApply(for descriptor: ProfileDescriptor) throws {
         guard let record = ApplyRecordStore.load(from: descriptor.directory) else { return }
         let fm = FileManager.default
@@ -468,31 +443,40 @@ final class ProfileService: ObservableObject {
         }
     }
     
-    // MARK: - Active Profile Management
     
-    /// Sets the active profile
     func setActiveProfile(_ descriptor: ProfileDescriptor?) {
-        DispatchQueue.main.async {
+        LoggerService.info("Setting active profile: \(descriptor?.profile.name ?? "nil")")
+        
+        if Thread.isMainThread {
             self.activeProfile = descriptor
+        } else {
+            DispatchQueue.main.sync {
+                self.activeProfile = descriptor
+            }
         }
         
-        if let descriptor = descriptor {
-            UserDefaults.standard.set(descriptor.directory.path, forKey: userDefaultsKey)
-        } else {
-            UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+        DispatchQueue.main.async {
+            self.objectWillChange.send()
+        }
+        
+        Task.detached(priority: .background) {
+            if let descriptor = descriptor {
+                UserDefaults.standard.set(descriptor.directory.path, forKey: self.userDefaultsKey)
+                LoggerService.info("Profile '\(descriptor.profile.name)' saved to UserDefaults")
+            } else {
+                UserDefaults.standard.removeObject(forKey: self.userDefaultsKey)
+                LoggerService.info("Active profile cleared from UserDefaults")
+            }
         }
     }
     
-    // MARK: - Profile Metadata Updates
     
-    /// Saves profile metadata to disk
     func saveProfile(_ profile: Profile, at directory: URL) throws {
         let jsonURL = directory.appendingPathComponent("profile.json")
         try FileSystemUtilities.writeJSON(profile, to: jsonURL)
         invalidateCache(directory: directory)
     }
     
-    /// Updates wallpaper for a profile
     func updateWallpaper(for descriptor: ProfileDescriptor, from sourceURL: URL) throws -> ProfileDescriptor {
         let fm = FileManager.default
         let ext = sourceURL.pathExtension.isEmpty ? "jpg" : sourceURL.pathExtension
@@ -517,7 +501,6 @@ final class ProfileService: ObservableObject {
         return newDesc
     }
     
-    // MARK: - File System Watching
     
     private func startWatching() {
         stopWatching()
@@ -534,13 +517,11 @@ final class ProfileService: ObservableObject {
             for i in 0..<numEvents {
                 if let cstr = evPaths[Int(i)] {
                     let path = String(cString: cstr)
-                    // Ignore events under ~/.config/alacritty to avoid apply-trigger loops
                     if path.contains("/\(Constants.alacrittyDirRelative)/") { continue }
                     changed.append(path)
                 }
             }
             
-            // Debounce events to avoid thrashing
             DispatchQueue.main.async {
                 profileService.debounceTimer?.invalidate()
                 profileService.debounceTimer = Timer.scheduledTimer(withTimeInterval: 0.4, repeats: false) { _ in
@@ -569,8 +550,6 @@ final class ProfileService: ObservableObject {
         let activeDir = activeProfile?.directory.path
         
         if let activeDir, changedPaths.contains(where: { $0.hasPrefix(activeDir) }) {
-            // Auto-apply when files inside the active profile change
-            // Use longer window to prevent interference with manual switches
             guard !ApplyActivity.isApplying && !ApplyActivity.recentlyApplied(within: 2.0) else { return }
             guard let active = activeProfile else { return }
             
@@ -582,23 +561,20 @@ final class ProfileService: ObservableObject {
                 }
             }
         } else {
-            // General profile changes, reload the list
+            LoggerService.info("File system watcher triggering reload due to changes: \(changedPaths)")
             reload()
         }
     }
     
-    // MARK: - Caching
     
     private func getProfileFromCache(at directory: URL) -> Profile? {
         return cacheQueue.sync {
-            // Check if we have a valid cached version
             if let cached = profileCache[directory],
                cached.isValid,
                isFileUnchanged(at: directory, lastKnownDate: cached.fileModificationDate) {
                 return cached.profile
             }
             
-            // Load from disk and cache
             if let profile = loadProfileFromDisk(at: directory) {
                 cacheProfile(profile, at: directory)
                 return profile
@@ -633,7 +609,6 @@ final class ProfileService: ObservableObject {
     }
     
     private func getModificationDate(for directory: URL) -> Date {
-        // Check modification date of profile configuration files
         for fileName in Constants.profileFileCandidates {
             let url = directory.appendingPathComponent(fileName)
             if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
@@ -642,7 +617,6 @@ final class ProfileService: ObservableObject {
             }
         }
         
-        // Fallback to directory modification date
         if let attributes = try? FileManager.default.attributesOfItem(atPath: directory.path),
            let modificationDate = attributes[.modificationDate] as? Date {
             return modificationDate
@@ -652,7 +626,6 @@ final class ProfileService: ObservableObject {
     }
 }
 
-// MARK: - Private Implementation
 
 private extension ProfileService {
     
@@ -669,26 +642,28 @@ private extension ProfileService {
     }
     
     func loadActiveProfileFromDefaults() {
-        // During init, just validate the path exists
-        // Actual restoration happens after profiles are loaded
         if let path = UserDefaults.standard.string(forKey: userDefaultsKey) {
             let url = URL(fileURLWithPath: path)
             if !FileManager.default.fileExists(atPath: url.path) {
-                // Clean up invalid path
                 UserDefaults.standard.removeObject(forKey: userDefaultsKey)
             }
         }
     }
     
     private func restoreActiveProfileFromDefaults() {
-        guard let path = UserDefaults.standard.string(forKey: userDefaultsKey) else { return }
+        guard let path = UserDefaults.standard.string(forKey: userDefaultsKey) else { 
+            LoggerService.info("No active profile path in UserDefaults")
+            return 
+        }
         let url = URL(fileURLWithPath: path)
         
-        // Find the matching profile descriptor
+        LoggerService.info("Restoring active profile from UserDefaults: \(url.lastPathComponent)")
+        
         if let descriptor = profiles.first(where: { $0.directory == url }) {
+            LoggerService.info("Found matching profile, setting as active: \(descriptor.profile.name)")
             activeProfile = descriptor
         } else {
-            // Profile no longer exists, clear the setting
+            LoggerService.warning("Profile no longer exists, clearing UserDefaults: \(url.lastPathComponent)")
             UserDefaults.standard.removeObject(forKey: userDefaultsKey)
         }
     }
@@ -699,7 +674,6 @@ private extension ProfileService {
     }
     
     func loadProfile(at directory: URL) -> Profile? {
-        // Try cache first
         if let cached = getProfileFromCache(at: directory) {
             return cached
         }
@@ -756,19 +730,34 @@ private extension ProfileService {
     func firstImage(in directory: URL) -> URL? {
         let fm = FileManager.default
         let exts = Array(Constants.wallpaperExtensions)
-        guard let items = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil, options: []) else { return nil }
+        guard let items = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil, options: []) else { 
+            LoggerService.warning("Could not read directory contents: \(directory.path)")
+            return nil 
+        }
         
-        // Prefer files named like wallpaper/background/bg first
+        LoggerService.info("Looking for wallpaper in \(directory.lastPathComponent), found \(items.count) items")
+        
+        let imageFiles = items.filter { exts.contains($0.pathExtension.lowercased()) }
+        LoggerService.info("Found \(imageFiles.count) image files: \(imageFiles.map { $0.lastPathComponent }.joined(separator: ", "))")
+        
         let preferredPrefixes = Constants.preferredWallpaperPrefixes
         if let preferred = items.first(where: { url in
             let name = url.deletingPathExtension().lastPathComponent.lowercased()
-            return exts.contains(url.pathExtension.lowercased()) && preferredPrefixes.contains(where: { name.hasPrefix($0) })
+            let hasPreferredName = preferredPrefixes.contains(where: { name.hasPrefix($0) })
+            let hasValidExt = exts.contains(url.pathExtension.lowercased())
+            return hasValidExt && hasPreferredName
         }) {
+            LoggerService.info("Selected preferred wallpaper: \(preferred.lastPathComponent)")
             return preferred
         }
         
-        // Otherwise first image
-        return items.first { exts.contains($0.pathExtension.lowercased()) }
+        if let firstImage = items.first(where: { exts.contains($0.pathExtension.lowercased()) }) {
+            LoggerService.info("Selected first available image: \(firstImage.lastPathComponent)")
+            return firstImage
+        }
+        
+        LoggerService.info("No wallpaper images found in directory")
+        return nil
     }
     
     func saveProfileToJSON(_ profile: Profile, at url: URL) throws {
@@ -778,7 +767,6 @@ private extension ProfileService {
         try data.write(to: url, options: .atomic)
     }
     
-    // MARK: - Profile Application Implementation
     
     func snapshotCurrentConfiguration(to descriptor: ProfileDescriptor) throws {
         let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
@@ -790,21 +778,18 @@ private extension ProfileService {
             try copyDirectoryRecursively(from: src, to: dst)
         }
         
-        // Snapshot IDE configurations
         try snapshotIDEConfigurations(to: descriptor, home: home)
     }
     
     func snapshotIDEConfigurations(to descriptor: ProfileDescriptor, home: URL) throws {
         let fm = FileManager.default
         
-        // Snapshot VS Code configuration
         let vscodeConfigDir = home.appendingPathComponent(Constants.vscodeConfigDir, isDirectory: true)
         if fm.fileExists(atPath: vscodeConfigDir.path) {
             let vscodeSnapshotDir = descriptor.directory.appendingPathComponent("vscode", isDirectory: true)
             try copyIDEConfigForSnapshot(from: vscodeConfigDir, to: vscodeSnapshotDir, ideType: .vscode)
         }
         
-        // Snapshot Cursor configuration
         let cursorConfigDir = home.appendingPathComponent(Constants.cursorConfigDir, isDirectory: true)
         if fm.fileExists(atPath: cursorConfigDir.path) {
             let cursorSnapshotDir = descriptor.directory.appendingPathComponent("cursor", isDirectory: true)
@@ -816,7 +801,6 @@ private extension ProfileService {
         let fm = FileManager.default
         try fm.createDirectory(at: dstDir, withIntermediateDirectories: true)
         
-        // Copy essential files
         let essentialFiles = [
             ideType.settingsFile,
             ideType.keybindingsFile
@@ -831,7 +815,6 @@ private extension ProfileService {
             }
         }
         
-        // Copy snippets directory if it exists
         let snippetsDir = srcDir.appendingPathComponent(ideType.snippetsDirectory, isDirectory: true)
         if fm.fileExists(atPath: snippetsDir.path) {
             let snippetsDst = dstDir.appendingPathComponent(ideType.snippetsDirectory, isDirectory: true)
@@ -851,27 +834,36 @@ private extension ProfileService {
             try fm.moveItem(at: configDir, to: backup)
         }
         
-        // Recreate empty .config for overlay
         try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
     }
     
     func applyWallpaper(url: URL) throws {
+        LoggerService.info("Attempting to apply wallpaper: \(url.path)")
+        
         guard FileManager.default.fileExists(atPath: url.path) else { 
+            LoggerService.error("Wallpaper file not found: \(url.path)")
             throw ProfileServiceError.fileNotFound(url.path) 
         }
         
+        LoggerService.info("Wallpaper file exists, attempting to set for \(NSScreen.screens.count) screens")
+        
         var lastError: Error?
-        for screen in NSScreen.screens {
+        var successCount = 0
+        
+        for (index, screen) in NSScreen.screens.enumerated() {
             do {
+                LoggerService.info("Setting wallpaper for screen \(index + 1)")
                 try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
+                successCount += 1
+                LoggerService.info("Successfully set wallpaper for screen \(index + 1)")
             } catch {
                 lastError = error
-                LoggerService.error("Wallpaper set failed for screen: \(error.localizedDescription)")
+                LoggerService.error("Wallpaper set failed for screen \(index + 1): \(error.localizedDescription)")
             }
         }
         
-        if lastError != nil {
-            // Fallback via AppleScript to set all desktops
+        if successCount == 0 {
+            LoggerService.warning("All screens failed, trying AppleScript fallback")
             let script = """
             tell application "System Events"
               tell every desktop
@@ -881,9 +873,20 @@ private extension ProfileService {
             """
             var errorDict: NSDictionary?
             if let appleScript = NSAppleScript(source: script) {
+                LoggerService.info("Executing AppleScript wallpaper command")
                 appleScript.executeAndReturnError(&errorDict)
-                if let errorDict { LoggerService.error("AppleScript wallpaper error: \(errorDict)") }
+                if let errorDict { 
+                    LoggerService.error("AppleScript wallpaper error: \(errorDict)") 
+                    throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "AppleScript failed: \(errorDict)"]))
+                } else {
+                    LoggerService.info("AppleScript wallpaper command executed successfully")
+                }
+            } else {
+                LoggerService.error("Failed to create AppleScript")
+                throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create AppleScript"]))
             }
+        } else {
+            LoggerService.info("Wallpaper applied successfully to \(successCount)/\(NSScreen.screens.count) screens")
         }
     }
     
@@ -900,7 +903,6 @@ private extension ProfileService {
         var kind: ApplyAction.Kind = .created
         
         if fm.fileExists(atPath: destination.path) {
-            // Skip heavy work if content is identical
             if fm.contentsEqual(atPath: source.path, andPath: destination.path) {
                 return ApplyAction(kind: .updated, source: source.path, destination: destination.path, backup: nil)
             }
@@ -922,7 +924,6 @@ private extension ProfileService {
         let fm = FileManager.default
         var actions: [ApplyAction] = []
         
-        // IMPORTANT: do NOT skip hidden files; we need to copy `.config/**` and other dotfiles
         guard let enumerator = fm.enumerator(at: sourceDir, includingPropertiesForKeys: [.isDirectoryKey], options: []) else { return actions }
         
         for case let fileURL as URL in enumerator {
@@ -992,7 +993,6 @@ private extension ProfileService {
         let now = Date()
         try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: path)
         
-        // Nudge both common config filenames so Alacritty notices
         let home = URL(fileURLWithPath: NSHomeDirectory())
         let ymlPath = home.appendingPathComponent("\(Constants.alacrittyDirRelative)/\(Constants.alacrittyYml)").path
         let tomlPath = home.appendingPathComponent("\(Constants.alacrittyDirRelative)/\(Constants.alacrittyToml)").path
@@ -1004,7 +1004,6 @@ private extension ProfileService {
             try? FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: tomlPath)
         }
         
-        // Ask a running Alacritty to reload its config if available
         fileSystemService.reloadAlacritty()
     }
     
@@ -1059,7 +1058,6 @@ private extension ProfileService {
         
         guard fm.fileExists(atPath: alt.path) else { return }
         
-        // Move to backups folder to avoid Alacritty loading the wrong file
         try? fm.createDirectory(at: ConfigAccess.backupsRoot, withIntermediateDirectories: true)
         let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let backup = ConfigAccess.backupsRoot.appendingPathComponent("alacritty_\(altName).\(timestamp)")
@@ -1082,24 +1080,20 @@ private extension ProfileService {
         let ideType = Constants.IDEType.vscode
         let configDir = home.appendingPathComponent(ideType.configDirectory, isDirectory: true)
         
-        // Check if theme is a built-in theme ID (starts with @id:)
         if let themeSpec = ide.theme {
             if themeSpec.hasPrefix("@id:") {
                 let themeId = String(themeSpec.dropFirst(4))
                 try applyBuiltInTheme(themeId: themeId, ideType: ideType, configDir: configDir)
             } else {
-                // Handle as file path
                 let src = base.appendingPathComponent(themeSpec)
                 try applyIDESettings(from: src, to: configDir, ideType: ideType)
             }
         } else {
-            // Auto-detect default IDE configuration files
             if let defaultConfig = findDefaultIDEConfig(in: base, for: ideType) {
                 try applyIDESettings(from: defaultConfig, to: configDir, ideType: ideType)
             }
         }
         
-        // Install extensions if specified
         if let extensions = ide.extensions, !extensions.isEmpty {
             try installVSCodeExtensions(extensions)
         }
@@ -1109,31 +1103,26 @@ private extension ProfileService {
         let ideType = Constants.IDEType.cursor
         let configDir = home.appendingPathComponent(ideType.configDirectory, isDirectory: true)
         
-        // Check if theme is a built-in theme ID (starts with @id:)
         if let themeSpec = ide.theme {
             if themeSpec.hasPrefix("@id:") {
                 let themeId = String(themeSpec.dropFirst(4))
                 try applyBuiltInTheme(themeId: themeId, ideType: ideType, configDir: configDir)
             } else {
-                // Handle as file path
                 let src = base.appendingPathComponent(themeSpec)
                 try applyIDESettings(from: src, to: configDir, ideType: ideType)
             }
         } else {
-            // Auto-detect default IDE configuration files
             if let defaultConfig = findDefaultIDEConfig(in: base, for: ideType) {
                 try applyIDESettings(from: defaultConfig, to: configDir, ideType: ideType)
             }
         }
         
-        // Install extensions if specified
         if let extensions = ide.extensions, !extensions.isEmpty {
             try installCursorExtensions(extensions)
         }
     }
     
     func applyBuiltInTheme(themeId: String, ideType: Constants.IDEType, configDir: URL) throws {
-        // Discover available themes from the actual IDE installation
         let availableThemes = try discoverAvailableThemes(for: ideType)
         
         guard let theme = availableThemes.first(where: { $0.name == themeId }) else {
@@ -1143,7 +1132,6 @@ private extension ProfileService {
         let fm = FileManager.default
         try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
         
-        // Create or update settings.json with the theme
         try applyDiscoveredThemeToSettings(theme: theme, configDir: configDir, ideType: ideType)
         
         LoggerService.info("Applied theme '\(theme.displayName)' to \(ideType.displayName)")
@@ -1155,10 +1143,8 @@ private extension ProfileService {
         
         var themes: [Constants.DiscoveredTheme] = []
         
-        // Add built-in themes (these are always available)
         themes.append(contentsOf: getBuiltInThemes())
         
-        // Discover themes from installed extensions
         let extensionsDir = configDir.appendingPathComponent("extensions", isDirectory: true)
         if FileManager.default.fileExists(atPath: extensionsDir.path) {
             themes.append(contentsOf: try discoverExtensionThemes(in: extensionsDir))
@@ -1214,7 +1200,6 @@ private extension ProfileService {
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: extensionDir.path, isDirectory: &isDir), isDir.boolValue else { continue }
             
-            // Look for package.json to get extension info
             let packageJsonPath = extensionDir.appendingPathComponent("package.json")
             guard fm.fileExists(atPath: packageJsonPath.path) else { continue }
             
@@ -1222,7 +1207,6 @@ private extension ProfileService {
                 let packageData = try Data(contentsOf: packageJsonPath)
                 guard let packageJson = try JSONSerialization.jsonObject(with: packageData) as? [String: Any] else { continue }
                 
-                // Extract themes from the extension
                 if let contributes = packageJson["contributes"] as? [String: Any],
                    let extensionThemes = contributes["themes"] as? [[String: Any]] {
                     
@@ -1250,7 +1234,6 @@ private extension ProfileService {
     func applyDiscoveredThemeToSettings(theme: Constants.DiscoveredTheme, configDir: URL, ideType: Constants.IDEType) throws {
         let settingsFile = configDir.appendingPathComponent(ideType.settingsFile)
         
-        // Load existing settings or create new ones
         var settings: [String: Any] = [:]
         
         if FileManager.default.fileExists(atPath: settingsFile.path) {
@@ -1264,10 +1247,8 @@ private extension ProfileService {
             }
         }
         
-        // Update theme setting
         settings["workbench.colorTheme"] = theme.name
         
-        // Write updated settings
         do {
             let data = try JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: settingsFile, options: .atomic)
@@ -1276,7 +1257,6 @@ private extension ProfileService {
         }
     }
     
-    /// Lists all available themes for an IDE (useful for debugging and user reference)
     func getAvailableThemes(for ideType: Constants.IDEType) -> [Constants.DiscoveredTheme] {
         do {
             let themes = try discoverAvailableThemes(for: ideType)
@@ -1306,17 +1286,13 @@ private extension ProfileService {
     func applyIDESettings(from src: URL, to configDir: URL, ideType: Constants.IDEType) throws {
         let fm = FileManager.default
         
-        // Ensure config directory exists
         try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
         
-        // Copy settings file
         let settingsDst = configDir.appendingPathComponent(ideType.settingsFile)
         _ = try replaceFile(source: src, destination: settingsDst)
         
-        // Check if source is a directory (multiple config files)
         var isDir: ObjCBool = false
         if fm.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
-            // Copy all files from source directory
             try copyIDEConfigDirectory(from: src, to: configDir, ideType: ideType)
         }
     }
@@ -1336,7 +1312,6 @@ private extension ProfileService {
             if isDir.boolValue {
                 try fm.createDirectory(at: dstURL, withIntermediateDirectories: true)
             } else {
-                // Skip certain files that shouldn't be copied
                 let fileName = fileURL.lastPathComponent
                 if shouldSkipIDEFile(fileName) { continue }
                 
@@ -1373,7 +1348,6 @@ private extension ProfileService {
             return
         }
         
-        // Install each extension
         for extensionId in extensions {
             try installVSCodeExtension(extensionId)
         }
@@ -1430,7 +1404,6 @@ private extension ProfileService {
             return
         }
         
-        // Install each extension
         for extensionId in extensions {
             try installCursorExtension(extensionId)
         }
@@ -1488,14 +1461,12 @@ private extension ProfileService {
         
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        // Run script via absolute path, robustly quoted to handle spaces/special chars
         process.currentDirectoryURL = url.deletingLastPathComponent()
         let quotedPath = "'\(url.path.replacingOccurrences(of: "'", with: "'\\''"))'"
         process.arguments = ["-lc", quotedPath]
         try process.run()
     }
     
-    /// Gets the current desktop wallpaper URL
     func getCurrentWallpaper() -> URL? {
         guard let mainScreen = NSScreen.main else { return nil }
         
@@ -1505,7 +1476,6 @@ private extension ProfileService {
                 return nil
             }
             
-            // Verify the file exists and is accessible
             if FileManager.default.fileExists(atPath: wallpaperURL.path) {
                 LoggerService.info("Found current wallpaper: \(wallpaperURL.path)")
                 return wallpaperURL
@@ -1516,12 +1486,10 @@ private extension ProfileService {
         } catch {
             LoggerService.error("Failed to get current wallpaper: \(error)")
             
-            // Fallback: Try to get via AppleScript
             return getCurrentWallpaperViaAppleScript()
         }
     }
     
-    /// Fallback method to get wallpaper via AppleScript
     private func getCurrentWallpaperViaAppleScript() -> URL? {
         let script = """
         tell application "System Events"
@@ -1556,25 +1524,19 @@ private extension ProfileService {
         }
     }
     
-    // MARK: - VS Code/Cursor Settings Capture
     
-    /// Captures current VS Code and Cursor settings and extensions
     private func captureCodeEditorSettings(to descriptor: ProfileDescriptor) throws {
         let fm = FileManager.default
         let homeURL = URL(fileURLWithPath: NSHomeDirectory())
         
-        // Create vscode directory in profile
         let vscodeDir = descriptor.directory.appendingPathComponent("vscode", isDirectory: true)
         try fm.createDirectory(at: vscodeDir, withIntermediateDirectories: true)
         
-        // VS Code paths
         let vscodeAppSupportPath = homeURL.appendingPathComponent("Library/Application Support/Code")
         let vscodeExtensionsPath = homeURL.appendingPathComponent(".vscode/extensions")
         
-        // Cursor paths  
         let cursorAppSupportPath = homeURL.appendingPathComponent("Library/Application Support/Cursor")
         
-        // Capture VS Code settings
         if fm.fileExists(atPath: vscodeAppSupportPath.path) {
             try captureEditorSettings(
                 from: vscodeAppSupportPath,
@@ -1584,7 +1546,6 @@ private extension ProfileService {
             )
         }
         
-        // Capture Cursor settings
         if fm.fileExists(atPath: cursorAppSupportPath.path) {
             try captureEditorSettings(
                 from: cursorAppSupportPath,
@@ -1597,18 +1558,15 @@ private extension ProfileService {
         LoggerService.info("Captured VS Code/Cursor settings for profile: \(descriptor.profile.name)")
     }
     
-    /// Helper method to capture settings from a specific code editor
     private func captureEditorSettings(from appSupportPath: URL, extensionsPath: URL?, to destination: URL, editorName: String) throws {
         let fm = FileManager.default
         
         try fm.createDirectory(at: destination, withIntermediateDirectories: true)
         
-        // Copy user settings
         let userPath = appSupportPath.appendingPathComponent("User")
         if fm.fileExists(atPath: userPath.path) {
             let userDest = destination.appendingPathComponent("User")
             
-            // Copy settings.json
             let settingsFile = userPath.appendingPathComponent("settings.json")
             if fm.fileExists(atPath: settingsFile.path) {
                 let settingsDest = userDest.appendingPathComponent("settings.json")
@@ -1617,7 +1575,6 @@ private extension ProfileService {
                 LoggerService.info("Captured \(editorName) settings.json")
             }
             
-            // Copy keybindings.json
             let keybindingsFile = userPath.appendingPathComponent("keybindings.json")
             if fm.fileExists(atPath: keybindingsFile.path) {
                 let keybindingsDest = userDest.appendingPathComponent("keybindings.json")
@@ -1626,7 +1583,6 @@ private extension ProfileService {
                 LoggerService.info("Captured \(editorName) keybindings.json")
             }
             
-            // Copy snippets directory
             let snippetsPath = userPath.appendingPathComponent("snippets")
             if fm.fileExists(atPath: snippetsPath.path) {
                 let snippetsDest = userDest.appendingPathComponent("snippets")
@@ -1635,22 +1591,18 @@ private extension ProfileService {
             }
         }
         
-        // Generate extensions list
         if let extensionsPath = extensionsPath, fm.fileExists(atPath: extensionsPath.path) {
             try captureExtensionsList(from: extensionsPath, to: destination, editorName: editorName)
         } else {
-            // For Cursor, look for cached extensions
             let cachedExtensions = appSupportPath.appendingPathComponent("CachedExtensionVSIXs")
             if fm.fileExists(atPath: cachedExtensions.path) {
                 try captureExtensionsList(from: cachedExtensions, to: destination, editorName: editorName)
             }
         }
         
-        // Extract theme information from settings
         try extractThemeInfo(from: appSupportPath, to: destination, editorName: editorName)
     }
     
-    /// Captures the list of installed extensions
     private func captureExtensionsList(from extensionsPath: URL, to destination: URL, editorName: String) throws {
         let fm = FileManager.default
         
@@ -1664,10 +1616,8 @@ private extension ProfileService {
         for extensionDir in extensionDirs {
             let dirName = extensionDir.lastPathComponent
             
-            // Skip system files
             guard !dirName.hasPrefix(".") && !dirName.hasSuffix(".json") else { continue }
             
-            // Extract extension ID (format: publisher.name-version)
             let components = dirName.components(separatedBy: "-")
             if components.count >= 2 {
                 let versionIndex = components.count - 1
@@ -1676,7 +1626,6 @@ private extension ProfileService {
             }
         }
         
-        // Write extensions list to file
         let extensionsFile = destination.appendingPathComponent("extensions.txt")
         let extensionsContent = extensions.sorted().joined(separator: "\n")
         try extensionsContent.write(to: extensionsFile, atomically: true, encoding: .utf8)
@@ -1684,7 +1633,6 @@ private extension ProfileService {
         LoggerService.info("Captured \(extensions.count) \(editorName) extensions")
     }
     
-    /// Extracts theme information from settings
     private func extractThemeInfo(from appSupportPath: URL, to destination: URL, editorName: String) throws {
         let settingsFile = appSupportPath.appendingPathComponent("User/settings.json")
         
@@ -1696,7 +1644,6 @@ private extension ProfileService {
         
         var themeInfo: [String: Any] = [:]
         
-        // Extract theme-related settings
         if let colorTheme = settingsDict["workbench.colorTheme"] as? String {
             themeInfo["colorTheme"] = colorTheme
         }
@@ -1709,7 +1656,6 @@ private extension ProfileService {
             themeInfo["productIconTheme"] = productIconTheme
         }
         
-        // Extract font settings
         if let fontFamily = settingsDict["editor.fontFamily"] as? String {
             themeInfo["fontFamily"] = fontFamily
         }
@@ -1718,7 +1664,6 @@ private extension ProfileService {
             themeInfo["fontSize"] = fontSize
         }
         
-        // Write theme info to file
         if !themeInfo.isEmpty {
             let themeFile = destination.appendingPathComponent("theme-info.json")
             let themeData = try JSONSerialization.data(withJSONObject: themeInfo, options: .prettyPrinted)
@@ -1728,9 +1673,7 @@ private extension ProfileService {
         }
     }
     
-    // MARK: - VS Code/Cursor Settings Application
     
-    /// Applies VS Code and Cursor settings from the profile
     private func applyCodeEditorSettings(from descriptor: ProfileDescriptor) throws {
         let vscodeDir = descriptor.directory.appendingPathComponent("vscode", isDirectory: true)
         let fm = FileManager.default
@@ -1742,7 +1685,6 @@ private extension ProfileService {
         
         let homeURL = URL(fileURLWithPath: NSHomeDirectory())
         
-        // Apply VS Code settings
         let vscodeProfileDir = vscodeDir.appendingPathComponent("vscode", isDirectory: true)
         if fm.fileExists(atPath: vscodeProfileDir.path) {
             try applyEditorSettingsToSystem(
@@ -1753,7 +1695,6 @@ private extension ProfileService {
             )
         }
         
-        // Apply Cursor settings
         let cursorProfileDir = vscodeDir.appendingPathComponent("cursor", isDirectory: true)
         if fm.fileExists(atPath: cursorProfileDir.path) {
             try applyEditorSettingsToSystem(
@@ -1767,40 +1708,32 @@ private extension ProfileService {
         LoggerService.info("Applied VS Code/Cursor settings from profile: \(descriptor.profile.name)")
     }
     
-    /// Applies settings from profile to the system editor configuration
     private func applyEditorSettingsToSystem(from profileDir: URL, to appSupportPath: URL, extensionsTo: URL?, editorName: String) throws {
         let fm = FileManager.default
         
-        // Apply user settings
         let userProfileDir = profileDir.appendingPathComponent("User")
         if fm.fileExists(atPath: userProfileDir.path) {
             let userSystemDir = appSupportPath.appendingPathComponent("User")
             
-            // Create User directory if it doesn't exist
             try fm.createDirectory(at: userSystemDir, withIntermediateDirectories: true)
             
-            // Apply settings.json
             let profileSettings = userProfileDir.appendingPathComponent("settings.json")
             if fm.fileExists(atPath: profileSettings.path) {
                 let systemSettings = userSystemDir.appendingPathComponent("settings.json")
                 
-                // Remove existing settings and copy profile settings
                 if fm.fileExists(atPath: systemSettings.path) {
                     try fm.removeItem(at: systemSettings)
                 }
                 try fm.copyItem(at: profileSettings, to: systemSettings)
                 LoggerService.info("Applied \(editorName) settings.json")
                 
-                // Small delay to allow editor to detect file changes
                 Thread.sleep(forTimeInterval: 0.1)
             }
             
-            // Apply keybindings.json
             let profileKeybindings = userProfileDir.appendingPathComponent("keybindings.json")
             if fm.fileExists(atPath: profileKeybindings.path) {
                 let systemKeybindings = userSystemDir.appendingPathComponent("keybindings.json")
                 
-                // Remove existing keybindings and copy profile keybindings
                 if fm.fileExists(atPath: systemKeybindings.path) {
                     try fm.removeItem(at: systemKeybindings)
                 }
@@ -1808,12 +1741,10 @@ private extension ProfileService {
                 LoggerService.info("Applied \(editorName) keybindings.json")
             }
             
-            // Apply snippets
             let profileSnippets = userProfileDir.appendingPathComponent("snippets")
             if fm.fileExists(atPath: profileSnippets.path) {
                 let systemSnippets = userSystemDir.appendingPathComponent("snippets")
                 
-                // Remove existing snippets and copy profile snippets
                 if fm.fileExists(atPath: systemSnippets.path) {
                     try fm.removeItem(at: systemSnippets)
                 }
@@ -1822,7 +1753,6 @@ private extension ProfileService {
             }
         }
         
-        // Show extension installation instructions
         let extensionsFile = profileDir.appendingPathComponent("extensions.txt")
         if fm.fileExists(atPath: extensionsFile.path) {
             if let extensionsContent = try? String(contentsOf: extensionsFile) {
@@ -1841,7 +1771,6 @@ private extension ProfileService {
     }
 }
 
-// MARK: - Extensions
 
 private extension String {
     var expandingTildeInPath: String {

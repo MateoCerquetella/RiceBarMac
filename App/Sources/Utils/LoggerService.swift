@@ -1,7 +1,6 @@
 import Foundation
 import OSLog
 
-/// Lightweight logger wrapper to centralize app logging.
 enum LoggerService {
     private static let subsystem = Bundle.main.bundleIdentifier ?? "com.ricebar.RiceBarMac"
     private static let logger = Logger(subsystem: subsystem, category: "app")

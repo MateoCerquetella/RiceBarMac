@@ -2,29 +2,19 @@ import Foundation
 
 #if DEBUG
 
-/// Testing utilities and protocols for unit testing support
-/// Only compiled in debug builds to avoid affecting release performance
 
-// MARK: - Test Protocols
 
-/// Protocol for testable components
 protocol Testable {
-    /// Resets the component to a clean state for testing
     func resetForTesting()
     
-    /// Returns current state information for verification
     var testState: [String: Any] { get }
 }
 
-/// Protocol for components that need dependency injection for testing
 protocol TestableWithDependencies: Testable {
-    /// Injects test dependencies
     func injectTestDependencies(_ dependencies: [String: Any])
 }
 
-// MARK: - Test File System
 
-/// Mock file system for testing file operations without affecting real files
 final class MockFileSystem {
     private var files: [String: Data] = [:]
     private var directories: Set<String> = []
@@ -37,7 +27,6 @@ final class MockFileSystem {
     func createFile(at path: String, contents: Data) {
         files[path] = contents
         
-        // Ensure parent directories exist
         let parentPath = (path as NSString).deletingLastPathComponent
         if !parentPath.isEmpty && parentPath != "/" {
             directories.insert(parentPath)
@@ -69,17 +58,13 @@ final class MockFileSystem {
     }
 }
 
-// MARK: - Test Profile Factory
 
-/// Factory for creating test profiles and descriptors
 enum TestProfileFactory {
     
-    /// Creates a minimal test profile
     static func createTestProfile(name: String = "TestProfile") -> Profile {
         return Profile(name: name)
     }
     
-    /// Creates a comprehensive test profile with all fields populated
     static func createCompleteTestProfile(name: String = "CompleteTestProfile") -> Profile {
         var profile = Profile(name: name)
         profile.order = 1
@@ -93,7 +78,6 @@ enum TestProfileFactory {
         return profile
     }
     
-    /// Creates a test profile descriptor
     static func createTestDescriptor(
         profile: Profile? = nil,
         directory: URL? = nil
@@ -103,7 +87,6 @@ enum TestProfileFactory {
         return ProfileDescriptor(profile: testProfile, directory: testDirectory)
     }
     
-    /// Creates multiple test profiles for bulk testing
     static func createTestProfiles(count: Int = 3) -> [ProfileDescriptor] {
         return (1...count).map { index in
             let profile = createTestProfile(name: "TestProfile\(index)")
@@ -113,12 +96,9 @@ enum TestProfileFactory {
     }
 }
 
-// MARK: - Test Validation
 
-/// Utilities for validating test results
 enum TestValidation {
     
-    /// Validates that a profile has expected values
     static func validateProfile(
         _ profile: Profile,
         name: String? = nil,
@@ -133,26 +113,21 @@ enum TestValidation {
         return true
     }
     
-    /// Validates that an error is of the expected type
     static func validateError<T: Error>(_ error: Error, type: T.Type) -> Bool {
         return error is T
     }
     
-    /// Validates that a URL points to an existing location (for mock testing)
     static func validateURL(_ url: URL, existsInMockFS mockFS: MockFileSystem) -> Bool {
         return mockFS.fileExists(at: url.path)
     }
 }
 
-// MARK: - Performance Testing
 
-/// Simple performance measurement utilities
 struct PerformanceMeasurement {
     let name: String
     let duration: TimeInterval
     let memoryUsage: UInt64?
     
-    /// Measures execution time of a closure
     static func measure<T>(
         name: String = "Measurement",
         operation: () throws -> T
@@ -191,14 +166,10 @@ struct PerformanceMeasurement {
     }
 }
 
-// MARK: - Test Extensions
 
 extension ProfileService: Testable {
     func resetForTesting() {
-        // Reset by reloading (clears profiles array and cache)
         reload()
-        // Clear cache through private method access would need to be implemented
-        // For now, the cache will reset naturally on reload
     }
     
     var testState: [String: Any] {
@@ -226,7 +197,6 @@ extension SystemService: Testable {
 
 extension FileSystemService: Testable {
     func resetForTesting() {
-        // File system service is stateless, nothing to reset
     }
     
     var testState: [String: Any] {

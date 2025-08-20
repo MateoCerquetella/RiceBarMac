@@ -4,7 +4,6 @@ import ServiceManagement
 import HotKey
 import Combine
 
-// MARK: - System Service Errors
 
 enum SystemServiceError: LocalizedError {
     case hotKeyParsingFailed(String)
@@ -38,22 +37,16 @@ enum SystemServiceError: LocalizedError {
     }
 }
 
-// MARK: - System Service
 
-/// Consolidated service for system-level operations including hotkey management 
-/// and launch at login functionality.
 final class SystemService: ObservableObject {
     
-    // MARK: - Published Properties
     
     @Published private(set) var registeredHotKeys: [String] = []
     @Published private(set) var isLaunchAtLoginEnabled = false
     
-    // MARK: - Private Properties
     
     private var hotkeys: [HotKey] = []
     
-    // MARK: - Singleton
     
     static let shared = SystemService()
     
@@ -61,17 +54,40 @@ final class SystemService: ObservableObject {
         updateLaunchAtLoginStatus()
     }
     
-    // MARK: - HotKey Management
     
-    /// Registers hotkeys for the given profiles
-    /// - Parameters:
-    ///   - profiles: Array of profile descriptors with hotkey configurations
-    ///   - onTrigger: Closure called when a hotkey is triggered
     func registerHotKeys(profiles: [ProfileDescriptor], onTrigger: @escaping (ProfileDescriptor) -> Void) {
-        // Clear existing hotkeys
         clearHotKeys()
         
         var registeredKeys: [String] = []
+        
+        for (index, descriptor) in profiles.prefix(9).enumerated() {
+            let key: Key
+            switch index {
+            case 0: key = .one
+            case 1: key = .two
+            case 2: key = .three
+            case 3: key = .four
+            case 4: key = .five
+            case 5: key = .six
+            case 6: key = .seven
+            case 7: key = .eight
+            case 8: key = .nine
+            default: continue
+            }
+            
+            let combo = KeyCombo(key: key, modifiers: [.command])
+            let hotKey = HotKey(keyCombo: combo)
+            
+            hotKey.keyDownHandler = { 
+                LoggerService.info("Global hotkey Cmd+\(index + 1) activated for profile: \(descriptor.profile.name)")
+                onTrigger(descriptor) 
+            }
+            
+            hotkeys.append(hotKey)
+            registeredKeys.append("⌘\(index + 1) → \(descriptor.profile.name)")
+            
+            LoggerService.info("Registered global hotkey Cmd+\(index + 1) for profile '\(descriptor.profile.name)'")
+        }
         
         for descriptor in profiles {
             guard let comboString = descriptor.profile.hotkey else { continue }
@@ -79,11 +95,14 @@ final class SystemService: ObservableObject {
             do {
                 let combo = try parseKeyCombo(comboString)
                 let hotKey = HotKey(keyCombo: combo)
-                hotKey.keyDownHandler = { onTrigger(descriptor) }
+                hotKey.keyDownHandler = { 
+                    LoggerService.info("Custom hotkey '\(comboString)' activated for profile: \(descriptor.profile.name)")
+                    onTrigger(descriptor) 
+                }
                 hotkeys.append(hotKey)
-                registeredKeys.append(comboString)
+                registeredKeys.append("\(comboString) → \(descriptor.profile.name)")
                 
-                LoggerService.info("Registered hotkey '\(comboString)' for profile '\(descriptor.profile.name)'")
+                LoggerService.info("Registered custom hotkey '\(comboString)' for profile '\(descriptor.profile.name)'")
             } catch {
                 LoggerService.error("Failed to register hotkey '\(comboString)' for profile '\(descriptor.profile.name)': \(error)")
             }
@@ -94,7 +113,6 @@ final class SystemService: ObservableObject {
         }
     }
     
-    /// Clears all registered hotkeys
     func clearHotKeys() {
         hotkeys.removeAll()
         DispatchQueue.main.async {
@@ -102,9 +120,6 @@ final class SystemService: ObservableObject {
         }
     }
     
-    /// Validates if a hotkey string can be parsed successfully
-    /// - Parameter keyString: The hotkey string to validate (e.g., "cmd+shift+1")
-    /// - Returns: True if the hotkey string is valid
     func validateHotKey(_ keyString: String) -> Bool {
         do {
             _ = try parseKeyCombo(keyString)
@@ -114,15 +129,12 @@ final class SystemService: ObservableObject {
         }
     }
     
-    // MARK: - Launch at Login Management
     
-    /// Checks if the app is currently set to launch at login
     func updateLaunchAtLoginStatus() {
         let enabled: Bool
         if #available(macOS 13.0, *) {
             enabled = SMAppService.mainApp.status == .enabled
         } else {
-            // For older macOS versions, we can't reliably check without deprecated APIs
             enabled = false
         }
         
@@ -131,7 +143,6 @@ final class SystemService: ObservableObject {
         }
     }
     
-    /// Toggles launch at login setting
     func toggleLaunchAtLogin() throws {
         if isLaunchAtLoginEnabled {
             try disableLaunchAtLogin()
@@ -140,7 +151,6 @@ final class SystemService: ObservableObject {
         }
     }
     
-    /// Enables launch at login
     func enableLaunchAtLogin() throws {
         guard #available(macOS 13.0, *) else {
             throw SystemServiceError.unsupportedVersion
@@ -156,7 +166,6 @@ final class SystemService: ObservableObject {
         }
     }
     
-    /// Disables launch at login
     func disableLaunchAtLogin() throws {
         guard #available(macOS 13.0, *) else {
             throw SystemServiceError.unsupportedVersion
@@ -172,8 +181,6 @@ final class SystemService: ObservableObject {
         }
     }
     
-    /// Sets launch at login to a specific state
-    /// - Parameter enabled: Whether launch at login should be enabled
     func setLaunchAtLogin(enabled: Bool) throws {
         if enabled != isLaunchAtLoginEnabled {
             try toggleLaunchAtLogin()
@@ -181,14 +188,9 @@ final class SystemService: ObservableObject {
     }
 }
 
-// MARK: - Private Implementation
 
 private extension SystemService {
     
-    /// Parses a hotkey string into a KeyCombo
-    /// - Parameter string: String like "ctrl+cmd+1" or "cmd+option+a"
-    /// - Returns: KeyCombo object for hotkey registration
-    /// - Throws: SystemServiceError if parsing fails
     func parseKeyCombo(_ string: String) throws -> KeyCombo {
         let parts = string.lowercased().split(separator: "+").map { String($0) }
         guard !parts.isEmpty else { 
@@ -224,11 +226,7 @@ private extension SystemService {
         return KeyCombo(key: key, modifiers: modifiers)
     }
     
-    /// Maps a string to a Key enum value
-    /// - Parameter s: String representation of a key
-    /// - Returns: Key enum value or nil if not found
     func mapKey(_ s: String) -> Key? {
-        // Handle numbers
         if let number = Int(s), (0...9).contains(number) {
             switch number {
             case 0: return .zero
@@ -245,7 +243,6 @@ private extension SystemService {
             }
         }
         
-        // Handle letters
         if s.count == 1, let c = s.uppercased().unicodeScalars.first {
             switch c {
             case "A": return .a
@@ -278,7 +275,6 @@ private extension SystemService {
             }
         }
         
-        // Handle special keys
         switch s {
         case "left": return .leftArrow
         case "right": return .rightArrow
