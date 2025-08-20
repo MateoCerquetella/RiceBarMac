@@ -1,10 +1,3 @@
-# RiceBarMac 🍚
-
-[![macOS](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://www.apple.com/macos/)
-[![Swift](https://img.shields.io/badge/Swift-5.0+-orange.svg)](https://swift.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
-
 <div align="center">
   
   # 🍚 RiceBarMac
@@ -21,6 +14,45 @@
 ## 🚀 Overview
 
 RiceBarMac is a powerful macOS menu bar application that allows you to quickly switch between different Rice configurations (themes, wallpapers, and system settings) using keyboard shortcuts. Perfect for developers and power users who want to maintain multiple aesthetic setups and switch between them seamlessly.
+
+## 🔧 How It Works
+
+RiceBarMac operates as a **menu bar utility** that manages your desktop rice configurations through a simple but powerful system:
+
+### 🎯 **Core Functionality**
+
+-   **Menu Bar Integration**: Runs silently in your menu bar with a rice bowl icon 🍚
+-   **Profile Management**: Stores rice configurations in `~/.ricebar/profiles/`
+-   **Hotkey Registration**: Uses macOS global hotkey system for instant switching
+-   **System Integration**: Applies changes to wallpapers, themes, and configurations
+
+### 📁 **Data Storage**
+
+```
+~/.ricebar/
+├── config.json          # Main configuration file
+├── profiles/            # Your rice profiles
+│   ├── Work/
+│   │   ├── wallpaper.jpg
+│   │   └── profile.json
+│   └── Gaming/
+│       ├── wallpaper.png
+│       └── profile.json
+```
+
+### ⚡ **Profile Switching Process**
+
+1. **User triggers shortcut** (e.g., ⌘+1)
+2. **RiceBarMac loads profile** from `~/.ricebar/profiles/`
+3. **Applies wallpaper** using macOS APIs
+4. **Updates system settings** if configured
+5. **Provides visual feedback** in menu bar
+
+### 🔄 **Real-time Updates**
+
+-   **Hotkey changes** are applied immediately
+-   **Profile modifications** are detected automatically
+-   **No restart required** for configuration changes
 
 ## ✨ Features
 
@@ -47,10 +79,10 @@ RiceBarMac is a powerful macOS menu bar application that allows you to quickly s
 
 ### 🔧 **Advanced Capabilities**
 
--   **YAML Configuration**: Easy-to-edit configuration files
--   **Backup System**: Automatic backup of existing configurations
+-   **JSON Configuration**: Easy-to-edit configuration files
 -   **Error Handling**: Robust error handling and recovery
 -   **Debug Logging**: Comprehensive logging for troubleshooting
+-   **Universal Binary**: Works on both Intel and Apple Silicon Macs
 
 ## 📦 Installation
 
@@ -139,56 +171,41 @@ Profiles are stored at `~/.ricebar/profiles/<ProfileName>/` with this structure:
 ```
 ~/.ricebar/profiles/
 ├── Work/
-│   ├── home/
-│   │   └── .config/
-│   │       ├── alacritty/alacritty.yml
-│   │       ├── nvim/
-│   │       └── tmux/tmux.conf
-│   ├── vscode/
-│   │   ├── settings.json
-│   │   ├── keybindings.json
-│   │   └── extensions.txt
 │   ├── wallpaper.jpg
-│   ├── profile.json
-│   └── hotkey.txt
+│   └── profile.json
 └── Gaming/
-    ├── home/.config/...
     ├── wallpaper.png
-    └── startup.sh
+    └── profile.json
 ```
 
 ### Profile Configuration
 
-```yaml
-profiles:
-    - name: 'Dark Theme'
-      theme: 'dark'
-      wallpaper: '/path/to/dark-wallpaper.jpg'
-      systemSettings:
-          appearance: 'dark'
-          accentColor: 'blue'
-
-    - name: 'Light Theme'
-      theme: 'light'
-      wallpaper: '/path/to/light-wallpaper.jpg'
-      systemSettings:
-          appearance: 'light'
-          accentColor: 'orange'
+```json
+{
+    "name": "Work Setup",
+    "wallpaper": "wallpaper.jpg",
+    "theme": "dark",
+    "order": 1
+}
 ```
 
 ### Shortcut Configuration
 
-```yaml
-shortcuts:
-    profileShortcuts:
-        profile1: 'cmd+1'
-        profile2: 'cmd+2'
-        profile3: 'cmd+3'
-
-    navigationShortcuts:
-        nextProfile: 'cmd+option+control+]'
-        previousProfile: 'cmd+option+control+['
-        reloadProfiles: 'cmd+option+control+r'
+```json
+{
+    "shortcuts": {
+        "profileShortcuts": {
+            "profile1": "cmd+1",
+            "profile2": "cmd+2",
+            "profile3": "cmd+3"
+        },
+        "navigationShortcuts": {
+            "nextProfile": "cmd+option+control+]",
+            "previousProfile": "cmd+option+control+[",
+            "reloadProfiles": "cmd+option+control+r"
+        }
+    }
+}
 ```
 
 ## 🎨 Customization
@@ -207,11 +224,10 @@ shortcuts:
 
 RiceBarMac integrates with popular rice configurations:
 
--   **Alacritty themes**
--   **i3wm configurations**
--   **Polybar themes**
--   **Rofi themes**
--   **Custom wallpapers**
+-   **Wallpaper switching** with multiple format support
+-   **System appearance** changes (dark/light mode)
+-   **Profile management** with custom ordering
+-   **Keyboard shortcuts** for quick switching
 
 ## 🐛 Troubleshooting
 
