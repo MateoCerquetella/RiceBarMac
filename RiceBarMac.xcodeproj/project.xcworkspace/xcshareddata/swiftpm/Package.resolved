@@ -1,10 +1,10 @@
 {
-  "originHash" : "bb062f912e8a163dd02fbe7cdd15c3465931c9ecd6da08a672f54d55db5ec880",
+  "originHash" : "a68839857cd04e1d32cc1d1e51f9bcb20dc7430de845983bf82afad40e80c4f7",
   "pins" : [
     {
       "identity" : "hotkey",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/soffes/HotKey",
+      "location" : "https://github.com/soffes/HotKey.git",
       "state" : {
         "revision" : "a3cf605d7a96f6ff50e04fcb6dea6e2613cfcbe4",
         "version" : "0.2.1"
@@ -13,7 +13,7 @@
     {
       "identity" : "yams",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/jpsim/Yams",
+      "location" : "https://github.com/jpsim/Yams.git",
       "state" : {
         "revision" : "3d6871d5b4a5cd519adf233fbb576e0a2af71c17",
         "version" : "5.4.0"

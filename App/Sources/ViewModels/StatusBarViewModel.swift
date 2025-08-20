@@ -20,6 +20,7 @@ final class StatusBarViewModel: ObservableObject {
     private let profileService: ProfileService
     private let systemService: SystemService
     private let fileSystemService: FileSystemService
+    private let configService: ConfigService
     
     
     private var cancellables = Set<AnyCancellable>()
@@ -28,11 +29,13 @@ final class StatusBarViewModel: ObservableObject {
     init(
         profileService: ProfileService = .shared,
         systemService: SystemService = .shared,
-        fileSystemService: FileSystemService = .shared
+        fileSystemService: FileSystemService = .shared,
+        configService: ConfigService = .shared
     ) {
         self.profileService = profileService
         self.systemService = systemService
         self.fileSystemService = fileSystemService
+        self.configService = configService
         
         setupBindings()
         refreshData()
@@ -71,6 +74,13 @@ final class StatusBarViewModel: ObservableObject {
                 self?.registerHotKeys()
             }
             .store(in: &cancellables)
+        
+        // Listen for shortcut updates and re-register hotkeys
+        configService.$shortcutsUpdated
+            .sink { [weak self] _ in
+                self?.registerHotKeys()
+            }
+            .store(in: &cancellables)
     }
     
     
@@ -92,6 +102,44 @@ final class StatusBarViewModel: ObservableObject {
     private func registerHotKeys() {
         systemService.registerHotKeys(profiles: profiles) { [weak self] descriptor in
             self?.applyProfile(descriptor)
+        }
+        
+        systemService.registerNavigationHotKeys(
+            onNextProfile: { [weak self] in
+                self?.switchToNextProfile()
+            },
+            onPreviousProfile: { [weak self] in
+                self?.switchToPreviousProfile()
+            },
+            onReloadProfiles: { [weak self] in
+                self?.refreshData()
+            }
+        )
+    }
+    
+    func switchToNextProfile() {
+        let sortedProfiles = sortedProfiles
+        guard !sortedProfiles.isEmpty else { return }
+        
+        if let currentIndex = sortedProfiles.firstIndex(where: { isProfileActive($0) }) {
+            let nextIndex = (currentIndex + 1) % sortedProfiles.count
+            let nextProfile = sortedProfiles[nextIndex]
+            applyProfile(nextProfile)
+        } else {
+            applyProfile(sortedProfiles[0])
+        }
+    }
+    
+    func switchToPreviousProfile() {
+        let sortedProfiles = sortedProfiles
+        guard !sortedProfiles.isEmpty else { return }
+        
+        if let currentIndex = sortedProfiles.firstIndex(where: { isProfileActive($0) }) {
+            let prevIndex = currentIndex == 0 ? sortedProfiles.count - 1 : currentIndex - 1
+            let prevProfile = sortedProfiles[prevIndex]
+            applyProfile(prevProfile)
+        } else {
+            applyProfile(sortedProfiles.last!)
         }
     }
     

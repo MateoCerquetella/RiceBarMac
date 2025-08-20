@@ -59,32 +59,26 @@ final class SystemService: ObservableObject {
         clearHotKeys()
         
         var registeredKeys: [String] = []
+        let config = ConfigService.shared.config
         
         for (index, descriptor) in profiles.prefix(9).enumerated() {
-            let key: Key
-            switch index {
-            case 0: key = .one
-            case 1: key = .two
-            case 2: key = .three
-            case 3: key = .four
-            case 4: key = .five
-            case 5: key = .six
-            case 6: key = .seven
-            case 7: key = .eight
-            case 8: key = .nine
-            default: continue
+            let profileKey = "profile\(index + 1)"
+            guard let shortcutString = config.shortcuts.profileShortcuts[profileKey] else { continue }
+            
+            do {
+                let combo = try parseKeyCombo(shortcutString)
+                let hotKey = HotKey(keyCombo: combo)
+                
+                hotKey.keyDownHandler = { 
+                    onTrigger(descriptor) 
+                }
+                
+                hotkeys.append(hotKey)
+                registeredKeys.append("\(shortcutString) → \(descriptor.profile.name)")
+                
+            } catch {
+                continue
             }
-            
-            let combo = KeyCombo(key: key, modifiers: [.command])
-            let hotKey = HotKey(keyCombo: combo)
-            
-            hotKey.keyDownHandler = { 
-                onTrigger(descriptor) 
-            }
-            
-            hotkeys.append(hotKey)
-            registeredKeys.append("⌘\(index + 1) → \(descriptor.profile.name)")
-            
         }
         
         for descriptor in profiles {
@@ -108,6 +102,77 @@ final class SystemService: ObservableObject {
         }
     }
     
+    func registerNavigationHotKeys(onNextProfile: @escaping () -> Void, onPreviousProfile: @escaping () -> Void, onReloadProfiles: @escaping () -> Void) {
+        let config = ConfigService.shared.config
+        
+        print("🔧 Registering navigation hotkeys...")
+        
+        // Test the shortcuts first
+        print("🧪 Testing shortcuts:")
+        testShortcut(config.shortcuts.navigationShortcuts.nextProfile)
+        testShortcut(config.shortcuts.navigationShortcuts.previousProfile)
+        testShortcut(config.shortcuts.navigationShortcuts.reloadProfiles)
+        
+        // Register Next Profile hotkey
+        if !config.shortcuts.navigationShortcuts.nextProfile.isEmpty {
+            print("📱 Next Profile shortcut: \(config.shortcuts.navigationShortcuts.nextProfile)")
+            do {
+                let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.nextProfile)
+                let hotKey = HotKey(keyCombo: combo)
+                hotKey.keyDownHandler = {
+                    print("🎯 Next Profile hotkey triggered!")
+                    onNextProfile()
+                }
+                hotkeys.append(hotKey)
+                print("✅ Next Profile hotkey registered successfully")
+            } catch {
+                print("❌ Failed to register Next Profile hotkey: \(error)")
+            }
+        } else {
+            print("⚠️ Next Profile shortcut is empty")
+        }
+        
+        // Register Previous Profile hotkey
+        if !config.shortcuts.navigationShortcuts.previousProfile.isEmpty {
+            print("📱 Previous Profile shortcut: \(config.shortcuts.navigationShortcuts.previousProfile)")
+            do {
+                let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.previousProfile)
+                let hotKey = HotKey(keyCombo: combo)
+                hotKey.keyDownHandler = {
+                    print("🎯 Previous Profile hotkey triggered!")
+                    onPreviousProfile()
+                }
+                hotkeys.append(hotKey)
+                print("✅ Previous Profile hotkey registered successfully")
+            } catch {
+                print("❌ Failed to register Previous Profile hotkey: \(error)")
+            }
+        } else {
+            print("⚠️ Previous Profile shortcut is empty")
+        }
+        
+        // Register Reload Profiles hotkey
+        if !config.shortcuts.navigationShortcuts.reloadProfiles.isEmpty {
+            print("📱 Reload Profiles shortcut: \(config.shortcuts.navigationShortcuts.reloadProfiles)")
+            do {
+                let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.reloadProfiles)
+                let hotKey = HotKey(keyCombo: combo)
+                hotKey.keyDownHandler = {
+                    print("🎯 Reload Profiles hotkey triggered!")
+                    onReloadProfiles()
+                }
+                hotkeys.append(hotKey)
+                print("✅ Reload Profiles hotkey registered successfully")
+            } catch {
+                print("❌ Failed to register Reload Profiles hotkey: \(error)")
+            }
+        } else {
+            print("⚠️ Reload Profiles shortcut is empty")
+        }
+        
+        print("🔧 Navigation hotkeys registration complete. Total hotkeys: \(hotkeys.count)")
+    }
+    
     func clearHotKeys() {
         hotkeys.removeAll()
         DispatchQueue.main.async {
@@ -116,11 +181,23 @@ final class SystemService: ObservableObject {
     }
     
     func validateHotKey(_ keyString: String) -> Bool {
+        print("🔍 Validating hotkey: '\(keyString)'")
         do {
-            _ = try parseKeyCombo(keyString)
+            let combo = try parseKeyCombo(keyString)
+            print("✅ Hotkey validation successful: \(combo)")
             return true
         } catch {
+            print("❌ Hotkey validation failed: \(error)")
             return false
+        }
+    }
+    
+    func testShortcut(_ shortcut: String) {
+        print("🧪 Testing shortcut: '\(shortcut)'")
+        if validateHotKey(shortcut) {
+            print("✅ Shortcut is valid")
+        } else {
+            print("❌ Shortcut is invalid")
         }
     }
     
@@ -183,8 +260,11 @@ final class SystemService: ObservableObject {
 private extension SystemService {
     
     func parseKeyCombo(_ string: String) throws -> KeyCombo {
+        print("🔍 Parsing key combo: '\(string)'")
         let parts = string.lowercased().split(separator: "+").map { String($0) }
+        print("🔍 Parts: \(parts)")
         guard !parts.isEmpty else { 
+            print("❌ Empty key combo")
             throw SystemServiceError.hotKeyParsingFailed(string) 
         }
         
@@ -192,28 +272,37 @@ private extension SystemService {
         var keyString: String?
         
         for part in parts {
+            print("🔍 Processing part: '\(part)'")
             switch part {
             case "ctrl", "control": 
                 modifiers.insert(.control)
+                print("🔍 Added control modifier")
             case "cmd", "command": 
                 modifiers.insert(.command)
+                print("🔍 Added command modifier")
             case "opt", "option", "alt": 
                 modifiers.insert(.option)
+                print("🔍 Added option modifier")
             case "shift": 
                 modifiers.insert(.shift)
+                print("🔍 Added shift modifier")
             default: 
                 keyString = part
+                print("🔍 Key string: '\(part)'")
             }
         }
         
         guard let keyString = keyString else { 
+            print("❌ No key string found")
             throw SystemServiceError.hotKeyParsingFailed(string) 
         }
         
         guard let key = mapKey(keyString) else { 
+            print("❌ Failed to map key: '\(keyString)'")
             throw SystemServiceError.hotKeyParsingFailed(string) 
         }
         
+        print("✅ Successfully parsed key combo: \(key) with modifiers: \(modifiers)")
         return KeyCombo(key: key, modifiers: modifiers)
     }
     
@@ -262,32 +351,47 @@ private extension SystemService {
             case "X": return .x
             case "Y": return .y
             case "Z": return .z
+            case "[": return .leftBracket
+            case "]": return .rightBracket
+            case "\\": return .backslash
+            case ";": return .semicolon
+            case "'": return .quote
+            case ",": return .comma
+            case ".": return .period
+            case "/": return .slash
+            case "`": return .grave
+            case "-": return .minus
+            case "=": return .equal
             default: break
             }
         }
         
-        switch s {
-        case "left": return .leftArrow
-        case "right": return .rightArrow
-        case "up": return .upArrow
-        case "down": return .downArrow
-        case "space": return .space
-        case "tab": return .tab
-        case "return", "enter": return .return
-        case "escape", "esc": return .escape
-        case "delete": return .delete
-        case "f1": return .f1
-        case "f2": return .f2
-        case "f3": return .f3
-        case "f4": return .f4
-        case "f5": return .f5
-        case "f6": return .f6
-        case "f7": return .f7
-        case "f8": return .f8
-        case "f9": return .f9
-        case "f10": return .f10
-        case "f11": return .f11
-        case "f12": return .f12
+        switch s.uppercased() {
+        case "SPACE": return .space
+        case "TAB": return .tab
+        case "RETURN", "ENTER": return .return
+        case "ESCAPE", "ESC": return .escape
+        case "DELETE", "DEL": return .delete
+        case "UP": return .upArrow
+        case "DOWN": return .downArrow
+        case "LEFT": return .leftArrow
+        case "RIGHT": return .rightArrow
+        case "HOME": return .home
+        case "END": return .end
+        case "PAGEUP": return .pageUp
+        case "PAGEDOWN": return .pageDown
+        case "F1": return .f1
+        case "F2": return .f2
+        case "F3": return .f3
+        case "F4": return .f4
+        case "F5": return .f5
+        case "F6": return .f6
+        case "F7": return .f7
+        case "F8": return .f8
+        case "F9": return .f9
+        case "F10": return .f10
+        case "F11": return .f11
+        case "F12": return .f12
         default: return nil
         }
     }

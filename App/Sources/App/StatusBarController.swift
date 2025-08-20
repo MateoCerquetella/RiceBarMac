@@ -9,6 +9,7 @@ final class StatusBarController {
     private let statusItem: NSStatusItem
     private let viewModel: StatusBarViewModel
     private var cancellables = Set<AnyCancellable>()
+    private lazy var settingsWindowController = SettingsWindowController()
 
     init(viewModel: StatusBarViewModel = StatusBarViewModel()) {
         self.viewModel = viewModel
@@ -89,9 +90,7 @@ final class StatusBarController {
             if let descriptor = item.representedObject as? ProfileDescriptor {
                 profileItemsFound += 1
                 let isActive = viewModel.isProfileActive(descriptor)
-                let currentState = item.state
                 let newState: NSControl.StateValue = isActive ? .on : .off
-                
                 
                 item.state = newState
             }
@@ -117,21 +116,35 @@ final class StatusBarController {
             return [empty]
         }
         
+        let config = ConfigService.shared.config
+        
         return viewModel.sortedProfiles.enumerated().map { (index, descriptor) in
             let title = descriptor.profile.name
-            let keyEquivalent = index < 9 ? "\(index + 1)" : ""
+            let profileKey = "profile\(index + 1)"
+            let configShortcut = config.shortcuts.profileShortcuts[profileKey] ?? ""
+            
+            var keyEquivalent = ""
+            var modifierMask: NSEvent.ModifierFlags = []
+            
+            if index < 9, let parsedShortcut = parseMenuShortcut(configShortcut) {
+                keyEquivalent = parsedShortcut.key
+                modifierMask = parsedShortcut.modifiers
+            }
+            
             let item = NSMenuItem(title: title, action: #selector(applyProfileMenu(_:)), keyEquivalent: keyEquivalent)
             item.target = self
             item.representedObject = descriptor
+            item.keyEquivalentModifierMask = modifierMask
             
-            if index < 9 {
-                item.keyEquivalentModifierMask = .command
+            var tooltipParts: [String] = []
+            if !configShortcut.isEmpty {
+                tooltipParts.append("Shortcut: \(configShortcut)")
             }
-            
             if let hotkeyText = descriptor.profile.hotkey {
-                item.toolTip = "Hotkey: \(hotkeyText) | Shortcut: ⌘\(index + 1)"
-            } else if index < 9 {
-                item.toolTip = "Shortcut: ⌘\(index + 1)"
+                tooltipParts.append("Hotkey: \(hotkeyText)")
+            }
+            if !tooltipParts.isEmpty {
+                item.toolTip = tooltipParts.joined(separator: " | ")
             }
             
             let isActive = viewModel.isProfileActive(descriptor)
@@ -176,16 +189,25 @@ final class StatusBarController {
     
     private func createActionMenuItems() -> [NSMenuItem] {
         var items: [NSMenuItem] = []
+        let config = ConfigService.shared.config
         
         let createProfileMenu = NSMenuItem(title: "Create Profile", action: nil, keyEquivalent: "")
         let createSubmenu = NSMenu()
         
-        let newEmpty = NSMenuItem(title: "Empty Profile…", action: #selector(promptCreateEmpty), keyEquivalent: Constants.MenuKeyEquivalents.newEmptyProfile)
+        let newEmpty = NSMenuItem(title: "Empty Profile…", action: #selector(promptCreateEmpty), keyEquivalent: "")
         newEmpty.target = self
+        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.createEmptyProfile) {
+            newEmpty.keyEquivalent = parsed.key
+            newEmpty.keyEquivalentModifierMask = parsed.modifiers
+        }
         createSubmenu.addItem(newEmpty)
         
-        let snapshot = NSMenuItem(title: "From Current Setup…", action: #selector(promptCreateFromCurrent), keyEquivalent: Constants.MenuKeyEquivalents.newFromCurrent)
+        let snapshot = NSMenuItem(title: "From Current Setup…", action: #selector(promptCreateFromCurrent), keyEquivalent: "")
         snapshot.target = self
+        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.createFromCurrentSetup) {
+            snapshot.keyEquivalent = parsed.key
+            snapshot.keyEquivalentModifierMask = parsed.modifiers
+        }
         createSubmenu.addItem(snapshot)
         
         createProfileMenu.submenu = createSubmenu
@@ -193,27 +215,49 @@ final class StatusBarController {
         
         items.append(.separator())
         
-        let nextProfile = NSMenuItem(title: "Next Profile", action: #selector(switchToNextProfile), keyEquivalent: "]")
+        let nextProfile = NSMenuItem(title: "Next Profile", action: #selector(switchToNextProfile), keyEquivalent: "")
         nextProfile.target = self
-        nextProfile.keyEquivalentModifierMask = .command
+        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.nextProfile) {
+            nextProfile.keyEquivalent = parsed.key
+            nextProfile.keyEquivalentModifierMask = parsed.modifiers
+        }
         items.append(nextProfile)
         
-        let prevProfile = NSMenuItem(title: "Previous Profile", action: #selector(switchToPreviousProfile), keyEquivalent: "[")
+        let prevProfile = NSMenuItem(title: "Previous Profile", action: #selector(switchToPreviousProfile), keyEquivalent: "")
         prevProfile.target = self
-        prevProfile.keyEquivalentModifierMask = .command
+        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.previousProfile) {
+            prevProfile.keyEquivalent = parsed.key
+            prevProfile.keyEquivalentModifierMask = parsed.modifiers
+        }
         items.append(prevProfile)
         
         items.append(.separator())
         
-        let reload = NSMenuItem(title: "Reload Profiles", action: #selector(reloadProfiles), keyEquivalent: Constants.MenuKeyEquivalents.reloadProfiles)
+        let reload = NSMenuItem(title: "Reload Profiles", action: #selector(reloadProfiles), keyEquivalent: "")
         reload.target = self
+        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.reloadProfiles) {
+            reload.keyEquivalent = parsed.key
+            reload.keyEquivalentModifierMask = parsed.modifiers
+        }
         items.append(reload)
         
-        let open = NSMenuItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder), keyEquivalent: Constants.MenuKeyEquivalents.openFolder)
+        let open = NSMenuItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder), keyEquivalent: "")
         open.target = self
+        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.openProfilesFolder) {
+            open.keyEquivalent = parsed.key
+            open.keyEquivalentModifierMask = parsed.modifiers
+        }
         items.append(open)
         
         items.append(.separator())
+        
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
+        settings.target = self
+        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.openSettings) {
+            settings.keyEquivalent = parsed.key
+            settings.keyEquivalentModifierMask = parsed.modifiers
+        }
+        items.append(settings)
         
         let launchAtLogin = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
         launchAtLogin.target = self
@@ -222,8 +266,12 @@ final class StatusBarController {
         
         items.append(.separator())
         
-        let quit = NSMenuItem(title: "Quit \(Constants.appName)", action: #selector(quit), keyEquivalent: Constants.MenuKeyEquivalents.quit)
+        let quit = NSMenuItem(title: "Quit \(Constants.appName)", action: #selector(quit), keyEquivalent: "")
         quit.target = self
+        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.quitApp) {
+            quit.keyEquivalent = parsed.key
+            quit.keyEquivalentModifierMask = parsed.modifiers
+        }
         items.append(quit)
         
         return items
@@ -359,28 +407,62 @@ final class StatusBarController {
     }
     
     @objc private func switchToNextProfile() {
-        let profiles = viewModel.sortedProfiles
-        guard !profiles.isEmpty else { return }
-        
-        if let currentIndex = profiles.firstIndex(where: { viewModel.isProfileActive($0) }) {
-            let nextIndex = (currentIndex + 1) % profiles.count
-            let nextProfile = profiles[nextIndex]
-            viewModel.applyProfile(nextProfile)
-        } else {
-            viewModel.applyProfile(profiles[0])
-        }
+        viewModel.switchToNextProfile()
     }
     
     @objc private func switchToPreviousProfile() {
-        let profiles = viewModel.sortedProfiles
-        guard !profiles.isEmpty else { return }
+        viewModel.switchToPreviousProfile()
+    }
+    
+    @objc private func openSettings() {
+        settingsWindowController.showSettings()
+    }
+    
+    private func parseMenuShortcut(_ shortcut: String) -> (key: String, modifiers: NSEvent.ModifierFlags)? {
+        let parts = shortcut.lowercased().split(separator: "+").map { String($0) }
+        guard !parts.isEmpty else { return nil }
         
-        if let currentIndex = profiles.firstIndex(where: { viewModel.isProfileActive($0) }) {
-            let prevIndex = currentIndex == 0 ? profiles.count - 1 : currentIndex - 1
-            let prevProfile = profiles[prevIndex]
-            viewModel.applyProfile(prevProfile)
-        } else {
-            viewModel.applyProfile(profiles.last!)
+        var modifiers: NSEvent.ModifierFlags = []
+        var keyString: String?
+        
+        for part in parts {
+            switch part {
+            case "ctrl", "control": 
+                modifiers.insert(.control)
+            case "cmd", "command": 
+                modifiers.insert(.command)
+            case "opt", "option", "alt": 
+                modifiers.insert(.option)
+            case "shift": 
+                modifiers.insert(.shift)
+            default: 
+                keyString = part
+            }
+        }
+        
+        guard let key = keyString else { return nil }
+        
+        if key == "]" || key == "[" {
+            return (key: key, modifiers: modifiers)
+        }
+        
+        if key.count == 1, let first = key.first, first.isLetter {
+            return (key: key.lowercased(), modifiers: modifiers)
+        }
+        
+        if let number = Int(key), (1...9).contains(number) {
+            return (key: "\(number)", modifiers: modifiers)
+        }
+        
+        switch key {
+        case "0": return (key: "0", modifiers: modifiers)
+        case "r": return (key: "r", modifiers: modifiers)
+        case "o": return (key: "o", modifiers: modifiers)
+        case "e": return (key: "e", modifiers: modifiers)
+        case "n": return (key: "n", modifiers: modifiers)
+        case "q": return (key: "q", modifiers: modifiers)
+        case ",": return (key: ",", modifiers: modifiers)
+        default: return nil
         }
     }
 }
