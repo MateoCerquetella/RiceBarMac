@@ -287,7 +287,6 @@ enum Constants {
         for directory in managedDirectories {
             if !fileManager.fileExists(atPath: directory.path) {
                 try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-                LoggerService.info("Created directory: \(directory.path)")
             }
         }
     }

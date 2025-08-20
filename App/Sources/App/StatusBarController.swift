@@ -24,7 +24,6 @@ final class StatusBarController {
             .debounce(for: .milliseconds(100), scheduler: DispatchQueue.main)
             .removeDuplicates { $0.count == $1.count && $0.map(\.directory) == $1.map(\.directory) }
             .sink { [weak self] profiles in
-                LoggerService.info("Menu: Profiles changed, reconstructing menu")
                 self?.constructMenu()
             }
             .store(in: &cancellables)
@@ -37,7 +36,6 @@ final class StatusBarController {
             }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] activeProfile in
-                LoggerService.info("Menu: Active profile changed to: \(activeProfile?.profile.name ?? "nil")")
                 self?.updateActiveProfileCheckmarks()
             }
             .store(in: &cancellables)
@@ -82,11 +80,9 @@ final class StatusBarController {
     
     private func updateActiveProfileCheckmarks() {
         guard let menu = statusItem.menu else { 
-            LoggerService.error("Menu: No menu available for checkmark update")
             return 
         }
         
-        LoggerService.info("Menu: Starting checkmark update for \(menu.items.count) items")
         var profileItemsFound = 0
         
         for (index, item) in menu.items.enumerated() {
@@ -96,14 +92,11 @@ final class StatusBarController {
                 let currentState = item.state
                 let newState: NSControl.StateValue = isActive ? .on : .off
                 
-                LoggerService.info("Menu: Item[\(index)] '\(descriptor.profile.name)' - current: \(currentState.rawValue), new: \(newState.rawValue), isActive: \(isActive)")
                 
                 item.state = newState
-                LoggerService.info("Menu: FORCED update checkmark for '\(descriptor.profile.name)' to \(isActive ? "ON" : "OFF")")
             }
         }
         
-        LoggerService.info("Menu: Checkmark update complete - found \(profileItemsFound) profile items")
     }
     
     private func updateLaunchAtLoginCheckmark() {
@@ -143,7 +136,6 @@ final class StatusBarController {
             
             let isActive = viewModel.isProfileActive(descriptor)
             item.state = isActive ? .on : .off
-            LoggerService.info("Menu: Profile '\(descriptor.profile.name)' initial state: \(isActive ? "ON" : "OFF")")
             
             let submenu = createProfileSubmenu(for: descriptor, isActive: isActive)
             item.submenu = submenu
@@ -240,13 +232,10 @@ final class StatusBarController {
     @objc private func applyProfileMenu(_ sender: NSMenuItem) {
         guard let descriptor = sender.representedObject as? ProfileDescriptor else { return }
         
-        LoggerService.info("Menu: Clicked profile '\(descriptor.profile.name)'")
         
-        LoggerService.info("Menu: Starting profile application for '\(descriptor.profile.name)'")
         viewModel.applyProfile(descriptor)
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            LoggerService.info("Menu: Force checkmark update after profile click")
             self.updateActiveProfileCheckmarks()
         }
     }
@@ -283,7 +272,6 @@ final class StatusBarController {
                 _ = try await viewModel.copyProfile(current, to: name)
                 await viewModel.showSuccess(title: "Profile Copied", message: "Profile copied successfully.")
             } catch {
-                LoggerService.error("Failed to copy profile: \(error)")
             }
         }
     }
@@ -300,7 +288,6 @@ final class StatusBarController {
                 _ = try await viewModel.createProfileFromCurrent(name: name)
                 await viewModel.showSuccess(title: "Profile Created", message: "Profile created from current configuration.")
             } catch {
-                LoggerService.error("Failed to create profile from current: \(error)")
             }
         }
     }
@@ -327,7 +314,6 @@ final class StatusBarController {
                         self?.viewModel.applyProfile(updated)
                     }
                 } catch {
-                    LoggerService.error("Failed to update wallpaper: \(error)")
                 }
             }
         }
@@ -347,7 +333,6 @@ final class StatusBarController {
                     message: "The profile '\(descriptor.profile.name)' has been moved to the Trash."
                 )
             } catch {
-                LoggerService.error("Failed to delete profile: \(error)")
             }
         }
     }
@@ -369,7 +354,6 @@ final class StatusBarController {
                 _ = try await viewModel.createEmptyProfile(name: name)
                 await viewModel.showSuccess(title: "Profile Created", message: "Empty profile created successfully.")
             } catch {
-                LoggerService.error("Failed to create empty profile: \(error)")
             }
         }
     }
@@ -381,10 +365,8 @@ final class StatusBarController {
         if let currentIndex = profiles.firstIndex(where: { viewModel.isProfileActive($0) }) {
             let nextIndex = (currentIndex + 1) % profiles.count
             let nextProfile = profiles[nextIndex]
-            LoggerService.info("Switching to next profile: \(nextProfile.profile.name)")
             viewModel.applyProfile(nextProfile)
         } else {
-            LoggerService.info("No active profile, selecting first: \(profiles[0].profile.name)")
             viewModel.applyProfile(profiles[0])
         }
     }
@@ -396,10 +378,8 @@ final class StatusBarController {
         if let currentIndex = profiles.firstIndex(where: { viewModel.isProfileActive($0) }) {
             let prevIndex = currentIndex == 0 ? profiles.count - 1 : currentIndex - 1
             let prevProfile = profiles[prevIndex]
-            LoggerService.info("Switching to previous profile: \(prevProfile.profile.name)")
             viewModel.applyProfile(prevProfile)
         } else {
-            LoggerService.info("No active profile, selecting last: \(profiles.last!.profile.name)")
             viewModel.applyProfile(profiles.last!)
         }
     }

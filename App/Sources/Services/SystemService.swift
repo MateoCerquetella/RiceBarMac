@@ -79,14 +79,12 @@ final class SystemService: ObservableObject {
             let hotKey = HotKey(keyCombo: combo)
             
             hotKey.keyDownHandler = { 
-                LoggerService.info("Global hotkey Cmd+\(index + 1) activated for profile: \(descriptor.profile.name)")
                 onTrigger(descriptor) 
             }
             
             hotkeys.append(hotKey)
             registeredKeys.append("⌘\(index + 1) → \(descriptor.profile.name)")
             
-            LoggerService.info("Registered global hotkey Cmd+\(index + 1) for profile '\(descriptor.profile.name)'")
         }
         
         for descriptor in profiles {
@@ -96,15 +94,12 @@ final class SystemService: ObservableObject {
                 let combo = try parseKeyCombo(comboString)
                 let hotKey = HotKey(keyCombo: combo)
                 hotKey.keyDownHandler = { 
-                    LoggerService.info("Custom hotkey '\(comboString)' activated for profile: \(descriptor.profile.name)")
                     onTrigger(descriptor) 
                 }
                 hotkeys.append(hotKey)
                 registeredKeys.append("\(comboString) → \(descriptor.profile.name)")
                 
-                LoggerService.info("Registered custom hotkey '\(comboString)' for profile '\(descriptor.profile.name)'")
             } catch {
-                LoggerService.error("Failed to register hotkey '\(comboString)' for profile '\(descriptor.profile.name)': \(error)")
             }
         }
         
@@ -159,9 +154,7 @@ final class SystemService: ObservableObject {
         do {
             try SMAppService.mainApp.register()
             updateLaunchAtLoginStatus()
-            LoggerService.info("Launch at login enabled successfully")
         } catch {
-            LoggerService.error("Failed to enable launch at login: \(error)")
             throw SystemServiceError.launchAtLoginFailed
         }
     }
@@ -174,9 +167,7 @@ final class SystemService: ObservableObject {
         do {
             try SMAppService.mainApp.unregister()
             updateLaunchAtLoginStatus()
-            LoggerService.info("Launch at login disabled successfully")
         } catch {
-            LoggerService.error("Failed to disable launch at login: \(error)")
             throw SystemServiceError.launchAtLoginDisableFailed
         }
     }

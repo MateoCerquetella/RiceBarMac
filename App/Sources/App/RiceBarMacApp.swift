@@ -46,25 +46,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try Constants.ensureDirectoriesExist()
         } catch {
-            LoggerService.error("Failed to create required directories: \(error)")
         }
         
-        LoggerService.info("\(Constants.appName) services initialized")
     }
     
     private func setupControllers() {
         statusBarController = StatusBarController(viewModel: statusBarViewModel)
-        LoggerService.info("Status bar controller initialized")
     }
     
     private func setupInitialState() {
         statusBarViewModel.refreshData()
-        LoggerService.info("\(Constants.appName) startup completed")
     }
     
     private func cleanupServices() {
         systemService.clearHotKeys()
-        LoggerService.info("\(Constants.appName) cleanup completed")
     }
 }
 

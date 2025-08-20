@@ -75,21 +75,16 @@ final class StatusBarViewModel: ObservableObject {
     
     
     func refreshData() {
-        LoggerService.info("ViewModel: Starting data refresh")
         profileService.reload()
         systemService.updateLaunchAtLoginStatus()
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             if let active = self.activeProfile {
-                LoggerService.info("ViewModel: Re-applying active profile after reload: \(active.profile.name)")
                 if let updatedProfile = self.profiles.first(where: { $0.directory == active.directory }) {
-                    LoggerService.info("ViewModel: Found updated profile, applying changes")
                     self.applyProfile(updatedProfile)
                 } else {
-                    LoggerService.warning("ViewModel: Could not find updated profile after reload")
                 }
             } else {
-                LoggerService.info("ViewModel: No active profile to re-apply after reload")
             }
         }
     }
@@ -104,36 +99,28 @@ final class StatusBarViewModel: ObservableObject {
     private var currentApplicationTask: Task<Void, Never>?
     
     func applyProfile(_ descriptor: ProfileDescriptor) {
-        LoggerService.info("ViewModel: applyProfile called for '\(descriptor.profile.name)'")
         
         if let current = activeProfile, current.directory == descriptor.directory {
             if ApplyActivity.recentlyApplied(within: 2.0) {
-                LoggerService.info("Skipping duplicate application of active profile '\(descriptor.profile.name)'")
                 return
             }
         }
         
         currentApplicationTask?.cancel()
         
-        LoggerService.info("ViewModel: Setting active profile immediately for UI")
         profileService.setActiveProfile(descriptor)
         
         DispatchQueue.main.async {
-            LoggerService.info("ViewModel: Forcing objectWillChange after profile set")
             self.objectWillChange.send()
         }
         
-        LoggerService.info("Profile '\(descriptor.profile.name)' activated instantly for UI")
         
         currentApplicationTask = Task.detached(priority: .userInitiated) {
             do {
                 try await self.profileService.applyProfileAsync(descriptor, cleanConfig: false)
-                LoggerService.info("Profile '\(descriptor.profile.name)' applied successfully in background")
             } catch {
                 if Task.isCancelled {
-                    LoggerService.info("Profile application cancelled: \(descriptor.profile.name)")
                 } else {
-                    LoggerService.error("Profile apply failed: \(error)")
                     await self.showError(error)
                 }
             }
@@ -229,7 +216,6 @@ final class StatusBarViewModel: ObservableObject {
         do {
             try systemService.toggleLaunchAtLogin()
         } catch {
-            LoggerService.error("Failed to toggle launch at login: \(error)")
             await showError(error)
         }
     }
@@ -241,7 +227,6 @@ final class StatusBarViewModel: ObservableObject {
     
     func isProfileActive(_ descriptor: ProfileDescriptor) -> Bool {
         guard let active = activeProfile else {
-            LoggerService.info("Profile '\(descriptor.profile.name)' active check: false (no active profile)")
             return false
         }
         
@@ -249,7 +234,6 @@ final class StatusBarViewModel: ObservableObject {
         let nameMatch = active.profile.name == descriptor.profile.name
         let isActive = pathMatch && nameMatch
         
-        LoggerService.info("Profile '\(descriptor.profile.name)' active check: \(isActive) (current: \(active.profile.name), pathMatch: \(pathMatch), nameMatch: \(nameMatch))")
         return isActive
     }
     

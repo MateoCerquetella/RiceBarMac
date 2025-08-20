@@ -149,7 +149,6 @@ final class FileSystemService: ObservableObject {
         if !fileManager.fileExists(atPath: url.path) {
             do {
                 try fileManager.createDirectory(at: url, withIntermediateDirectories: true)
-                LoggerService.info("Created directory: \(url.path)")
             } catch {
                 throw FileSystemServiceError.directoryCreationFailed(url.path, error)
             }
@@ -164,7 +163,6 @@ final class FileSystemService: ObservableObject {
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: url.path) {
             try fileManager.removeItem(at: url)
-            LoggerService.info("Removed item: \(url.path)")
         }
     }
     
@@ -187,13 +185,11 @@ final class FileSystemService: ObservableObject {
                 let backupURL = destination.appendingPathExtension("bak")
                 try removeItemIfExists(at: backupURL) // Remove old backup
                 try fileManager.moveItem(at: destination, to: backupURL)
-                LoggerService.info("Created backup: \(backupURL.path)")
             } else if fileManager.fileExists(atPath: destination.path) {
                 try removeItemIfExists(at: destination)
             }
             
             try fileManager.copyItem(at: source, to: destination)
-            LoggerService.info("Copied file: \(source.path) -> \(destination.path)")
         } catch {
             throw FileSystemServiceError.fileCopyFailed(source.path, destination.path, error)
         }
@@ -218,7 +214,6 @@ final class FileSystemService: ObservableObject {
         
         try ensureParentDirectoryExists(for: url)
         try content.write(to: url, atomically: true, encoding: encoding)
-        LoggerService.info("Wrote file: \(url.path)")
     }
     
     
@@ -248,7 +243,6 @@ final class FileSystemService: ObservableObject {
             let data = try encoder.encode(object)
             try ensureParentDirectoryExists(for: url)
             try data.write(to: url, options: .atomic)
-            LoggerService.info("Wrote JSON file: \(url.path)")
         } catch {
             throw FileSystemServiceError.jsonSerializationFailed(error)
         }
@@ -272,7 +266,6 @@ final class FileSystemService: ObservableObject {
         for case let tplURL as URL in enumerator {
             processedCount += 1
             if processedCount > maxTemplates {
-                LoggerService.warning("Template processing limit reached (\(maxTemplates)), stopping early")
                 break
             }
             
@@ -303,14 +296,11 @@ final class FileSystemService: ObservableObject {
                 }
                 
                 try rendered.write(to: outURL, atomically: true, encoding: .utf8)
-                LoggerService.debug("Rendered template: \(tplURL.lastPathComponent) -> \(outURL.lastPathComponent)")
             } catch {
-                LoggerService.error("Template render error for \(tplURL.lastPathComponent): \(error)")
             }
         }
         
         if processedCount > 0 {
-            LoggerService.info("Template rendering completed: \(processedCount) templates processed")
         }
     }
     
@@ -341,9 +331,7 @@ final class FileSystemService: ObservableObject {
         
         do {
             try process.run()
-            LoggerService.info("Triggered Alacritty config reload")
         } catch {
-            LoggerService.error("Failed to reload Alacritty config: \(error)")
         }
     }
     

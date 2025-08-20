@@ -105,7 +105,6 @@ final class ProfileService: ObservableObject {
     
     
     func reload() {
-        LoggerService.info("ProfileService: Starting reload of all profiles")
         let root = profilesRoot()
         let fm = FileManager.default
         var loaded: [ProfileDescriptor] = []
@@ -116,28 +115,22 @@ final class ProfileService: ObservableObject {
         }
         
         if let items = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: []) {
-            LoggerService.info("ProfileService: Found \(items.count) items in profiles directory")
             for url in items {
                 guard (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false else { continue }
                 
-                LoggerService.info("ProfileService: Loading profile from: \(url.lastPathComponent)")
                 if let profile = loadProfile(at: url) {
                     loaded.append(ProfileDescriptor(profile: profile, directory: url))
-                    LoggerService.info("ProfileService: Loaded profile '\(profile.name)' with wallpaper: \(profile.wallpaper ?? "none")")
                 } else {
                     let defaults = defaultProfile(for: url)
                     loaded.append(ProfileDescriptor(profile: defaults, directory: url))
-                    LoggerService.info("ProfileService: Created default profile '\(defaults.name)' with wallpaper: \(defaults.wallpaper ?? "none")")
                 }
             }
         }
         
-        LoggerService.info("ProfileService: Loaded \(loaded.count) profiles total")
         
         DispatchQueue.main.async {
             self.profiles = loaded
             self.restoreActiveProfileFromDefaults()
-            LoggerService.info("ProfileService: Reload complete, active profile restored")
         }
     }
     
@@ -188,7 +181,6 @@ final class ProfileService: ObservableObject {
             let wallpaperDest = dest.appendingPathComponent("wallpaper.\(currentWallpaper.pathExtension)")
             try fm.copyItem(at: currentWallpaper, to: wallpaperDest)
             profile.wallpaper = wallpaperDest.lastPathComponent
-            LoggerService.info("Copied current wallpaper to new profile: \(wallpaperDest.lastPathComponent)")
         }
         
         let descriptor = ProfileDescriptor(profile: profile, directory: dest)
@@ -252,7 +244,6 @@ final class ProfileService: ObservableObject {
             
             reload()
             
-            LoggerService.info("Profile '\(descriptor.profile.name)' moved to trash successfully")
         } catch {
             throw ProfileServiceError.deletionFailed(error.localizedDescription)
         }
@@ -282,10 +273,8 @@ final class ProfileService: ObservableObject {
         
         if let wallpaperRel = profile.wallpaper {
             let url = descriptor.directory.appendingPathComponent(wallpaperRel)
-            LoggerService.info("Profile specifies wallpaper: '\(wallpaperRel)' -> Full path: \(url.path)")
             try applyWallpaper(url: url)
         } else {
-            LoggerService.info("Profile has no wallpaper specified")
         }
         
         try applyCodeEditorSettings(from: descriptor)
@@ -362,10 +351,8 @@ final class ProfileService: ObservableObject {
                     
                     if let wallpaperRel = profile.wallpaper {
                         let url = descriptor.directory.appendingPathComponent(wallpaperRel)
-                        LoggerService.info("Profile specifies wallpaper: '\(wallpaperRel)' -> Full path: \(url.path)")
                         try self.applyWallpaper(url: url)
                     } else {
-                        LoggerService.info("Profile has no wallpaper specified")
                     }
                     
                     if Task.isCancelled {
@@ -445,7 +432,6 @@ final class ProfileService: ObservableObject {
     
     
     func setActiveProfile(_ descriptor: ProfileDescriptor?) {
-        LoggerService.info("Setting active profile: \(descriptor?.profile.name ?? "nil")")
         
         if Thread.isMainThread {
             self.activeProfile = descriptor
@@ -462,10 +448,8 @@ final class ProfileService: ObservableObject {
         Task.detached(priority: .background) {
             if let descriptor = descriptor {
                 UserDefaults.standard.set(descriptor.directory.path, forKey: self.userDefaultsKey)
-                LoggerService.info("Profile '\(descriptor.profile.name)' saved to UserDefaults")
             } else {
                 UserDefaults.standard.removeObject(forKey: self.userDefaultsKey)
-                LoggerService.info("Active profile cleared from UserDefaults")
             }
         }
     }
@@ -557,11 +541,9 @@ final class ProfileService: ObservableObject {
                 do {
                     try await self.applyProfileAsync(active, cleanConfig: false)
                 } catch {
-                    LoggerService.error("Auto-apply failed: \(error)")
                 }
             }
         } else {
-            LoggerService.info("File system watcher triggering reload due to changes: \(changedPaths)")
             reload()
         }
     }
@@ -637,7 +619,6 @@ private extension ProfileService {
         do {
             try ConfigAccess.ensureDirectoriesExist()
         } catch {
-            LoggerService.error("Failed to create profiles directory: \(error)")
         }
     }
     
@@ -652,18 +633,14 @@ private extension ProfileService {
     
     private func restoreActiveProfileFromDefaults() {
         guard let path = UserDefaults.standard.string(forKey: userDefaultsKey) else { 
-            LoggerService.info("No active profile path in UserDefaults")
             return 
         }
         let url = URL(fileURLWithPath: path)
         
-        LoggerService.info("Restoring active profile from UserDefaults: \(url.lastPathComponent)")
         
         if let descriptor = profiles.first(where: { $0.directory == url }) {
-            LoggerService.info("Found matching profile, setting as active: \(descriptor.profile.name)")
             activeProfile = descriptor
         } else {
-            LoggerService.warning("Profile no longer exists, clearing UserDefaults: \(url.lastPathComponent)")
             UserDefaults.standard.removeObject(forKey: userDefaultsKey)
         }
     }
@@ -707,7 +684,6 @@ private extension ProfileService {
                         #endif
                     }
                 } catch {
-                    LoggerService.error("Failed to load profile at \(directory.lastPathComponent): \(error)")
                 }
             }
         }
@@ -731,14 +707,11 @@ private extension ProfileService {
         let fm = FileManager.default
         let exts = Array(Constants.wallpaperExtensions)
         guard let items = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil, options: []) else { 
-            LoggerService.warning("Could not read directory contents: \(directory.path)")
             return nil 
         }
         
-        LoggerService.info("Looking for wallpaper in \(directory.lastPathComponent), found \(items.count) items")
         
         let imageFiles = items.filter { exts.contains($0.pathExtension.lowercased()) }
-        LoggerService.info("Found \(imageFiles.count) image files: \(imageFiles.map { $0.lastPathComponent }.joined(separator: ", "))")
         
         let preferredPrefixes = Constants.preferredWallpaperPrefixes
         if let preferred = items.first(where: { url in
@@ -747,16 +720,13 @@ private extension ProfileService {
             let hasValidExt = exts.contains(url.pathExtension.lowercased())
             return hasValidExt && hasPreferredName
         }) {
-            LoggerService.info("Selected preferred wallpaper: \(preferred.lastPathComponent)")
             return preferred
         }
         
         if let firstImage = items.first(where: { exts.contains($0.pathExtension.lowercased()) }) {
-            LoggerService.info("Selected first available image: \(firstImage.lastPathComponent)")
             return firstImage
         }
         
-        LoggerService.info("No wallpaper images found in directory")
         return nil
     }
     
@@ -838,32 +808,25 @@ private extension ProfileService {
     }
     
     func applyWallpaper(url: URL) throws {
-        LoggerService.info("Attempting to apply wallpaper: \(url.path)")
         
         guard FileManager.default.fileExists(atPath: url.path) else { 
-            LoggerService.error("Wallpaper file not found: \(url.path)")
             throw ProfileServiceError.fileNotFound(url.path) 
         }
         
-        LoggerService.info("Wallpaper file exists, attempting to set for \(NSScreen.screens.count) screens")
         
         var lastError: Error?
         var successCount = 0
         
         for (index, screen) in NSScreen.screens.enumerated() {
             do {
-                LoggerService.info("Setting wallpaper for screen \(index + 1)")
                 try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
                 successCount += 1
-                LoggerService.info("Successfully set wallpaper for screen \(index + 1)")
             } catch {
                 lastError = error
-                LoggerService.error("Wallpaper set failed for screen \(index + 1): \(error.localizedDescription)")
             }
         }
         
         if successCount == 0 {
-            LoggerService.warning("All screens failed, trying AppleScript fallback")
             let script = """
             tell application "System Events"
               tell every desktop
@@ -873,20 +836,15 @@ private extension ProfileService {
             """
             var errorDict: NSDictionary?
             if let appleScript = NSAppleScript(source: script) {
-                LoggerService.info("Executing AppleScript wallpaper command")
                 appleScript.executeAndReturnError(&errorDict)
                 if let errorDict { 
-                    LoggerService.error("AppleScript wallpaper error: \(errorDict)") 
                     throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "AppleScript failed: \(errorDict)"]))
                 } else {
-                    LoggerService.info("AppleScript wallpaper command executed successfully")
                 }
             } else {
-                LoggerService.error("Failed to create AppleScript")
                 throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create AppleScript"]))
             }
         } else {
-            LoggerService.info("Wallpaper applied successfully to \(successCount)/\(NSScreen.screens.count) screens")
         }
     }
     
@@ -1134,7 +1092,6 @@ private extension ProfileService {
         
         try applyDiscoveredThemeToSettings(theme: theme, configDir: configDir, ideType: ideType)
         
-        LoggerService.info("Applied theme '\(theme.displayName)' to \(ideType.displayName)")
     }
     
     func discoverAvailableThemes(for ideType: Constants.IDEType) throws -> [Constants.DiscoveredTheme] {
@@ -1224,7 +1181,6 @@ private extension ProfileService {
                     }
                 }
             } catch {
-                LoggerService.warning("Failed to parse package.json for \(extensionDir.lastPathComponent): \(error)")
             }
         }
         
@@ -1243,7 +1199,6 @@ private extension ProfileService {
                     settings = existingSettings
                 }
             } catch {
-                LoggerService.warning("Failed to load existing settings, creating new ones: \(error)")
             }
         }
         
@@ -1260,13 +1215,10 @@ private extension ProfileService {
     func getAvailableThemes(for ideType: Constants.IDEType) -> [Constants.DiscoveredTheme] {
         do {
             let themes = try discoverAvailableThemes(for: ideType)
-            LoggerService.info("Found \(themes.count) themes for \(ideType.displayName):")
             for theme in themes {
-                LoggerService.info("  - \(theme.name) (\(theme.source))")
             }
             return themes
         } catch {
-            LoggerService.error("Failed to discover themes for \(ideType.displayName): \(error)")
             return []
         }
     }
@@ -1344,7 +1296,6 @@ private extension ProfileService {
     
     func installVSCodeExtensions(_ extensions: [String]) throws {
         guard isVSCodeInstalled() else {
-            LoggerService.warning("VS Code not found, skipping extension installation")
             return
         }
         
@@ -1365,7 +1316,6 @@ private extension ProfileService {
     
     func installVSCodeExtension(_ extensionId: String) throws {
         guard let codePath = findVSCodeCLI() else {
-            LoggerService.warning("VS Code CLI not found, cannot install extension: \(extensionId)")
             return
         }
         
@@ -1378,12 +1328,9 @@ private extension ProfileService {
             process.waitUntilExit()
             
             if process.terminationStatus == 0 {
-                LoggerService.info("Successfully installed VS Code extension: \(extensionId)")
             } else {
-                LoggerService.warning("Failed to install VS Code extension: \(extensionId)")
             }
         } catch {
-            LoggerService.warning("Failed to install VS Code extension \(extensionId): \(error)")
         }
     }
     
@@ -1400,7 +1347,6 @@ private extension ProfileService {
     
     func installCursorExtensions(_ extensions: [String]) throws {
         guard isCursorInstalled() else {
-            LoggerService.warning("Cursor not found, skipping extension installation")
             return
         }
         
@@ -1421,7 +1367,6 @@ private extension ProfileService {
     
     func installCursorExtension(_ extensionId: String) throws {
         guard let cursorPath = findCursorCLI() else {
-            LoggerService.warning("Cursor CLI not found, cannot install extension: \(extensionId)")
             return
         }
         
@@ -1434,12 +1379,9 @@ private extension ProfileService {
             process.waitUntilExit()
             
             if process.terminationStatus == 0 {
-                LoggerService.info("Successfully installed Cursor extension: \(extensionId)")
             } else {
-                LoggerService.warning("Failed to install Cursor extension: \(extensionId)")
             }
         } catch {
-            LoggerService.warning("Failed to install Cursor extension \(extensionId): \(error)")
         }
     }
     
@@ -1472,19 +1414,15 @@ private extension ProfileService {
         
         do {
             guard let wallpaperURL = try NSWorkspace.shared.desktopImageURL(for: mainScreen) else {
-                LoggerService.warning("Desktop image URL returned nil for main screen")
                 return nil
             }
             
             if FileManager.default.fileExists(atPath: wallpaperURL.path) {
-                LoggerService.info("Found current wallpaper: \(wallpaperURL.path)")
                 return wallpaperURL
             } else {
-                LoggerService.warning("Current wallpaper file not accessible: \(wallpaperURL.path)")
                 return nil
             }
         } catch {
-            LoggerService.error("Failed to get current wallpaper: \(error)")
             
             return getCurrentWallpaperViaAppleScript()
         }
@@ -1505,21 +1443,17 @@ private extension ProfileService {
         let result = appleScript.executeAndReturnError(&errorDict)
         
         if let errorDict = errorDict {
-            LoggerService.error("AppleScript wallpaper error: \(errorDict)")
             return nil
         }
         
         guard let wallpaperPath = result.stringValue, !wallpaperPath.isEmpty else {
-            LoggerService.warning("No wallpaper path returned from AppleScript")
             return nil
         }
         
         let wallpaperURL = URL(fileURLWithPath: wallpaperPath)
         if FileManager.default.fileExists(atPath: wallpaperURL.path) {
-            LoggerService.info("Found current wallpaper via AppleScript: \(wallpaperPath)")
             return wallpaperURL
         } else {
-            LoggerService.warning("Wallpaper from AppleScript not accessible: \(wallpaperPath)")
             return nil
         }
     }
@@ -1555,7 +1489,6 @@ private extension ProfileService {
             )
         }
         
-        LoggerService.info("Captured VS Code/Cursor settings for profile: \(descriptor.profile.name)")
     }
     
     private func captureEditorSettings(from appSupportPath: URL, extensionsPath: URL?, to destination: URL, editorName: String) throws {
@@ -1572,7 +1505,6 @@ private extension ProfileService {
                 let settingsDest = userDest.appendingPathComponent("settings.json")
                 try fm.createDirectory(at: userDest, withIntermediateDirectories: true)
                 try fm.copyItem(at: settingsFile, to: settingsDest)
-                LoggerService.info("Captured \(editorName) settings.json")
             }
             
             let keybindingsFile = userPath.appendingPathComponent("keybindings.json")
@@ -1580,14 +1512,12 @@ private extension ProfileService {
                 let keybindingsDest = userDest.appendingPathComponent("keybindings.json")
                 try fm.createDirectory(at: userDest, withIntermediateDirectories: true)
                 try fm.copyItem(at: keybindingsFile, to: keybindingsDest)
-                LoggerService.info("Captured \(editorName) keybindings.json")
             }
             
             let snippetsPath = userPath.appendingPathComponent("snippets")
             if fm.fileExists(atPath: snippetsPath.path) {
                 let snippetsDest = userDest.appendingPathComponent("snippets")
                 try fm.copyItem(at: snippetsPath, to: snippetsDest)
-                LoggerService.info("Captured \(editorName) snippets")
             }
         }
         
@@ -1607,7 +1537,6 @@ private extension ProfileService {
         let fm = FileManager.default
         
         guard let extensionDirs = try? fm.contentsOfDirectory(at: extensionsPath, includingPropertiesForKeys: nil) else {
-            LoggerService.warning("Could not read \(editorName) extensions directory")
             return
         }
         
@@ -1630,7 +1559,6 @@ private extension ProfileService {
         let extensionsContent = extensions.sorted().joined(separator: "\n")
         try extensionsContent.write(to: extensionsFile, atomically: true, encoding: .utf8)
         
-        LoggerService.info("Captured \(extensions.count) \(editorName) extensions")
     }
     
     private func extractThemeInfo(from appSupportPath: URL, to destination: URL, editorName: String) throws {
@@ -1638,7 +1566,6 @@ private extension ProfileService {
         
         guard let settingsData = try? Data(contentsOf: settingsFile),
               let settingsDict = try? JSONSerialization.jsonObject(with: settingsData) as? [String: Any] else {
-            LoggerService.warning("Could not read \(editorName) settings for theme extraction")
             return
         }
         
@@ -1669,7 +1596,6 @@ private extension ProfileService {
             let themeData = try JSONSerialization.data(withJSONObject: themeInfo, options: .prettyPrinted)
             try themeData.write(to: themeFile)
             
-            LoggerService.info("Captured \(editorName) theme info: \(themeInfo)")
         }
     }
     
@@ -1679,7 +1605,6 @@ private extension ProfileService {
         let fm = FileManager.default
         
         guard fm.fileExists(atPath: vscodeDir.path) else {
-            LoggerService.info("No VS Code/Cursor settings found in profile: \(descriptor.profile.name)")
             return
         }
         
@@ -1705,7 +1630,6 @@ private extension ProfileService {
             )
         }
         
-        LoggerService.info("Applied VS Code/Cursor settings from profile: \(descriptor.profile.name)")
     }
     
     private func applyEditorSettingsToSystem(from profileDir: URL, to appSupportPath: URL, extensionsTo: URL?, editorName: String) throws {
@@ -1725,7 +1649,6 @@ private extension ProfileService {
                     try fm.removeItem(at: systemSettings)
                 }
                 try fm.copyItem(at: profileSettings, to: systemSettings)
-                LoggerService.info("Applied \(editorName) settings.json")
                 
                 Thread.sleep(forTimeInterval: 0.1)
             }
@@ -1738,7 +1661,6 @@ private extension ProfileService {
                     try fm.removeItem(at: systemKeybindings)
                 }
                 try fm.copyItem(at: profileKeybindings, to: systemKeybindings)
-                LoggerService.info("Applied \(editorName) keybindings.json")
             }
             
             let profileSnippets = userProfileDir.appendingPathComponent("snippets")
@@ -1749,7 +1671,6 @@ private extension ProfileService {
                     try fm.removeItem(at: systemSnippets)
                 }
                 try fm.copyItem(at: profileSnippets, to: systemSnippets)
-                LoggerService.info("Applied \(editorName) snippets")
             }
         }
         
@@ -1758,12 +1679,9 @@ private extension ProfileService {
             if let extensionsContent = try? String(contentsOf: extensionsFile) {
                 let extensions = extensionsContent.components(separatedBy: .newlines).filter { !$0.isEmpty }
                 if !extensions.isEmpty {
-                    LoggerService.info("\(editorName) Extensions to install manually:")
                     for ext in extensions.prefix(10) { // Log first 10
-                        LoggerService.info("  - \(ext)")
                     }
                     if extensions.count > 10 {
-                        LoggerService.info("  ... and \(extensions.count - 10) more extensions")
                     }
                 }
             }
