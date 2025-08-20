@@ -1,49 +1,138 @@
-# RiceBarMac
+# RiceBarMac 🍚
 
-🍚 **A lightning-fast macOS menu bar app for effortless desktop profile switching**
+[![macOS](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://www.apple.com/macos/)
+[![Swift](https://img.shields.io/badge/Swift-5.0+-orange.svg)](https://swift.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
 
-Switch between complete desktop environments in seconds. RiceBarMac lets you manage different "rices" (desktop configurations) by overlaying your `~/.config`, changing wallpapers, applying themes, and running custom scripts — all from your menu bar.
+<div align="center">
+  
+  # 🍚 RiceBarMac
+  
+  ### Lightning-fast macOS menu bar app for effortless desktop profile switching
+  
+  [![macOS](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://www.apple.com/macos/)
+  [![Swift](https://img.shields.io/badge/Swift-5.0+-orange.svg)](https://swift.org/)
+  [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+  [![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
+  
+</div>
 
-![RiceBarMac Demo](docs/demo.gif)
+## 🚀 Overview
+
+RiceBarMac is a powerful macOS menu bar application that allows you to quickly switch between different Rice configurations (themes, wallpapers, and system settings) using keyboard shortcuts. Perfect for developers and power users who want to maintain multiple aesthetic setups and switch between them seamlessly.
 
 ## ✨ Features
 
-- **🚀 Instant Profile Switching**: Change your entire desktop environment with one click
-- **⌨️ Global Shortcuts**: Quick switching with ⌘1-9 and ⌘]/[ navigation  
-- **🎨 Theme Integration**: VS Code/Cursor settings, extensions, and themes
-- **🖼️ Smart Wallpapers**: Auto-detection with multiple format support (PNG, JPG, HEIC)
-- **⚡ Terminal Themes**: Automatic Alacritty configuration and live reload
-- **📁 Profile Templates**: Dynamic templating with wallpaper color extraction
-- **🔄 Auto-Sync**: Live profile updates when you modify files
-- **🛡️ Non-Destructive**: Safe overlays with automatic backups
-- **🎯 Menu Bar Native**: Clean, minimal interface that stays out of your way
+### 🎨 **Profile Management**
 
-## 🔧 Quick Start
+-   **Multiple Rice Profiles**: Create and manage unlimited rice configurations
+-   **Theme Switching**: Instantly switch between different color schemes and themes
+-   **Wallpaper Management**: Automatic wallpaper switching with profile changes
+-   **System Integration**: Apply system-wide changes with a single click
 
-### Requirements
-- macOS Sonoma (14+) or later
-- Xcode 15+ for building from source
+### ⌨️ **Keyboard Shortcuts**
 
-### Installation
+-   **Global Hotkeys**: Switch profiles using customizable keyboard shortcuts (⌘+1, ⌘+2, etc.)
+-   **Navigation Shortcuts**: Quick navigation between profiles (⌘+⌥+⌃+[, ⌘+⌥+⌃+])
+-   **Auto-Save**: Shortcuts are automatically saved when configured
+-   **Remove Shortcuts**: Option to disable shortcuts for any profile
 
-1. **Clone and build:**
-```bash
-git clone https://github.com/MateoCerquetella/RiceBarMac.git
-cd RiceBarMac
-brew install xcodegen
-xcodegen generate
-open RiceBarMac.xcodeproj
-```
+### 🎯 **Smart Features**
 
-2. **Build and run** the project in Xcode (⌘R)
+-   **Universal Binary**: Works on both Intel and Apple Silicon Macs
+-   **Auto-Launch**: Option to start with macOS
+-   **Real-time Updates**: Hotkeys update immediately when changed
+-   **Visual Feedback**: Clear indication of active profile and shortcut status
 
-3. **Grant permissions** when prompted:
-   - Desktop folder access (for wallpaper changes)
-   - Apple Events (for terminal integration)
+### 🔧 **Advanced Capabilities**
 
-The app will appear in your menu bar with a rice bowl icon 🍚.
+-   **YAML Configuration**: Easy-to-edit configuration files
+-   **Backup System**: Automatic backup of existing configurations
+-   **Error Handling**: Robust error handling and recovery
+-   **Debug Logging**: Comprehensive logging for troubleshooting
 
-## 📁 Profile Structure
+## 📦 Installation
+
+### Prerequisites
+
+-   macOS 14.0 or later
+-   Xcode 15.0+ (for development)
+
+### Quick Start
+
+1. **Clone the repository**
+
+    ```bash
+    git clone https://github.com/MateoCerquetella/RiceBarMac.git
+    cd RiceBarMac
+    ```
+
+2. **Install dependencies**
+
+    ```bash
+    # Install XcodeGen if you don't have it
+    brew install xcodegen
+
+    # Generate Xcode project
+    xcodegen generate
+    ```
+
+3. **Build and run**
+
+    ```bash
+    # Build the project
+    xcodebuild -project RiceBarMac.xcodeproj -scheme RiceBarMac -configuration Release build
+
+    # Open the app
+    open /Users/$(whoami)/Library/Developer/Xcode/DerivedData/RiceBarMac-*/Build/Products/Release/RiceBarMac.app
+    ```
+
+### Development Setup
+
+1. **Open in Xcode**
+
+    ```bash
+    open RiceBarMac.xcodeproj
+    ```
+
+2. **Run the project**
+    - Select your target device (macOS)
+    - Press ⌘+R to build and run
+
+## 🎮 Usage
+
+### First Launch
+
+1. **Launch RiceBarMac** - The app will appear in your menu bar
+2. **Right-click the icon** to access the main menu
+3. **Open Settings** to configure your first profile
+
+### Creating Profiles
+
+1. **Go to Settings** → **Profiles tab**
+2. **Click "Add Profile"** to create a new rice configuration
+3. **Configure your settings**:
+    - **Theme**: Select your color scheme
+    - **Wallpaper**: Choose your background image
+    - **System Settings**: Configure additional preferences
+
+### Setting Up Shortcuts
+
+1. **Go to Settings** → **Shortcuts tab**
+2. **Click on any shortcut field** to record a new shortcut
+3. **Press your desired keys** (e.g., ⌘+1 for Profile 1)
+4. **The shortcut saves automatically** - no need to click "Save"
+
+### Navigation Shortcuts
+
+-   **Next Profile**: ⌘+⌥+⌃+] (or customize)
+-   **Previous Profile**: ⌘+⌥+⌃+[ (or customize)
+-   **Reload Profiles**: ⌘+⌥+⌃+R (or customize)
+
+## 🛠️ Configuration
+
+### 📁 Profile Structure
 
 Profiles are stored at `~/.ricebar/profiles/<ProfileName>/` with this structure:
 
@@ -68,224 +157,128 @@ Profiles are stored at `~/.ricebar/profiles/<ProfileName>/` with this structure:
     └── startup.sh
 ```
 
-### Core Components
-
-- **`home/`**: Files that overlay your home directory (non-destructive)
-- **`vscode/` & `cursor/`**: IDE settings, themes, and extension lists
-- **`wallpaper.*`**: Desktop background (PNG, JPG, HEIC, GIF, BMP, TIFF)
-- **`profile.json`**: Configuration metadata
-- **`hotkey.txt`**: Custom keyboard shortcuts
-- **`startup.sh`**: Post-application scripts
-
-## 🎮 Usage
-
-### Creating Profiles
-
-**From Menu:**
-- **"Create Profile" → "Empty Profile"**: Start with a blank slate
-- **"Create Profile" → "From Current Setup"**: Capture your current configuration
-
-**Manual Creation:**
-```bash
-mkdir -p ~/.ricebar/profiles/MyProfile/home/.config
-# Add your configs...
-echo "cmd+shift+1" > ~/.ricebar/profiles/MyProfile/hotkey.txt
-```
-
-### Switching Profiles
-
-**Multiple Ways:**
-- **Menu**: Click the profile name
-- **Keyboard**: ⌘1-9 for first 9 profiles
-- **Navigation**: ⌘] (next) / ⌘[ (previous)
-- **Hotkeys**: Custom shortcuts from `hotkey.txt`
-
 ### Profile Configuration
 
-**profile.json example:**
-```json
-{
-  "name": "Work Setup",
-  "order": 1,
-  "wallpaper": "wallpaper.jpg",
-  "hotkey": "cmd+shift+1",
-  "startupScript": "startup.sh",
-  "terminal": {
-    "kind": "alacritty",
-    "theme": "tokyo-night.yml"
-  },
-  "ide": {
-    "kind": "vscode",
-    "theme": "@id:Tokyo Night",
-    "extensions": ["ms-python.python", "rust-lang.rust-analyzer"]
-  }
-}
+```yaml
+profiles:
+    - name: 'Dark Theme'
+      theme: 'dark'
+      wallpaper: '/path/to/dark-wallpaper.jpg'
+      systemSettings:
+          appearance: 'dark'
+          accentColor: 'blue'
+
+    - name: 'Light Theme'
+      theme: 'light'
+      wallpaper: '/path/to/light-wallpaper.jpg'
+      systemSettings:
+          appearance: 'light'
+          accentColor: 'orange'
 ```
 
-## 🎨 Advanced Features
+### Shortcut Configuration
+
+```yaml
+shortcuts:
+    profileShortcuts:
+        profile1: 'cmd+1'
+        profile2: 'cmd+2'
+        profile3: 'cmd+3'
+
+    navigationShortcuts:
+        nextProfile: 'cmd+option+control+]'
+        previousProfile: 'cmd+option+control+['
+        reloadProfiles: 'cmd+option+control+r'
+```
+
+## 🎨 Customization
+
+### Supported Key Combinations
+
+-   **Letters**: `a`, `b`, `c`, etc.
+-   **Numbers**: `1`, `2`, `3`, etc.
+-   **Brackets**: `[`, `]`
+-   **Special Characters**: `\`, `;`, `'`, `,`, `.`, `/`, `` ` ``, `-`, `=`
+-   **Function Keys**: `F1`, `F2`, etc.
+-   **Navigation**: `UP`, `DOWN`, `LEFT`, `RIGHT`, `HOME`, `END`
+-   **Modifiers**: `cmd`, `option`, `control`, `shift`
 
 ### Theme Integration
 
-**Automatic VS Code/Cursor Setup:**
-- Settings and keybindings synchronization
-- Extension management and installation
-- Theme detection and application
-- Snippet library preservation
+RiceBarMac integrates with popular rice configurations:
 
-**Terminal Theming:**
-- Alacritty configuration with live reload
-- Color scheme extraction from wallpapers
-- Template-based configuration generation
+-   **Alacritty themes**
+-   **i3wm configurations**
+-   **Polybar themes**
+-   **Rofi themes**
+-   **Custom wallpapers**
 
-### Dynamic Templates
-
-Create templates in `templates/home/` with color variables:
-
-```yaml
-# templates/home/.config/alacritty/alacritty.yml
-colors:
-  primary:
-    background: "{{palette0}}"
-    foreground: "{{palette1}}"
-  normal:
-    black: "{{palette2}}"
-    red: "{{palette3}}"
-```
-
-Colors are automatically extracted from your wallpaper!
-
-### Auto-Sync & Live Updates
-
-RiceBarMac watches your active profile folder and automatically reapplies changes:
-- Edit a config file → instant update
-- Change wallpaper → automatic desktop refresh
-- Modify scripts → immediate execution
-
-## 🔧 App Distribution
-
-### Creating a Logo
-
-1. **Design Requirements:**
-   - 1024x1024px base resolution
-   - Simple, recognizable icon (rice bowl, grain, or abstract shape)
-   - Good contrast for menu bar display
-   - Scalable vector design
-
-2. **Tools:**
-   - **Free**: GIMP, Canva, or Figma
-   - **Paid**: Adobe Illustrator, Sketch
-   - **AI**: Midjourney, DALL-E for concepts
-
-3. **Icon Generation:**
-   - Use Xcode's Asset Catalog
-   - Generate all required sizes automatically
-   - Include @1x, @2x, @3x variants
-
-### Building for Distribution
-
-**Development Build:**
-```bash
-xcodebuild -project RiceBarMac.xcodeproj -scheme RiceBarMac -configuration Debug
-```
-
-**Release Build:**
-```bash
-xcodebuild -project RiceBarMac.xcodeproj -scheme RiceBarMac -configuration Release -archivePath RiceBarMac.xcarchive archive
-```
-
-**Notarization (for public distribution):**
-1. Enable Hardened Runtime in Release configuration
-2. Add Developer ID certificate
-3. Submit for notarization via Xcode or `xcrun notarytool`
-4. Staple the notarization to your app
-
-### Distribution Options
-
-**Direct Download:**
-1. Export as app bundle from Xcode
-2. Create DMG with utilities like `create-dmg`
-3. Host on GitHub Releases or your website
-
-**Mac App Store:**
-1. Add App Store entitlements
-2. Enable sandbox (already configured)
-3. Submit via App Store Connect
-
-**Package Managers:**
-```bash
-# Homebrew Cask example
-brew install --cask ricebarmac
-```
-
-## ⌨️ Keyboard Shortcuts
-
-- **⌘1-9**: Switch to profiles 1-9
-- **⌘]**: Next profile
-- **⌘[**: Previous profile  
-- **⌘E**: Create empty profile
-- **⌘N**: Create from current setup
-- **⌘R**: Reload profiles
-- **⌘O**: Open profiles folder
-- **⌘Q**: Quit RiceBarMac
-
-## 🛠️ Troubleshooting
+## 🐛 Troubleshooting
 
 ### Common Issues
 
-**Wallpaper not changing:**
-- Check file format (PNG, JPG, HEIC supported)
-- Verify file permissions
-- Try "Reload Profiles" from menu
+**Shortcuts not working?**
 
-**Terminal not updating:**
-- Ensure Alacritty is installed
-- Check config file syntax
-- Restart terminal application
+-   Check if the shortcut conflicts with other apps
+-   Ensure the app has accessibility permissions
+-   Try restarting the app
 
-**Hotkeys not working:**
-- Verify format in `hotkey.txt` (e.g., "cmd+shift+1")
-- Check for conflicting system shortcuts
-- Restart RiceBarMac
+**Profiles not switching?**
 
-### Permissions
+-   Verify file paths in your configuration
+-   Check console logs for error messages
+-   Ensure proper file permissions
 
-Grant these permissions in System Preferences → Security & Privacy:
+**App not launching?**
 
-- **Desktop Folder**: Required for wallpaper changes
-- **Apple Events**: Required for terminal integration
-- **Full Disk Access**: Required for some system configurations (optional)
+-   Check if it's blocked by Gatekeeper
+-   Verify macOS version compatibility
+-   Try building from source
+
+### Debug Mode
+
+Enable debug logging by running from terminal:
+
+```bash
+/Applications/RiceBarMac.app/Contents/MacOS/RiceBarMac
+```
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting PRs.
+We welcome contributions! Here's how you can help:
 
-### Development Setup
+1. **Fork the repository**
+2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
+3. **Commit your changes** (`git commit -m 'Add amazing feature'`)
+4. **Push to the branch** (`git push origin feature/amazing-feature`)
+5. **Open a Pull Request**
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+### Development Guidelines
 
-### Code Style
-
-- Swift code follows standard conventions
-- Use SwiftUI for UI components
-- Maintain backward compatibility with macOS 14+
-- Include tests for new features
+-   Follow Swift style guidelines
+-   Add tests for new features
+-   Update documentation
+-   Ensure compatibility with both Intel and Apple Silicon
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🙏 Acknowledgments
 
-- Inspired by the Unix "rice" culture
-- Built with SwiftUI and AppKit
-- Uses modern macOS APIs for seamless integration
+-   **HotKey Library**: For global keyboard shortcut support
+-   **Yams**: For YAML parsing capabilities
+-   **macOS Community**: For inspiration and feedback
+
+## 📞 Support
+
+-   **Issues**: [GitHub Issues](https://github.com/MateoCerquetella/RiceBarMac/issues)
+-   **Discussions**: [GitHub Discussions](https://github.com/MateoCerquetella/RiceBarMac/discussions)
+-   **Email**: mateo.cerquetella@gmail.com
 
 ---
 
-**Made with ❤️ by Mateo Cerquetella**
-
-⭐ Star this repo if RiceBarMac helps streamline your workflow!
+<div align="center">
+  <p>Made with ❤️ by Mateo Cerquetella for the macOS community</p>
+  <p>If you find this project helpful, please give it a ⭐️</p>
+</div>
