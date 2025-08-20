@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let profileService = ProfileService.shared
     private let systemService = SystemService.shared
     private let fileSystemService = FileSystemService.shared
+    private let backupService = BackupService.shared
     
     
     private lazy var statusBarViewModel = StatusBarViewModel(
@@ -33,6 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupServices()
+        createInitialBackup()
         setupControllers()
         setupInitialState()
     }
@@ -46,8 +48,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try Constants.ensureDirectoriesExist()
         } catch {
+            print("Warning: Could not create directories: \(error)")
         }
-        
+    }
+    
+    private func createInitialBackup() {
+        do {
+            try backupService.createInitialBackupIfNeeded()
+        } catch {
+            print("Warning: Failed to create initial backup: \(error.localizedDescription)")
+            // Don't fail the app launch if backup fails
+        }
     }
     
     private func setupControllers() {

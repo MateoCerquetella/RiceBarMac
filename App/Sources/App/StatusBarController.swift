@@ -14,7 +14,7 @@ final class StatusBarController {
     init(viewModel: StatusBarViewModel = StatusBarViewModel()) {
         self.viewModel = viewModel
         statusItem = NSStatusBar.system.statusItem(withLength: Constants.StatusBarIcon.menuBarLength)
-        statusItem.button?.image = NSImage(systemSymbolName: Constants.StatusBarIcon.systemName, accessibilityDescription: Constants.StatusBarIcon.accessibilityDescription)
+        statusItem.button?.title = Constants.StatusBarIcon.systemName
         
         setupBindings()
         constructMenu()

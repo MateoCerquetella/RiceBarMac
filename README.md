@@ -80,7 +80,7 @@ RiceBarMac operates as a **file replacement and overlay system** that manages yo
 -   **Config File Replacement**: Copy `.config` directories and files to your system
 -   **Home Directory Overlay**: Automatic overlay of `home/` directory contents
 -   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 configuration support
--   **Backup System**: Automatic backup of existing configurations before replacement
+-   **Backup System**: Automatic backup of existing configurations to `~/.ricebarmac/backups/` before replacement
 -   **Startup Scripts**: Execute custom scripts when profiles are applied
 
 ### 🖼️ **Visual Customization**
@@ -186,10 +186,10 @@ RiceBarMac operates as a **file replacement and overlay system** that manages yo
 
 ### 📁 Profile Structure
 
-Profiles are stored at `~/.ricebar/profiles/<ProfileName>/` with this structure:
+Profiles are stored at `~/.ricebarmac/profiles/<ProfileName>/` with this structure:
 
 ```
-~/.ricebar/profiles/
+~/.ricebarmac/profiles/
 ├── Work/
 │   ├── wallpaper.jpg
 │   └── profile.json

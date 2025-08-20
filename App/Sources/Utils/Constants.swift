@@ -25,7 +25,7 @@ enum Constants {
     
     
     private static let ricebarRoot = URL(fileURLWithPath: NSHomeDirectory())
-        .appendingPathComponent(".ricebar", isDirectory: true)
+        .appendingPathComponent(".ricebarmac", isDirectory: true)
     
     static let profilesRoot = ricebarRoot
         .appendingPathComponent("profiles", isDirectory: true)
@@ -188,7 +188,7 @@ enum Constants {
     }
     
     enum StatusBarIcon {
-        static let systemName = "paintbrush.pointed"  // Icono de pincel para personalización
+        static let systemName = "🍚"  // Rice bowl emoji
         static let accessibilityDescription = "RiceBar"
         static let menuBarLength = NSStatusItem.squareLength
     }
