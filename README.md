@@ -13,69 +13,89 @@
 
 ## 🚀 Overview
 
-RiceBarMac is a powerful macOS menu bar application that allows you to quickly switch between different Rice configurations (themes, wallpapers, and system settings) using keyboard shortcuts. Perfect for developers and power users who want to maintain multiple aesthetic setups and switch between them seamlessly.
+RiceBarMac is a powerful macOS menu bar application that manages your **desktop rice configurations** by copying files from profile directories to your actual system locations. It's designed for developers and power users who maintain multiple aesthetic setups and want to switch between them instantly using keyboard shortcuts.
 
 ## 🔧 How It Works
 
-RiceBarMac operates as a **menu bar utility** that manages your desktop rice configurations through a simple but powerful system:
+RiceBarMac operates as a **file replacement and overlay system** that manages your rice configurations:
 
 ### 🎯 **Core Functionality**
 
 -   **Menu Bar Integration**: Runs silently in your menu bar with a rice bowl icon 🍚
 -   **Profile Management**: Stores rice configurations in `~/.ricebar/profiles/`
+-   **File Replacement**: Copies `.config` files and other configurations from profiles to your actual system
 -   **Hotkey Registration**: Uses macOS global hotkey system for instant switching
--   **System Integration**: Applies changes to wallpapers, themes, and configurations
 
-### 📁 **Data Storage**
+### 📁 **Profile Structure**
 
 ```
-~/.ricebar/
-├── config.json          # Main configuration file
-├── profiles/            # Your rice profiles
-│   ├── Work/
-│   │   ├── wallpaper.jpg
-│   │   └── profile.json
-│   └── Gaming/
-│       ├── wallpaper.png
-│       └── profile.json
+~/.ricebar/profiles/
+├── Work/
+│   ├── home/                    # Overlays your home directory
+│   │   └── .config/            # Copies to ~/.config/
+│   │       ├── alacritty/
+│   │       ├── nvim/
+│   │       └── tmux/
+│   ├── vscode/                 # VS Code settings
+│   │   ├── settings.json
+│   │   ├── keybindings.json
+│   │   └── extensions.txt
+│   ├── wallpaper.jpg
+│   ├── profile.json            # Profile configuration
+│   └── startup.sh              # Script to run when profile is applied
+└── Gaming/
+    ├── home/.config/...
+    ├── wallpaper.png
+    └── profile.json
 ```
 
-### ⚡ **Profile Switching Process**
+### ⚡ **Profile Application Process**
 
 1. **User triggers shortcut** (e.g., ⌘+1)
 2. **RiceBarMac loads profile** from `~/.ricebar/profiles/`
 3. **Applies wallpaper** using macOS APIs
-4. **Updates system settings** if configured
-5. **Provides visual feedback** in menu bar
+4. **Copies `.config` files** from profile to your actual `~/.config/`
+5. **Replaces IDE settings** (VS Code, Cursor, etc.)
+6. **Runs startup scripts** if configured
+7. **Provides visual feedback** in menu bar
 
-### 🔄 **Real-time Updates**
+### 🔄 **File Replacement Methods**
 
--   **Hotkey changes** are applied immediately
--   **Profile modifications** are detected automatically
--   **No restart required** for configuration changes
+-   **Direct Replacements**: Specific file mappings defined in `profile.json`
+-   **Home Overlay**: Automatic copying of `home/` directory contents
+-   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 support
+-   **Backup System**: Creates backups before replacing files
 
 ## ✨ Features
 
 ### 🎨 **Profile Management**
 
--   **Multiple Rice Profiles**: Create and manage unlimited rice configurations
--   **Theme Switching**: Instantly switch between different color schemes and themes
--   **Wallpaper Management**: Automatic wallpaper switching with profile changes
--   **System Integration**: Apply system-wide changes with a single click
+-   **Multiple Profiles**: Create and manage unlimited rice profiles
+-   **Instant Switching**: Switch between profiles with keyboard shortcuts
+-   **Profile Ordering**: Customize the order of profiles in the menu
+-   **Profile Validation**: Automatic validation of profile configurations
+
+### 🔧 **File Management**
+
+-   **Config File Replacement**: Copy `.config` directories and files to your system
+-   **Home Directory Overlay**: Automatic overlay of `home/` directory contents
+-   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 configuration support
+-   **Backup System**: Automatic backup of existing configurations before replacement
+-   **Startup Scripts**: Execute custom scripts when profiles are applied
+
+### 🖼️ **Visual Customization**
+
+-   **Wallpaper Switching**: Change desktop wallpapers instantly
+-   **Multiple Formats**: Support for PNG, JPG, HEIC, GIF, BMP, TIFF
+-   **Terminal Themes**: Alacritty, Terminal.app, iTerm2 theme switching
+-   **IDE Themes**: VS Code and Cursor theme management
 
 ### ⌨️ **Keyboard Shortcuts**
 
--   **Global Hotkeys**: Switch profiles using customizable keyboard shortcuts (⌘+1, ⌘+2, etc.)
--   **Navigation Shortcuts**: Quick navigation between profiles (⌘+⌥+⌃+[, ⌘+⌥+⌃+])
--   **Auto-Save**: Shortcuts are automatically saved when configured
--   **Remove Shortcuts**: Option to disable shortcuts for any profile
-
-### 🎯 **Smart Features**
-
--   **Universal Binary**: Works on both Intel and Apple Silicon Macs
--   **Auto-Launch**: Option to start with macOS
--   **Real-time Updates**: Hotkeys update immediately when changed
--   **Visual Feedback**: Clear indication of active profile and shortcut status
+-   **Profile Shortcuts**: Direct profile switching (⌘+1, ⌘+2, etc.)
+-   **Navigation Shortcuts**: Next/Previous profile cycling
+-   **Quick Actions**: Create profiles, open settings, reload profiles
+-   **Global Hotkeys**: Works system-wide, even when other apps are active
 
 ### 🔧 **Advanced Capabilities**
 
@@ -184,8 +204,28 @@ Profiles are stored at `~/.ricebar/profiles/<ProfileName>/` with this structure:
 {
     "name": "Work Setup",
     "wallpaper": "wallpaper.jpg",
-    "theme": "dark",
-    "order": 1
+    "order": 1,
+    "hotkey": "cmd+1",
+    "terminal": {
+        "kind": "alacritty",
+        "theme": "alacritty.yml"
+    },
+    "ide": {
+        "kind": "vscode",
+        "theme": "vscode/settings.json",
+        "extensions": ["ms-vscode.vscode-typescript-next"]
+    },
+    "replacements": [
+        {
+            "source": "home/.config/nvim",
+            "destination": "~/.config/nvim"
+        },
+        {
+            "source": "home/.config/tmux",
+            "destination": "~/.config/tmux"
+        }
+    ],
+    "startupScript": "startup.sh"
 }
 ```
 
@@ -222,12 +262,12 @@ Profiles are stored at `~/.ricebar/profiles/<ProfileName>/` with this structure:
 
 ### Theme Integration
 
-RiceBarMac integrates with popular rice configurations:
+RiceBarMac integrates with popular development tools and configurations:
 
--   **Wallpaper switching** with multiple format support
--   **System appearance** changes (dark/light mode)
--   **Profile management** with custom ordering
--   **Keyboard shortcuts** for quick switching
+-   **Terminal Emulators**: Alacritty, Terminal.app, iTerm2 theme switching
+-   **Code Editors**: VS Code and Cursor settings, themes, and extensions
+-   **Shell Configurations**: Neovim, Tmux, and other `.config` files
+-   **Custom Scripts**: Execute startup scripts when profiles are applied
 
 ## 🐛 Troubleshooting
 
