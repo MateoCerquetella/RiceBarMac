@@ -5,6 +5,11 @@
 ._*
 .Spotlight-V100
 .Trashes
+*/.fseventsd
+*/.DocumentRevisions-V100
+*/.TemporaryItems
+*/.Trashes
+*~
 
 # Xcode
 build/
@@ -13,6 +18,8 @@ DerivedData/
 *.ipa
 *.dSYM
 *.dSYM.zip
+*.xcarchive
+*.xcframework
 
 # Xcode metadata (user-specific)
 *.pbxuser
@@ -29,19 +36,24 @@ xcuserdata/
 *.xcuserstate
 *.xcscmblueprint
 
+# Xcode project backup files (should NOT be committed)
+*.pbxproj.backup
+
 # Swift Package Manager
 .build/
 .swiftpm/
 Packages/
 Package.pins
 # Keep Package.resolved committed for reproducible builds
-# Package.resolved
+Package.resolved
 
 # CocoaPods
 Pods/
+Podfile.lock
 
 # Carthage
 Carthage/Build/
+Carthage/Checkouts/
 
 # Accio
 Dependencies/
@@ -59,11 +71,59 @@ fastlane/readme.md
 *.iml
 .vscode/
 *.swp
+*.swo
+*~
 
 # Swift Playgrounds
 timeline.xctimeline
 playground.xcworkspace
 
+# Swift/SwiftUI specific
+*.xctimeline
+*.playgroundpage
+*.playground
+*.swiftpm/xcode/package.xcworkspace
+
+# Node.js (for vscode-theme-manager)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build outputs
+*.app
+*.dmg
+*.pkg
+
+# RiceBarMac specific
+# User configuration files (should not be committed)
+.ricebar*/
+.ricebarmac/
+# Backup files created by RiceBarMac
+*.ricebar-backup*
+
+# Logs and debugging
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
 # Misc
 *.orig
 *.rej
+*.bak
