@@ -169,8 +169,8 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding(20)
-        .frame(width: 500, height: 400)
+        .padding(24)
+        .frame(width: 650, height: 550)
         .navigationTitle(Constants.appName)
     }
 }

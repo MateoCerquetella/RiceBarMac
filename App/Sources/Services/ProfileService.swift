@@ -310,6 +310,7 @@ final class ProfileService: ObservableObject {
             try applyIDEConfig(ide, base: descriptor.directory)
         }
         
+        
         if let scriptRel = profile.startupScript {
             let scriptURL = descriptor.directory.appendingPathComponent(scriptRel)
             try runScript(scriptURL)
@@ -396,6 +397,15 @@ final class ProfileService: ObservableObject {
                     
                     if let ide = profile.ide {
                         try self.applyIDEConfig(ide, base: descriptor.directory)
+                    }
+                    
+                    // Apply comprehensive theme settings
+                    Task {
+                        do {
+                            try await ThemeService.shared.applyProfileThemes(profile)
+                        } catch {
+                            print("Warning: Failed to apply theme settings: \(error)")
+                        }
                     }
                     
                     if let scriptRel = profile.startupScript {
@@ -1687,6 +1697,7 @@ private extension ProfileService {
             }
         }
     }
+    
 }
 
 

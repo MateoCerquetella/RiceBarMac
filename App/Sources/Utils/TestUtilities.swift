@@ -70,7 +70,8 @@ enum TestProfileFactory {
         profile.order = 1
         profile.hotkey = "ctrl+cmd+1"
         profile.wallpaper = "wallpaper.jpg"
-        profile.terminal = Profile.Terminal(kind: .alacritty, theme: "theme.yml")
+        profile.terminal = Profile.Terminal(kind: .alacritty)
+        profile.terminal?.theme = "theme.yml"
         profile.replacements = [
             Profile.Replacement(source: "source.txt", destination: "~/destination.txt")
         ]

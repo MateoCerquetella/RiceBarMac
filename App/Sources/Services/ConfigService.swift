@@ -111,6 +111,7 @@ final class ConfigService: ObservableObject {
         }
     }
     
+    
     private static func loadConfig(from url: URL) -> RiceBarConfig? {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return nil

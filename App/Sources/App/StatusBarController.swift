@@ -60,6 +60,12 @@ final class StatusBarController {
         menu.addItem(titleItem)
         menu.addItem(.separator())
 
+        // Add "Open Profile Manager" as the first item
+        let openProfileManager = NSMenuItem(title: "Open Profile Manager", action: #selector(openSettings), keyEquivalent: "")
+        openProfileManager.target = self
+        menu.addItem(openProfileManager)
+        menu.addItem(.separator())
+
         let profileItems = createProfileMenuItems()
         for item in profileItems {
             menu.addItem(item)

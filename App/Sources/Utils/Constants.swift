@@ -85,7 +85,7 @@ enum Constants {
     
     static let cursorSnippetsDir = "snippets"
     
-    enum IDEType: String, CaseIterable {
+    enum IDEType: String, CaseIterable, Codable {
         case vscode = "vscode"
         case cursor = "cursor"
         
@@ -121,6 +121,13 @@ enum Constants {
             switch self {
             case .vscode: return Constants.vscodeSnippetsDir
             case .cursor: return Constants.cursorSnippetsDir
+            }
+        }
+        
+        var settingsPath: String {
+            switch self {
+            case .vscode: return "~/Library/Application Support/Code/User/settings.json"
+            case .cursor: return "~/Library/Application Support/Cursor/User/settings.json"
             }
         }
     }
