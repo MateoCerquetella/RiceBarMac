@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		034C716933742FFADEB93893 /* RiceBarConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 905A29320716E040680009D2 /* RiceBarConfig.swift */; };
+		0F686CD54CEE4E786E108F79 /* ThemeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6F7A9374B3B880B1A53DA4B /* ThemeService.swift */; };
 		205B9A33D254D116AD48D87B /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BE3B3286B9F555650B9C7E0 /* Profile.swift */; };
 		2AA8E1537269A18B4C67A3E0 /* ProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC630074DEE99B0EC129091D /* ProfileTests.swift */; };
 		2EB7D82C4BDA5C9361E30356 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A401FFB6BC54C621640129E /* Assets.xcassets */; };
@@ -67,6 +68,7 @@
 		CDC3F74316A9A86DE31BD6C3 /* FileSystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemService.swift; sourceTree = "<group>"; };
 		D17F173E9D24510FAC082761 /* TestUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestUtilities.swift; sourceTree = "<group>"; };
 		DEF973746F5A165BF9E4C326 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		E6F7A9374B3B880B1A53DA4B /* ThemeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeService.swift; sourceTree = "<group>"; };
 		EC630074DEE99B0EC129091D /* ProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTests.swift; sourceTree = "<group>"; };
 		EE51A9870DA9A889723D2642 /* RiceBarMac_Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Release.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -138,6 +140,7 @@
 				CDC3F74316A9A86DE31BD6C3 /* FileSystemService.swift */,
 				9D9DD8D70913FAEE64EB6E2F /* ProfileService.swift */,
 				5FFDFB9CB09EA3ECD0DB47D7 /* SystemService.swift */,
+				E6F7A9374B3B880B1A53DA4B /* ThemeService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -339,6 +342,7 @@
 				8D23A2CF1F17FAD812AC62B5 /* StatusBarViewModel.swift in Sources */,
 				5CAA08DB78FAB9FA63ADA40E /* SystemService.swift in Sources */,
 				BA7D2D8F939F50DF862EED19 /* TestUtilities.swift in Sources */,
+				0F686CD54CEE4E786E108F79 /* ThemeService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -60,11 +60,7 @@ final class StatusBarController {
         menu.addItem(titleItem)
         menu.addItem(.separator())
 
-        // Add "Open Profile Manager" as the first item
-        let openProfileManager = NSMenuItem(title: "Open Profile Manager", action: #selector(openSettings), keyEquivalent: "")
-        openProfileManager.target = self
-        menu.addItem(openProfileManager)
-        menu.addItem(.separator())
+        // Keep only essential actions - remove profile manager UI
 
         let profileItems = createProfileMenuItems()
         for item in profileItems {
@@ -195,7 +191,6 @@ final class StatusBarController {
     
     private func createActionMenuItems() -> [NSMenuItem] {
         var items: [NSMenuItem] = []
-        let config = ConfigService.shared.config
         
         let createProfileMenu = NSMenuItem(title: "Create Profile", action: nil, keyEquivalent: "")
         let createSubmenu = NSMenu()
