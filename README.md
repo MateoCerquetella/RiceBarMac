@@ -13,26 +13,26 @@
 
 ## 🚀 Overview
 
-RiceBarMac is a powerful macOS menu bar application that manages your **desktop rice configurations** by copying files from profile directories to your actual system locations. It's designed for developers and power users who maintain multiple aesthetic setups and want to switch between them instantly using keyboard shortcuts.
+RiceBarMac is a powerful macOS menu bar application that manages your **desktop rice configurations** by creating symbolic links from profile directories to your actual system locations. It's designed for developers and power users who maintain multiple aesthetic setups and want to switch between them instantly using keyboard shortcuts.
 
 ## 🔧 How It Works
 
-RiceBarMac operates as a **file replacement and overlay system** that manages your rice configurations:
+RiceBarMac operates as a **symlink-based overlay system** that manages your rice configurations:
 
 ### 🎯 **Core Functionality**
 
 -   **Menu Bar Integration**: Runs silently in your menu bar with a rice bowl icon 🍚
--   **Profile Management**: Stores rice configurations in `~/.ricebar/profiles/`
--   **File Replacement**: Copies `.config` files and other configurations from profiles to your actual system
+-   **Profile Management**: Stores rice configurations in `~/.ricebarmac/profiles/`
+-   **Symlink Management**: Creates symbolic links from profile files to your actual system locations
 -   **Hotkey Registration**: Uses macOS global hotkey system for instant switching
 
 ### 📁 **Profile Structure**
 
 ```
-~/.ricebar/profiles/
+~/.ricebarmac/profiles/
 ├── Work/
 │   ├── home/                    # Overlays your home directory
-│   │   └── .config/            # Copies to ~/.config/
+│   │   └── .config/            # Symlinked to ~/.config/
 │   │       ├── alacritty/
 │   │       ├── nvim/
 │   │       └── tmux/
@@ -52,19 +52,19 @@ RiceBarMac operates as a **file replacement and overlay system** that manages yo
 ### ⚡ **Profile Application Process**
 
 1. **User triggers shortcut** (e.g., ⌘+1)
-2. **RiceBarMac loads profile** from `~/.ricebar/profiles/`
+2. **RiceBarMac loads profile** from `~/.ricebarmac/profiles/`
 3. **Applies wallpaper** using macOS APIs
-4. **Copies `.config` files** from profile to your actual `~/.config/`
-5. **Replaces IDE settings** (VS Code, Cursor, etc.)
+4. **Creates symbolic links** from profile files to your actual system locations
+5. **Symlinks IDE settings** (VS Code, Cursor, etc.)
 6. **Runs startup scripts** if configured
 7. **Provides visual feedback** in menu bar
 
 ### 🔄 **File Replacement Methods**
 
--   **Direct Replacements**: Specific file mappings defined in `profile.json`
--   **Home Overlay**: Automatic copying of `home/` directory contents
+-   **Direct Symlinks**: Specific file mappings defined in `profile.json`
+-   **Home Overlay**: Automatic symlinking of `home/` directory contents
 -   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 support
--   **Backup System**: Creates backups before replacing files
+-   **Backup System**: Creates backups of existing files before creating symlinks
 
 ## ✨ Features
 
@@ -77,10 +77,10 @@ RiceBarMac operates as a **file replacement and overlay system** that manages yo
 
 ### 🔧 **File Management**
 
--   **Config File Replacement**: Copy `.config` directories and files to your system
--   **Home Directory Overlay**: Automatic overlay of `home/` directory contents
+-   **Config File Symlinking**: Create symbolic links from `.config` directories and files to your system
+-   **Home Directory Overlay**: Automatic symlinking of `home/` directory contents
 -   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 configuration support
--   **Backup System**: Automatic backup of existing configurations to `~/.ricebarmac/backups/` before replacement
+-   **Backup System**: Automatic backup of existing files to `~/.ricebarmac/backups/` before creating symlinks
 -   **Startup Scripts**: Execute custom scripts when profiles are applied
 
 ### 🖼️ **Visual Customization**

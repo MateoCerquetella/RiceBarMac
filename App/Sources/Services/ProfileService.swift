@@ -273,8 +273,10 @@ final class ProfileService: ObservableObject {
         
         if let wallpaperRel = profile.wallpaper {
             let url = descriptor.directory.appendingPathComponent(wallpaperRel)
+            print("🖼️ Profile '\(profile.name)' has wallpaper: \(wallpaperRel)")
             try applyWallpaper(url: url)
         } else {
+            print("ℹ️ Profile '\(profile.name)' has no wallpaper configured")
         }
         
         try applyCodeEditorSettings(from: descriptor)
@@ -291,13 +293,29 @@ final class ProfileService: ObservableObject {
             for repl in replacements {
                 let src = descriptor.directory.appendingPathComponent(repl.source)
                 let dst = URL(fileURLWithPath: repl.destination.expandingTildeInPath)
-                let action = try replaceFile(source: src, destination: dst)
-                actions.append(action)
+                
+                // Check if source is a directory - if so, try to create a symlink tree
+                var isDir: ObjCBool = false
+                if FileManager.default.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
+                    do {
+                        try fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: true)
+                        actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path, backup: nil))
+                    } catch {
+                        // Fallback to overlay for directories that can't be symlinked as a whole
+                        let overlayActions = try overlayDirectory(from: src, to: dst)
+                        actions.append(contentsOf: overlayActions)
+                    }
+                } else {
+                    // Single file - create symlink
+                    let action = try createSymlink(source: src, destination: dst)
+                    actions.append(action)
+                }
             }
         } else {
             let homeOverlay = descriptor.directory.appendingPathComponent("home", isDirectory: true)
             if FileManager.default.fileExists(atPath: homeOverlay.path) {
-                let overlayActions = try overlayDirectory(from: homeOverlay, to: targetHome)
+                // Try to create directory-level symlinks where possible
+                let overlayActions = try overlaySymlinkDirectory(from: homeOverlay, to: targetHome)
                 actions.append(contentsOf: overlayActions)
             }
         }
@@ -318,6 +336,7 @@ final class ProfileService: ObservableObject {
         
         ApplyRecordStore.save(ApplyRecord(timestamp: Date(), actions: actions), to: descriptor.directory)
         
+        print("✅ Profile '\(descriptor.profile.name)' applied successfully")
         setActiveProfile(descriptor)
     }
     
@@ -352,8 +371,10 @@ final class ProfileService: ObservableObject {
                     
                     if let wallpaperRel = profile.wallpaper {
                         let url = descriptor.directory.appendingPathComponent(wallpaperRel)
+                        print("🖼️ Async: Profile '\(profile.name)' has wallpaper: \(wallpaperRel)")
                         try self.applyWallpaper(url: url)
                     } else {
+                        print("ℹ️ Async: Profile '\(profile.name)' has no wallpaper configured")
                     }
                     
                     if Task.isCancelled {
@@ -380,13 +401,29 @@ final class ProfileService: ObservableObject {
                         for repl in replacements {
                             let src = descriptor.directory.appendingPathComponent(repl.source)
                             let dst = URL(fileURLWithPath: repl.destination.expandingTildeInPath)
-                            let action = try self.replaceFile(source: src, destination: dst)
-                            actions.append(action)
+                            
+                            // Check if source is a directory - if so, try to create a symlink tree
+                            var isDir: ObjCBool = false
+                            if FileManager.default.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
+                                do {
+                                    try self.fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: true)
+                                    actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path, backup: nil))
+                                } catch {
+                                    // Fallback to overlay for directories that can't be symlinked as a whole
+                                    let overlayActions = try self.overlayDirectory(from: src, to: dst)
+                                    actions.append(contentsOf: overlayActions)
+                                }
+                            } else {
+                                // Single file - create symlink
+                                let action = try self.createSymlink(source: src, destination: dst)
+                                actions.append(action)
+                            }
                         }
                     } else {
                         let homeOverlay = descriptor.directory.appendingPathComponent("home", isDirectory: true)
                         if FileManager.default.fileExists(atPath: homeOverlay.path) {
-                            let overlayActions = try self.overlayDirectory(from: homeOverlay, to: targetHome)
+                            // Try to create directory-level symlinks where possible
+                            let overlayActions = try self.overlaySymlinkDirectory(from: homeOverlay, to: targetHome)
                             actions.append(contentsOf: overlayActions)
                         }
                     }
@@ -415,6 +452,7 @@ final class ProfileService: ObservableObject {
                     
                     ApplyRecordStore.save(ApplyRecord(timestamp: Date(), actions: actions), to: descriptor.directory)
                     
+                    print("✅ Async: Profile '\(descriptor.profile.name)' applied successfully")
                     self.setActiveProfile(descriptor)
                     
                     continuation.resume(returning: ())
@@ -431,11 +469,15 @@ final class ProfileService: ObservableObject {
         
         for action in record.actions {
             let dest = URL(fileURLWithPath: action.destination)
+            
+            // Remove symlink or file at destination
+            if fileSystemService.isSymlink(dest) || fm.fileExists(atPath: dest.path) {
+                try? fileSystemService.removeItemIfExists(at: dest)
+            }
+            
+            // Restore backup if it exists
             if let backup = action.backup.map({ URL(fileURLWithPath: $0) }), fm.fileExists(atPath: backup.path) {
-                if fm.fileExists(atPath: dest.path) { try? fm.removeItem(at: dest) }
                 try fm.moveItem(at: backup, to: dest)
-            } else {
-                try? fm.removeItem(at: dest)
             }
         }
     }
@@ -818,25 +860,36 @@ private extension ProfileService {
     }
     
     func applyWallpaper(url: URL) throws {
-        
         guard FileManager.default.fileExists(atPath: url.path) else { 
+            print("⚠️ Wallpaper file not found: \(url.path)")
             throw ProfileServiceError.fileNotFound(url.path) 
         }
         
+        print("🖼️ Setting wallpaper: \(url.path)")
         
         var lastError: Error?
         var successCount = 0
+        let screenCount = NSScreen.screens.count
         
+        // Try NSWorkspace first (preferred method)
         for (index, screen) in NSScreen.screens.enumerated() {
             do {
                 try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
+                print("✅ Set wallpaper for screen \(index + 1)/\(screenCount)")
                 successCount += 1
+                
+                // Add small delay to ensure the wallpaper is set properly
+                Thread.sleep(forTimeInterval: 0.1)
             } catch {
+                print("❌ Failed to set wallpaper for screen \(index + 1): \(error)")
                 lastError = error
             }
         }
         
+        // If NSWorkspace failed, try AppleScript as fallback
         if successCount == 0 {
+            print("🔄 NSWorkspace failed, trying AppleScript fallback...")
+            
             let script = """
             tell application "System Events"
               tell every desktop
@@ -844,22 +897,71 @@ private extension ProfileService {
               end tell
             end tell
             """
+            
             var errorDict: NSDictionary?
             if let appleScript = NSAppleScript(source: script) {
-                appleScript.executeAndReturnError(&errorDict)
-                if let errorDict { 
+                let result = appleScript.executeAndReturnError(&errorDict)
+                
+                if let errorDict = errorDict {
+                    print("❌ AppleScript failed: \(errorDict)")
                     throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "AppleScript failed: \(errorDict)"]))
                 } else {
+                    print("✅ AppleScript successfully set wallpaper")
+                    
+                    // Add delay to let AppleScript complete
+                    Thread.sleep(forTimeInterval: 0.2)
                 }
             } else {
+                print("❌ Failed to create AppleScript")
                 throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create AppleScript"]))
             }
+        } else if successCount < screenCount {
+            print("⚠️ Partial success: wallpaper set on \(successCount)/\(screenCount) screens")
+            if let error = lastError {
+                print("⚠️ Last error: \(error)")
+            }
         } else {
+            print("✅ Successfully set wallpaper on all \(successCount) screens")
+        }
+        
+        // Multiple strategies to ensure wallpaper change is visible
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // Strategy 1: Brief app hide/unhide to refresh desktop
+            NSApp.hide(nil)
+            NSApp.unhide(nil)
+        }
+        
+        // Strategy 2: Send notification to Dock to refresh desktop
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            let dockRestartScript = """
+            tell application "System Events"
+                tell application processes
+                    set frontmostProcess to first application process where frontmost is true
+                end tell
+                key code 53 using {command down} -- Command+Escape to refresh
+                delay 0.1
+                tell frontmostProcess to set frontmost to true
+            end tell
+            """
+            
+            if let appleScript = NSAppleScript(source: dockRestartScript) {
+                var errorDict: NSDictionary?
+                appleScript.executeAndReturnError(&errorDict)
+                if errorDict == nil {
+                    print("✅ Sent desktop refresh command")
+                }
+            }
         }
     }
     
     @discardableResult
     func replaceFile(source: URL, destination: URL) throws -> ApplyAction {
+        // Use symlinks instead of copying files
+        return try createSymlink(source: source, destination: destination)
+    }
+    
+    @discardableResult
+    func createSymlink(source: URL, destination: URL) throws -> ApplyAction {
         let fm = FileManager.default
         guard fm.fileExists(atPath: source.path) else { 
             throw ProfileServiceError.fileNotFound(source.path) 
@@ -870,19 +972,34 @@ private extension ProfileService {
         var backupPath: String? = nil
         var kind: ApplyAction.Kind = .created
         
-        if fm.fileExists(atPath: destination.path) {
-            if fm.contentsEqual(atPath: source.path, andPath: destination.path) {
-                return ApplyAction(kind: .updated, source: source.path, destination: destination.path, backup: nil)
+        // Check if destination exists (file or symlink)
+        if fm.fileExists(atPath: destination.path) || fileSystemService.isSymlink(destination) {
+            // If it's a symlink pointing to the same source, no need to change
+            if fileSystemService.isSymlink(destination) {
+                do {
+                    let currentTarget = try fileSystemService.readSymlink(destination)
+                    if currentTarget == source {
+                        return ApplyAction(kind: .updated, source: source.path, destination: destination.path, backup: nil)
+                    }
+                } catch {
+                    // Continue with replacement if we can't read the symlink
+                }
             }
             
-            let backup = destination.deletingLastPathComponent().appendingPathComponent(destination.lastPathComponent + ".bak")
-            try? fm.removeItem(at: backup)
-            try fm.moveItem(at: destination, to: backup)
-            backupPath = backup.path
+            // Backup only real files, not symlinks
+            if !fileSystemService.isSymlink(destination) {
+                let backup = destination.appendingPathExtension("ricebar-backup")
+                try? fileSystemService.removeItemIfExists(at: backup)
+                try fm.moveItem(at: destination, to: backup)
+                backupPath = backup.path
+            } else {
+                try fileSystemService.removeItemIfExists(at: destination)
+            }
             kind = .updated
         }
         
-        try fm.copyItem(at: source, to: destination)
+        // Create the symlink
+        try fm.createSymbolicLink(at: destination, withDestinationURL: source)
         touchIfNeededForReload(destination)
         
         return ApplyAction(kind: kind, source: source.path, destination: destination.path, backup: backupPath)
@@ -910,7 +1027,8 @@ private extension ProfileService {
             } else {
                 if shouldSkipInSnapshot(name: name) { continue }
                 autoreleasepool {
-                    if let action = try? replaceFile(source: fileURL, destination: dstURL) {
+                    // Use symlinks instead of copying files
+                    if let action = try? createSymlink(source: fileURL, destination: dstURL) {
                         actions.append(action)
                     }
                 }
@@ -918,6 +1036,21 @@ private extension ProfileService {
         }
         
         return actions
+    }
+    
+    func overlaySymlinkDirectory(from sourceDir: URL, to targetDir: URL) throws -> [ApplyAction] {
+        // Use the FileSystemService implementation and convert SymlinkActions to ApplyActions
+        let symlinkActions = try fileSystemService.overlaySymlinkDirectory(from: sourceDir, to: targetDir, createBackup: true)
+        
+        return symlinkActions.map { symlinkAction in
+            let kind: ApplyAction.Kind = symlinkAction.kind == .created ? .created : .updated
+            return ApplyAction(
+                kind: kind,
+                source: symlinkAction.source,
+                destination: symlinkAction.destination,
+                backup: symlinkAction.backup
+            )
+        }
     }
     
     func copyDirectoryRecursively(from src: URL, to dst: URL) throws {
@@ -1014,7 +1147,7 @@ private extension ProfileService {
         let ext = src.pathExtension.lowercased()
         let dstName = (ext == "toml") ? "alacritty.toml" : "alacritty.yml"
         let dst = home.appendingPathComponent(".config/alacritty/\(dstName)")
-        _ = try replaceFile(source: src, destination: dst)
+        _ = try createSymlink(source: src, destination: dst)
         return (ext == "toml") ? "toml" : "yml"
     }
     
@@ -1251,7 +1384,7 @@ private extension ProfileService {
         try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
         
         let settingsDst = configDir.appendingPathComponent(ideType.settingsFile)
-        _ = try replaceFile(source: src, destination: settingsDst)
+        _ = try createSymlink(source: src, destination: settingsDst)
         
         var isDir: ObjCBool = false
         if fm.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
@@ -1277,7 +1410,7 @@ private extension ProfileService {
                 let fileName = fileURL.lastPathComponent
                 if shouldSkipIDEFile(fileName) { continue }
                 
-                _ = try replaceFile(source: fileURL, destination: dstURL)
+                _ = try createSymlink(source: fileURL, destination: dstURL)
             }
         }
     }

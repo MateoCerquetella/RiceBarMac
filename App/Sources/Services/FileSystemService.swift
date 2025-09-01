@@ -12,6 +12,7 @@ enum FileSystemServiceError: LocalizedError {
     case fileCopyFailed(String, String, Error)
     case invalidEncoding(String)
     case jsonSerializationFailed(Error)
+    case symlinkCreationFailed(String, String, Error)
     
     var errorDescription: String? {
         switch self {
@@ -31,7 +32,28 @@ enum FileSystemServiceError: LocalizedError {
             return "Invalid text encoding for file: \(path)"
         case .jsonSerializationFailed(let error):
             return "JSON serialization failed: \(error.localizedDescription)"
+        case .symlinkCreationFailed(let source, let destination, let error):
+            return "Failed to create symlink from '\(source)' to '\(destination)': \(error.localizedDescription)"
         }
+    }
+}
+
+struct SymlinkAction: Codable {
+    enum Kind: String, Codable {
+        case created
+        case replaced
+    }
+    
+    let kind: Kind
+    let source: String
+    let destination: String
+    let backup: String?
+    
+    init(kind: Kind, source: String, destination: String, backup: String? = nil) {
+        self.kind = kind
+        self.source = source
+        self.destination = destination
+        self.backup = backup
     }
 }
 
@@ -192,6 +214,159 @@ final class FileSystemService: ObservableObject {
             try fileManager.copyItem(at: source, to: destination)
         } catch {
             throw FileSystemServiceError.fileCopyFailed(source.path, destination.path, error)
+        }
+    }
+    
+    // MARK: - Symlink Management
+    
+    func createSymlink(from source: URL, to destination: URL, createBackup: Bool = true) throws {
+        let fileManager = FileManager.default
+        
+        guard fileManager.fileExists(atPath: source.path) else {
+            throw FileSystemServiceError.fileNotFound(source.path)
+        }
+        
+        guard isSafeWritePath(destination) else {
+            throw FileSystemServiceError.unsafeWritePath(destination.path)
+        }
+        
+        try ensureParentDirectoryExists(for: destination)
+        
+        do {
+            if fileManager.fileExists(atPath: destination.path) || isSymlink(destination) {
+                if createBackup && !isSymlink(destination) {
+                    // Only backup real files, not symlinks
+                    let backupURL = destination.appendingPathExtension("ricebar-backup")
+                    try removeItemIfExists(at: backupURL)
+                    try fileManager.moveItem(at: destination, to: backupURL)
+                } else {
+                    try removeItemIfExists(at: destination)
+                }
+            }
+            
+            try fileManager.createSymbolicLink(at: destination, withDestinationURL: source)
+        } catch {
+            throw FileSystemServiceError.symlinkCreationFailed(source.path, destination.path, error)
+        }
+    }
+    
+    func createSymlinkTree(from sourceDir: URL, to targetDir: URL, createBackup: Bool = true) throws {
+        let fileManager = FileManager.default
+        
+        guard fileManager.fileExists(atPath: sourceDir.path) else {
+            throw FileSystemServiceError.fileNotFound(sourceDir.path)
+        }
+        
+        // Atomic symlink replacement using temporary directory
+        let tempTarget = targetDir.appendingPathExtension("ricebar-new")
+        try removeItemIfExists(at: tempTarget)
+        
+        // Create the symlink at temporary location
+        try createSymlink(from: sourceDir, to: tempTarget, createBackup: false)
+        
+        // Atomic replacement
+        if fileManager.fileExists(atPath: targetDir.path) || isSymlink(targetDir) {
+            if createBackup && !isSymlink(targetDir) {
+                let backupTarget = targetDir.appendingPathExtension("ricebar-backup")
+                try removeItemIfExists(at: backupTarget)
+                try fileManager.moveItem(at: targetDir, to: backupTarget)
+            } else {
+                try removeItemIfExists(at: targetDir)
+            }
+        }
+        
+        // Move temporary symlink to final location
+        try fileManager.moveItem(at: tempTarget, to: targetDir)
+    }
+    
+    func overlaySymlinkDirectory(from sourceDir: URL, to targetDir: URL, createBackup: Bool = true) throws -> [SymlinkAction] {
+        let fileManager = FileManager.default
+        var actions: [SymlinkAction] = []
+        
+        guard let enumerator = fileManager.enumerator(at: sourceDir, includingPropertiesForKeys: [.isDirectoryKey], options: []) else {
+            return actions
+        }
+        
+        for case let fileURL as URL in enumerator {
+            let relativePath = fileURL.path.replacingOccurrences(of: sourceDir.path + "/", with: "")
+            let targetURL = targetDir.appendingPathComponent(relativePath)
+            
+            var isDir: ObjCBool = false
+            _ = fileManager.fileExists(atPath: fileURL.path, isDirectory: &isDir)
+            
+            if isDir.boolValue {
+                // Create directory structure
+                try createDirectoryIfNeeded(at: targetURL)
+            } else {
+                // Create individual file symlinks
+                let action = try createFileSymlink(source: fileURL, destination: targetURL, createBackup: createBackup)
+                actions.append(action)
+            }
+        }
+        
+        return actions
+    }
+    
+    private func createFileSymlink(source: URL, destination: URL, createBackup: Bool) throws -> SymlinkAction {
+        let fileManager = FileManager.default
+        var backupPath: String? = nil
+        var kind: SymlinkAction.Kind = .created
+        
+        if fileManager.fileExists(atPath: destination.path) || isSymlink(destination) {
+            if !isSymlink(destination) && createBackup {
+                // Backup real files
+                let backup = destination.appendingPathExtension("ricebar-backup")
+                try removeItemIfExists(at: backup)
+                try fileManager.moveItem(at: destination, to: backup)
+                backupPath = backup.path
+                kind = .replaced
+            } else {
+                // Remove existing symlinks or files without backup
+                try removeItemIfExists(at: destination)
+                kind = .replaced
+            }
+        }
+        
+        try fileManager.createSymbolicLink(at: destination, withDestinationURL: source)
+        
+        return SymlinkAction(
+            kind: kind,
+            source: source.path,
+            destination: destination.path,
+            backup: backupPath
+        )
+    }
+    
+    func isSymlink(_ url: URL) -> Bool {
+        do {
+            let resourceValues = try url.resourceValues(forKeys: [.isSymbolicLinkKey])
+            return resourceValues.isSymbolicLink == true
+        } catch {
+            return false
+        }
+    }
+    
+    func readSymlink(_ url: URL) throws -> URL {
+        guard isSymlink(url) else {
+            throw FileSystemServiceError.fileNotFound("Not a symlink: \(url.path)")
+        }
+        
+        let destinationPath = try FileManager.default.destinationOfSymbolicLink(atPath: url.path)
+        return URL(fileURLWithPath: destinationPath)
+    }
+    
+    func removeSymlinkTree(at url: URL, restoreBackups: Bool = true) throws {
+        let fileManager = FileManager.default
+        
+        if isSymlink(url) {
+            try removeItemIfExists(at: url)
+            
+            if restoreBackups {
+                let backup = url.appendingPathExtension("ricebar-backup")
+                if fileManager.fileExists(atPath: backup.path) {
+                    try fileManager.moveItem(at: backup, to: url)
+                }
+            }
         }
     }
     
