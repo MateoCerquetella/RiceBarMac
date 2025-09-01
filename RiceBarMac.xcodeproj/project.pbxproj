@@ -15,7 +15,6 @@
 		401843DFD9E0A76FCB155BC5 /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81D869300D60DBBB638E7960 /* BackupService.swift */; };
 		5CAA08DB78FAB9FA63ADA40E /* SystemService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FFDFB9CB09EA3ECD0DB47D7 /* SystemService.swift */; };
 		6565061879C1006EFE25A0EB /* RiceBarMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 268D18331B39985EF0EF5B1A /* RiceBarMacApp.swift */; };
-		68F74325DC510EB696132E54 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEF973746F5A165BF9E4C326 /* SettingsWindowController.swift */; };
 		6A7587A8978C75DDBD7246A7 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9DD8D70913FAEE64EB6E2F /* ProfileService.swift */; };
 		7E1877D66D719FEB41197CBF /* ConfigService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB43E97EFA13FFCD52C57445 /* ConfigService.swift */; };
 		7F8A61EEB40D60D2F3020F45 /* ApplyRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87FF12B9E55064A525A6AB9F /* ApplyRecord.swift */; };
@@ -23,14 +22,10 @@
 		96DE72684819AA654BA471C2 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = C605F1B125C2302857023307 /* Yams */; };
 		999EE50D894B5C37205408A9 /* FileSystemUtilitiesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11AE24FAF50C913B94768EF0 /* FileSystemUtilitiesTests.swift */; };
 		9B90D0089306F3D5E4A960EB /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54B8CEBEDF14D653D5904C76 /* Constants.swift */; };
-		A525825F212E091B69060930 /* LoggerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6CD2EF252A84B8FE47A27C7C /* LoggerService.swift */; };
 		B32F895E6811F00E9609D921 /* ApplyActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1885A099C07F1C02C2D6D275 /* ApplyActivity.swift */; };
-		BA7D2D8F939F50DF862EED19 /* TestUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = D17F173E9D24510FAC082761 /* TestUtilities.swift */; };
 		BE0D34E6F46FD074BCEF948D /* FileSystemService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3F74316A9A86DE31BD6C3 /* FileSystemService.swift */; };
 		BF644B7A48F34F809B761EB3 /* StatusBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B003CBCD364D4FC36E0CDCA /* StatusBarController.swift */; };
-		C7E43FBE420C723A6B783B4F /* ShortcutCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B4CC448C12A3FC8C27DB461 /* ShortcutCaptureView.swift */; };
 		F8CF6A1782A672790B8B22F9 /* HotKey in Frameworks */ = {isa = PBXBuildFile; productRef = B17825F2AF40D3D8D44819F4 /* HotKey */; };
-		FF8E853152950C8CAC101B82 /* SettingsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1822F319CB4C1E75832949B4 /* SettingsWindow.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -46,17 +41,14 @@
 /* Begin PBXFileReference section */
 		0BE3B3286B9F555650B9C7E0 /* Profile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profile.swift; sourceTree = "<group>"; };
 		11AE24FAF50C913B94768EF0 /* FileSystemUtilitiesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemUtilitiesTests.swift; sourceTree = "<group>"; };
-		1822F319CB4C1E75832949B4 /* SettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindow.swift; sourceTree = "<group>"; };
 		1885A099C07F1C02C2D6D275 /* ApplyActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyActivity.swift; sourceTree = "<group>"; };
 		1B003CBCD364D4FC36E0CDCA /* StatusBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarController.swift; sourceTree = "<group>"; };
 		268D18331B39985EF0EF5B1A /* RiceBarMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiceBarMacApp.swift; sourceTree = "<group>"; };
 		3A401FFB6BC54C621640129E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		48E0071036E1D031DF38F28E /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		54B8CEBEDF14D653D5904C76 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
-		5B4CC448C12A3FC8C27DB461 /* ShortcutCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutCaptureView.swift; sourceTree = "<group>"; };
 		5FFDFB9CB09EA3ECD0DB47D7 /* SystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemService.swift; sourceTree = "<group>"; };
 		6C007FDFEBC40D65FCA96770 /* RiceBarMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RiceBarMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		6CD2EF252A84B8FE47A27C7C /* LoggerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggerService.swift; sourceTree = "<group>"; };
 		81D869300D60DBBB638E7960 /* BackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupService.swift; sourceTree = "<group>"; };
 		87FF12B9E55064A525A6AB9F /* ApplyRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyRecord.swift; sourceTree = "<group>"; };
 		8E0693C0DF87522673380697 /* RiceBarMac_Debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Debug.entitlements; sourceTree = "<group>"; };
@@ -66,8 +58,6 @@
 		BAE9BFB729AB2AD781D26AD3 /* StatusBarViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarViewModel.swift; sourceTree = "<group>"; };
 		C64AE5299733FC31BEA181F8 /* RiceBarMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RiceBarMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CDC3F74316A9A86DE31BD6C3 /* FileSystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileSystemService.swift; sourceTree = "<group>"; };
-		D17F173E9D24510FAC082761 /* TestUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestUtilities.swift; sourceTree = "<group>"; };
-		DEF973746F5A165BF9E4C326 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		E6F7A9374B3B880B1A53DA4B /* ThemeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeService.swift; sourceTree = "<group>"; };
 		EC630074DEE99B0EC129091D /* ProfileTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileTests.swift; sourceTree = "<group>"; };
 		EE51A9870DA9A889723D2642 /* RiceBarMac_Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Release.entitlements; sourceTree = "<group>"; };
@@ -148,8 +138,6 @@
 		69F721075A57E6F5C051686A /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				1822F319CB4C1E75832949B4 /* SettingsWindow.swift */,
-				5B4CC448C12A3FC8C27DB461 /* ShortcutCaptureView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -172,7 +160,6 @@
 		A54FA3DC97CA580EB5747889 /* Controllers */ = {
 			isa = PBXGroup;
 			children = (
-				DEF973746F5A165BF9E4C326 /* SettingsWindowController.swift */,
 			);
 			path = Controllers;
 			sourceTree = "<group>";
@@ -209,8 +196,6 @@
 			children = (
 				1885A099C07F1C02C2D6D275 /* ApplyActivity.swift */,
 				54B8CEBEDF14D653D5904C76 /* Constants.swift */,
-				6CD2EF252A84B8FE47A27C7C /* LoggerService.swift */,
-				D17F173E9D24510FAC082761 /* TestUtilities.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -330,18 +315,13 @@
 				7E1877D66D719FEB41197CBF /* ConfigService.swift in Sources */,
 				9B90D0089306F3D5E4A960EB /* Constants.swift in Sources */,
 				BE0D34E6F46FD074BCEF948D /* FileSystemService.swift in Sources */,
-				A525825F212E091B69060930 /* LoggerService.swift in Sources */,
 				205B9A33D254D116AD48D87B /* Profile.swift in Sources */,
 				6A7587A8978C75DDBD7246A7 /* ProfileService.swift in Sources */,
 				034C716933742FFADEB93893 /* RiceBarConfig.swift in Sources */,
 				6565061879C1006EFE25A0EB /* RiceBarMacApp.swift in Sources */,
-				FF8E853152950C8CAC101B82 /* SettingsWindow.swift in Sources */,
-				68F74325DC510EB696132E54 /* SettingsWindowController.swift in Sources */,
-				C7E43FBE420C723A6B783B4F /* ShortcutCaptureView.swift in Sources */,
 				BF644B7A48F34F809B761EB3 /* StatusBarController.swift in Sources */,
 				8D23A2CF1F17FAD812AC62B5 /* StatusBarViewModel.swift in Sources */,
 				5CAA08DB78FAB9FA63ADA40E /* SystemService.swift in Sources */,
-				BA7D2D8F939F50DF862EED19 /* TestUtilities.swift in Sources */,
 				0F686CD54CEE4E786E108F79 /* ThemeService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

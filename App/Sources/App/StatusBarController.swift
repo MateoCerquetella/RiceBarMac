@@ -9,7 +9,7 @@ final class StatusBarController {
     private let statusItem: NSStatusItem
     private let viewModel: StatusBarViewModel
     private var cancellables = Set<AnyCancellable>()
-    private lazy var settingsWindowController = SettingsWindowController()
+    // Removed settings UI components
 
     init(viewModel: StatusBarViewModel = StatusBarViewModel()) {
         self.viewModel = viewModel
@@ -192,87 +192,21 @@ final class StatusBarController {
     private func createActionMenuItems() -> [NSMenuItem] {
         var items: [NSMenuItem] = []
         
-        let createProfileMenu = NSMenuItem(title: "Create Profile", action: nil, keyEquivalent: "")
-        let createSubmenu = NSMenu()
-        
-        let newEmpty = NSMenuItem(title: "Empty Profile…", action: #selector(promptCreateEmpty), keyEquivalent: "")
-        newEmpty.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.createEmptyProfile) {
-            newEmpty.keyEquivalent = parsed.key
-            newEmpty.keyEquivalentModifierMask = parsed.modifiers
-        }
-        createSubmenu.addItem(newEmpty)
-        
-        let snapshot = NSMenuItem(title: "From Current Setup…", action: #selector(promptCreateFromCurrent), keyEquivalent: "")
+        // Simplified menu - keep only essential actions
+        let snapshot = NSMenuItem(title: "Create from Current Setup", action: #selector(promptCreateFromCurrent), keyEquivalent: "n")
         snapshot.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.createFromCurrentSetup) {
-            snapshot.keyEquivalent = parsed.key
-            snapshot.keyEquivalentModifierMask = parsed.modifiers
-        }
-        createSubmenu.addItem(snapshot)
-        
-        createProfileMenu.submenu = createSubmenu
-        items.append(createProfileMenu)
+        items.append(snapshot)
         
         items.append(.separator())
         
-        let nextProfile = NSMenuItem(title: "Next Profile", action: #selector(switchToNextProfile), keyEquivalent: "")
-        nextProfile.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.nextProfile) {
-            nextProfile.keyEquivalent = parsed.key
-            nextProfile.keyEquivalentModifierMask = parsed.modifiers
-        }
-        items.append(nextProfile)
-        
-        let prevProfile = NSMenuItem(title: "Previous Profile", action: #selector(switchToPreviousProfile), keyEquivalent: "")
-        prevProfile.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.previousProfile) {
-            prevProfile.keyEquivalent = parsed.key
-            prevProfile.keyEquivalentModifierMask = parsed.modifiers
-        }
-        items.append(prevProfile)
-        
-        items.append(.separator())
-        
-        let reload = NSMenuItem(title: "Reload Profiles", action: #selector(reloadProfiles), keyEquivalent: "")
-        reload.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.reloadProfiles) {
-            reload.keyEquivalent = parsed.key
-            reload.keyEquivalentModifierMask = parsed.modifiers
-        }
-        items.append(reload)
-        
-        let open = NSMenuItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder), keyEquivalent: "")
+        let open = NSMenuItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder), keyEquivalent: "o")
         open.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.openProfilesFolder) {
-            open.keyEquivalent = parsed.key
-            open.keyEquivalentModifierMask = parsed.modifiers
-        }
         items.append(open)
         
         items.append(.separator())
         
-        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
-        settings.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.openSettings) {
-            settings.keyEquivalent = parsed.key
-            settings.keyEquivalentModifierMask = parsed.modifiers
-        }
-        items.append(settings)
-        
-        let launchAtLogin = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-        launchAtLogin.target = self
-        launchAtLogin.state = viewModel.isLaunchAtLoginEnabled ? .on : .off
-        items.append(launchAtLogin)
-        
-        items.append(.separator())
-        
-        let quit = NSMenuItem(title: "Quit \(Constants.appName)", action: #selector(quit), keyEquivalent: "")
+        let quit = NSMenuItem(title: "Quit \(Constants.appName)", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.quitApp) {
-            quit.keyEquivalent = parsed.key
-            quit.keyEquivalentModifierMask = parsed.modifiers
-        }
         items.append(quit)
         
         return items
@@ -289,18 +223,8 @@ final class StatusBarController {
         }
     }
 
-    @objc private func reloadProfiles() {
-        viewModel.refreshData()
-    }
-
     @objc private func openProfilesFolder() {
         viewModel.openProfilesFolder()
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        Task {
-            await viewModel.toggleLaunchAtLogin()
-        }
     }
 
     @objc private func quit() {
@@ -391,33 +315,9 @@ final class StatusBarController {
         viewModel.openProfileFolder(descriptor)
     }
 
-    @objc private func promptCreateEmpty() {
-        Task { @MainActor in
-            guard let name = await viewModel.promptForProfileName(
-                title: "Create Empty Profile",
-                message: "Enter a name for the new empty profile.",
-                placeholder: "New profile name"
-            ) else { return }
-            
-            do {
-                _ = try await viewModel.createEmptyProfile(name: name)
-                await viewModel.showSuccess(title: "Profile Created", message: "Empty profile created successfully.")
-            } catch {
-            }
-        }
-    }
+    // Removed unused profile management methods
     
-    @objc private func switchToNextProfile() {
-        viewModel.switchToNextProfile()
-    }
-    
-    @objc private func switchToPreviousProfile() {
-        viewModel.switchToPreviousProfile()
-    }
-    
-    @objc private func openSettings() {
-        settingsWindowController.showSettings()
-    }
+    // Settings UI removed - profiles are managed through menu only
     
     private func parseMenuShortcut(_ shortcut: String) -> (key: String, modifiers: NSEvent.ModifierFlags)? {
         let parts = shortcut.lowercased().split(separator: "+").map { String($0) }
