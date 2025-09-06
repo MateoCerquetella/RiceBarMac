@@ -286,7 +286,6 @@ final class ProfileService: ObservableObject {
         let targetHome = URL(fileURLWithPath: NSHomeDirectory())
         
         if cleanConfig {
-            try backupAndCleanConfig(atHome: targetHome)
         }
         
         if let replacements = profile.replacements, !replacements.isEmpty {
@@ -298,8 +297,8 @@ final class ProfileService: ObservableObject {
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
                     do {
-                        try fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: true)
-                        actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path, backup: nil))
+                        try fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: false)
+                        actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path))
                     } catch {
                         // Fallback to overlay for directories that can't be symlinked as a whole
                         let overlayActions = try overlayDirectory(from: src, to: dst)
@@ -394,7 +393,6 @@ final class ProfileService: ObservableObject {
                     let targetHome = URL(fileURLWithPath: NSHomeDirectory())
                     
                     if cleanConfig {
-                        try self.backupAndCleanConfig(atHome: targetHome)
                     }
                     
                     if let replacements = profile.replacements, !replacements.isEmpty {
@@ -406,8 +404,8 @@ final class ProfileService: ObservableObject {
                             var isDir: ObjCBool = false
                             if FileManager.default.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
                                 do {
-                                    try self.fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: true)
-                                    actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path, backup: nil))
+                                    try self.fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: false)
+                                    actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path))
                                 } catch {
                                     // Fallback to overlay for directories that can't be symlinked as a whole
                                     let overlayActions = try self.overlayDirectory(from: src, to: dst)
@@ -475,10 +473,6 @@ final class ProfileService: ObservableObject {
                 try? fileSystemService.removeItemIfExists(at: dest)
             }
             
-            // Restore backup if it exists
-            if let backup = action.backup.map({ URL(fileURLWithPath: $0) }), fm.fileExists(atPath: backup.path) {
-                try fm.moveItem(at: backup, to: dest)
-            }
         }
     }
     
@@ -844,20 +838,6 @@ private extension ProfileService {
         }
     }
     
-    func backupAndCleanConfig(atHome home: URL) throws {
-        let fm = FileManager.default
-        let configDir = home.appendingPathComponent(".config", isDirectory: true)
-        var isDir: ObjCBool = false
-        
-        if fm.fileExists(atPath: configDir.path, isDirectory: &isDir), isDir.boolValue {
-            let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-            let backup = home.appendingPathComponent(".config.ricebar-backup-\(timestamp)", isDirectory: true)
-            try? fm.removeItem(at: backup)
-            try fm.moveItem(at: configDir, to: backup)
-        }
-        
-        try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
-    }
     
     func applyWallpaper(url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { 
@@ -969,7 +949,6 @@ private extension ProfileService {
         
         try fileSystemService.ensureParentDirectoryExists(for: destination)
         
-        var backupPath: String? = nil
         var kind: ApplyAction.Kind = .created
         
         // Check if destination exists (file or symlink)
@@ -979,22 +958,15 @@ private extension ProfileService {
                 do {
                     let currentTarget = try fileSystemService.readSymlink(destination)
                     if currentTarget == source {
-                        return ApplyAction(kind: .updated, source: source.path, destination: destination.path, backup: nil)
+                        return ApplyAction(kind: .updated, source: source.path, destination: destination.path)
                     }
                 } catch {
                     // Continue with replacement if we can't read the symlink
                 }
             }
             
-            // Backup only real files, not symlinks
-            if !fileSystemService.isSymlink(destination) {
-                let backup = destination.appendingPathExtension("ricebar-backup")
-                try? fileSystemService.removeItemIfExists(at: backup)
-                try fm.moveItem(at: destination, to: backup)
-                backupPath = backup.path
-            } else {
-                try fileSystemService.removeItemIfExists(at: destination)
-            }
+            // Remove existing file or symlink
+            try fileSystemService.removeItemIfExists(at: destination)
             kind = .updated
         }
         
@@ -1002,7 +974,7 @@ private extension ProfileService {
         try fm.createSymbolicLink(at: destination, withDestinationURL: source)
         touchIfNeededForReload(destination)
         
-        return ApplyAction(kind: kind, source: source.path, destination: destination.path, backup: backupPath)
+        return ApplyAction(kind: kind, source: source.path, destination: destination.path)
     }
     
     func overlayDirectory(from sourceDir: URL, to targetDir: URL) throws -> [ApplyAction] {
@@ -1040,15 +1012,14 @@ private extension ProfileService {
     
     func overlaySymlinkDirectory(from sourceDir: URL, to targetDir: URL) throws -> [ApplyAction] {
         // Use the FileSystemService implementation and convert SymlinkActions to ApplyActions
-        let symlinkActions = try fileSystemService.overlaySymlinkDirectory(from: sourceDir, to: targetDir, createBackup: true)
+        let symlinkActions = try fileSystemService.overlaySymlinkDirectory(from: sourceDir, to: targetDir, createBackup: false)
         
         return symlinkActions.map { symlinkAction in
             let kind: ApplyAction.Kind = symlinkAction.kind == .created ? .created : .updated
             return ApplyAction(
                 kind: kind,
                 source: symlinkAction.source,
-                destination: symlinkAction.destination,
-                backup: symlinkAction.backup
+                destination: symlinkAction.destination
             )
         }
     }
@@ -1083,7 +1054,6 @@ private extension ProfileService {
     func shouldSkipInSnapshot(name: String) -> Bool {
         if name == ".DS_Store" { return true }
         if name.hasSuffix(".bak") { return true }
-        if name.hasPrefix("alacritty.ricebar-backup-") { return true }
         return false
     }
     
@@ -1159,11 +1129,8 @@ private extension ProfileService {
         
         guard fm.fileExists(atPath: alt.path) else { return }
         
-        try? fm.createDirectory(at: ConfigAccess.backupsRoot, withIntermediateDirectories: true)
-        let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let backup = ConfigAccess.backupsRoot.appendingPathComponent("alacritty_\(altName).\(timestamp)")
-        try? fm.removeItem(at: backup)
-        try? fm.moveItem(at: alt, to: backup)
+        // Remove the existing alacritty config
+        try? fm.removeItem(at: alt)
     }
     
     func applyIDEConfig(_ ide: Profile.IDE, base: URL) throws {

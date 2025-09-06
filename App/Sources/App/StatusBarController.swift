@@ -10,6 +10,7 @@ final class StatusBarController {
     private let viewModel: StatusBarViewModel
     private var cancellables = Set<AnyCancellable>()
     private lazy var settingsWindowController = SettingsWindowController()
+    private let configService = ConfigService.shared
 
     init(viewModel: StatusBarViewModel = StatusBarViewModel()) {
         self.viewModel = viewModel
@@ -118,12 +119,10 @@ final class StatusBarController {
             return [empty]
         }
         
-        let config = ConfigService.shared.config
-        
         return viewModel.sortedProfiles.enumerated().map { (index, descriptor) in
             let title = descriptor.profile.name
             let profileKey = "profile\(index + 1)"
-            let configShortcut = config.shortcuts.profileShortcuts[profileKey] ?? ""
+            let configShortcut = configService.config.shortcuts.profileShortcuts[profileKey] ?? ""
             
             var keyEquivalent = ""
             var modifierMask: NSEvent.ModifierFlags = []
@@ -197,7 +196,7 @@ final class StatusBarController {
         
         let newEmpty = NSMenuItem(title: "Empty Profile…", action: #selector(promptCreateEmpty), keyEquivalent: "")
         newEmpty.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.createEmptyProfile) {
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.quickActions.createEmptyProfile) {
             newEmpty.keyEquivalent = parsed.key
             newEmpty.keyEquivalentModifierMask = parsed.modifiers
         }
@@ -205,7 +204,7 @@ final class StatusBarController {
         
         let snapshot = NSMenuItem(title: "From Current Setup…", action: #selector(promptCreateFromCurrent), keyEquivalent: "")
         snapshot.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.createFromCurrentSetup) {
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.quickActions.createFromCurrentSetup) {
             snapshot.keyEquivalent = parsed.key
             snapshot.keyEquivalentModifierMask = parsed.modifiers
         }
@@ -218,7 +217,7 @@ final class StatusBarController {
         
         let nextProfile = NSMenuItem(title: "Next Profile", action: #selector(switchToNextProfile), keyEquivalent: "")
         nextProfile.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.nextProfile) {
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.navigationShortcuts.nextProfile) {
             nextProfile.keyEquivalent = parsed.key
             nextProfile.keyEquivalentModifierMask = parsed.modifiers
         }
@@ -226,7 +225,7 @@ final class StatusBarController {
         
         let prevProfile = NSMenuItem(title: "Previous Profile", action: #selector(switchToPreviousProfile), keyEquivalent: "")
         prevProfile.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.previousProfile) {
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.navigationShortcuts.previousProfile) {
             prevProfile.keyEquivalent = parsed.key
             prevProfile.keyEquivalentModifierMask = parsed.modifiers
         }
@@ -236,7 +235,7 @@ final class StatusBarController {
         
         let reload = NSMenuItem(title: "Reload Profiles", action: #selector(reloadProfiles), keyEquivalent: "")
         reload.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.reloadProfiles) {
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.navigationShortcuts.reloadProfiles) {
             reload.keyEquivalent = parsed.key
             reload.keyEquivalentModifierMask = parsed.modifiers
         }
@@ -244,7 +243,7 @@ final class StatusBarController {
         
         let open = NSMenuItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder), keyEquivalent: "")
         open.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.navigationShortcuts.openProfilesFolder) {
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.navigationShortcuts.openProfilesFolder) {
             open.keyEquivalent = parsed.key
             open.keyEquivalentModifierMask = parsed.modifiers
         }
@@ -254,7 +253,7 @@ final class StatusBarController {
         
         let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
         settings.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.openSettings) {
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.quickActions.openSettings) {
             settings.keyEquivalent = parsed.key
             settings.keyEquivalentModifierMask = parsed.modifiers
         }
@@ -269,7 +268,7 @@ final class StatusBarController {
         
         let quit = NSMenuItem(title: "Quit \(Constants.appName)", action: #selector(quit), keyEquivalent: "")
         quit.target = self
-        if let parsed = parseMenuShortcut(config.shortcuts.quickActions.quitApp) {
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.quickActions.quitApp) {
             quit.keyEquivalent = parsed.key
             quit.keyEquivalentModifierMask = parsed.modifiers
         }

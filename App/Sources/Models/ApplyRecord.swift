@@ -5,7 +5,6 @@ struct ApplyAction: Codable, Equatable, Hashable {
     var kind: Kind
     var source: String
     var destination: String
-    var backup: String?
 }
 
 struct ApplyRecord: Codable {

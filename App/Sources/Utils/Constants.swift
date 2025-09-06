@@ -30,17 +30,11 @@ enum Constants {
     static let profilesRoot = ricebarRoot
         .appendingPathComponent("profiles", isDirectory: true)
     
-    static let backupsRoot = ricebarRoot
-        .appendingPathComponent("backups", isDirectory: true)
     
-    static let cacheRoot = ricebarRoot
-        .appendingPathComponent("cache", isDirectory: true)
     
-    static let tempRoot = ricebarRoot
-        .appendingPathComponent("temp", isDirectory: true)
     
     static let managedDirectories = [
-        ricebarRoot, profilesRoot, backupsRoot, cacheRoot, tempRoot
+        ricebarRoot, profilesRoot
     ]
     
     
@@ -151,14 +145,12 @@ enum Constants {
         "*.bak",
         "*.tmp",
         "*.log",
-        "alacritty.ricebar-backup-*",
         ".ricebar-*"
     ]
     
     static let snapshotSkipDirectories: [String] = [
         ".git",
         "node_modules",
-        ".cache",
         ".npm",
         ".yarn"
     ]
@@ -175,13 +167,11 @@ enum Constants {
     ]
     
     
-    static let maxCacheAge: TimeInterval = 300 // 5 minutes
     
     static let fileWatchDebounceInterval: TimeInterval = 0.4
     
     static let recentApplyWindow: TimeInterval = 2.0
     
-    static let maxBackupFiles = 10
     
     static let templateRenderTimeout: TimeInterval = 30.0
     
@@ -224,7 +214,7 @@ enum Constants {
     }()
     
     static let reservedProfileNames: Set<String> = [
-        "default", "system", "temp", "backup", "cache", "current", "active"
+        "default", "system", "current", "active"
     ]
     
     
@@ -331,11 +321,9 @@ enum Constants {
 }
 
 
-@available(*, deprecated, message: "Use Constants.profilesRoot, Constants.backupsRoot, etc. instead")
+@available(*, deprecated, message: "Use Constants.profilesRoot, etc. instead")
 enum ConfigAccess {
     static let defaultRoot = Constants.profilesRoot
-    static let backupsRoot = Constants.backupsRoot
-    static let cacheRoot = Constants.cacheRoot
     
     static func ensureDirectoriesExist() throws {
         try Constants.ensureDirectoriesExist()
