@@ -181,8 +181,19 @@ final class FileSystemService: ObservableObject {
     
     func removeItemIfExists(at url: URL) throws {
         let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: url.path) {
-            try fileManager.removeItem(at: url)
+        
+        // Handle regular files, directories, symlinks (including broken ones)
+        if fileManager.fileExists(atPath: url.path) || isSymlink(url) {
+            print("🗑️ Removing item at: \(url.path)")
+            do {
+                try fileManager.removeItem(at: url)
+                print("✅ Successfully removed item")
+            } catch {
+                print("❌ Failed to remove item: \(error.localizedDescription)")
+                throw error
+            }
+        } else {
+            print("ℹ️ No item to remove at: \(url.path)")
         }
     }
     
@@ -201,13 +212,31 @@ final class FileSystemService: ObservableObject {
         try ensureParentDirectoryExists(for: destination)
         
         do {
-            // Remove existing file
-            if fileManager.fileExists(atPath: destination.path) {
+            // Remove existing file or symlink (including broken symlinks) more robustly
+            let destinationExists = fileManager.fileExists(atPath: destination.path)
+            let isDestSymlink = isSymlink(destination)
+            
+            if destinationExists || isDestSymlink {
+                if isDestSymlink && !destinationExists {
+                    print("🗑️ Removing broken symlink at: \(destination.path)")
+                } else {
+                    print("🗑️ Removing existing item at: \(destination.path)")
+                }
+                
                 try removeItemIfExists(at: destination)
+                
+                // Verify removal was successful
+                if fileManager.fileExists(atPath: destination.path) || isSymlink(destination) {
+                    print("⚠️ Item still exists after removal attempt, trying direct removal")
+                    try fileManager.removeItem(at: destination)
+                }
             }
             
+            print("📄 Copying from: \(source.path) to: \(destination.path)")
             try fileManager.copyItem(at: source, to: destination)
+            print("✅ Copy successful")
         } catch {
+            print("❌ Copy failed: \(error.localizedDescription)")
             throw FileSystemServiceError.fileCopyFailed(source.path, destination.path, error)
         }
     }
@@ -228,13 +257,23 @@ final class FileSystemService: ObservableObject {
         try ensureParentDirectoryExists(for: destination)
         
         do {
-            if fileManager.fileExists(atPath: destination.path) || isSymlink(destination) {
-                // Remove existing file or symlink
+            let destinationExists = fileManager.fileExists(atPath: destination.path)
+            let isDestSymlink = isSymlink(destination)
+            
+            if destinationExists || isDestSymlink {
+                if isDestSymlink && !destinationExists {
+                    print("🔗 Destination is broken symlink, removing: \(destination.path)")
+                } else {
+                    print("🔗 Destination exists, removing: \(destination.path)")
+                }
                 try removeItemIfExists(at: destination)
             }
             
+            print("🔗 Creating symlink from: \(source.path) to: \(destination.path)")
             try fileManager.createSymbolicLink(at: destination, withDestinationURL: source)
+            print("✅ Symlink created successfully")
         } catch {
+            print("❌ Symlink creation failed: \(error.localizedDescription)")
             throw FileSystemServiceError.symlinkCreationFailed(source.path, destination.path, error)
         }
     }

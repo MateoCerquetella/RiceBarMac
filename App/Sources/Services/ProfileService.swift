@@ -427,11 +427,17 @@ final class ProfileService: ObservableObject {
                     }
                     
                     if let term = profile.terminal {
+                        print("🖥️ Found terminal config in profile: \(term.kind)")
                         try self.applyTerminalConfig(term, base: descriptor.directory)
+                    } else {
+                        print("ℹ️ No terminal config found in profile")
                     }
                     
                     if let ide = profile.ide {
+                        print("💻 Found IDE config in profile: \(ide.kind)")
                         try self.applyIDEConfig(ide, base: descriptor.directory)
+                    } else {
+                        print("ℹ️ No IDE config found in profile")
                     }
                     
                     // Apply comprehensive theme settings
@@ -1079,16 +1085,25 @@ private extension ProfileService {
     }
     
     func applyTerminalConfig(_ terminal: Profile.Terminal, base: URL) throws {
+        print("🖥️ Applying terminal config for: \(terminal.kind)")
         switch terminal.kind {
         case .alacritty:
             let home = URL(fileURLWithPath: NSHomeDirectory())
             if let themeRel = terminal.theme {
                 let src = base.appendingPathComponent(themeRel)
+                print("🎨 Applying Alacritty theme from: \(themeRel)")
+                print("📍 Source path: \(src.path)")
+                print("📍 Target: \(home.path)/.config/alacritty/")
                 let keptExt = try copyAlacrittyConfig(from: src, toHome: home)
                 archiveAlternateAlacrittyConfig(keepExt: keptExt, home: home)
+                print("✅ Alacritty theme applied successfully")
             } else if let auto = findDefaultAlacrittyTheme(in: base) {
+                print("🎨 Applying default Alacritty theme from: \(auto.path)")
                 let keptExt = try copyAlacrittyConfig(from: auto, toHome: home)
                 archiveAlternateAlacrittyConfig(keepExt: keptExt, home: home)
+                print("✅ Default Alacritty theme applied successfully")
+            } else {
+                print("⚠️ No Alacritty theme found to apply")
             }
         case .terminalApp:
             break
@@ -1134,13 +1149,18 @@ private extension ProfileService {
     }
     
     func applyIDEConfig(_ ide: Profile.IDE, base: URL) throws {
+        print("💻 Applying IDE config for: \(ide.kind)")
         let home = URL(fileURLWithPath: NSHomeDirectory())
         
         switch ide.kind {
         case .vscode:
+            print("🎨 Applying VSCode theme: \(ide.theme ?? "default")")
             try applyVSCodeConfig(ide, base: base, home: home)
+            print("✅ VSCode config applied successfully")
         case .cursor:
+            print("🎨 Applying Cursor theme: \(ide.theme ?? "default")")
             try applyCursorConfig(ide, base: base, home: home)
+            print("✅ Cursor config applied successfully")
         }
     }
     
