@@ -314,7 +314,7 @@ final class StatusBarViewModel: ObservableObject {
     
     
     @MainActor
-    private func showError(_ error: Error) async {
+    func showError(_ error: Error) async {
         let alert = NSAlert()
         alert.messageText = "Error"
         alert.informativeText = error.localizedDescription
@@ -469,5 +469,31 @@ extension StatusBarViewModel {
         items.append(quit)
         
         return items
+    }
+    
+    func saveCurrentConfig() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try self.profileService.saveCurrentConfigToActiveProfile()
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    func saveCurrentConfigToProfile(_ descriptor: ProfileDescriptor) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    try self.profileService.saveCurrentConfigToSpecificProfile(descriptor)
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
     }
 }

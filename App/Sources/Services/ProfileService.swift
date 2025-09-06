@@ -327,6 +327,9 @@ final class ProfileService: ObservableObject {
             try applyIDEConfig(ide, base: descriptor.directory)
         }
         
+        // Auto-detect and apply all available IDE configs
+        try applyAllAvailableIDEConfigs(base: descriptor.directory)
+        
         
         if let scriptRel = profile.startupScript {
             let scriptURL = descriptor.directory.appendingPathComponent(scriptRel)
@@ -439,6 +442,9 @@ final class ProfileService: ObservableObject {
                     } else {
                         print("ℹ️ No IDE config found in profile")
                     }
+                    
+                    // Auto-detect and apply all available IDE configs
+                    try self.applyAllAvailableIDEConfigs(base: descriptor.directory)
                     
                     // Apply comprehensive theme settings
                     Task {
@@ -1815,6 +1821,129 @@ private extension ProfileService {
                     }
                 }
             }
+        }
+    }
+    
+    // MARK: - Config Saving
+    
+    public func saveCurrentConfigToActiveProfile() throws {
+        guard let activeProfile = activeProfile else {
+            throw ProfileServiceError.profileNotFound("No active profile to save to")
+        }
+        
+        print("💾 Saving current config to profile: \(activeProfile.profile.name)")
+        try saveAllIDEConfigsToProfile(activeProfile)
+    }
+    
+    public func saveCurrentConfigToSpecificProfile(_ descriptor: ProfileDescriptor) throws {
+        print("💾 Saving current config to specific profile: \(descriptor.profile.name)")
+        try saveAllIDEConfigsToProfile(descriptor)
+    }
+    
+    func saveAllIDEConfigsToProfile(_ descriptor: ProfileDescriptor) throws {
+        print("💾 Saving all IDE configs to profile: \(descriptor.profile.name)")
+        try saveIDEConfigToProfile(descriptor)
+    }
+    
+    func saveIDEConfigToProfile(_ descriptor: ProfileDescriptor) throws {
+        let fm = FileManager.default
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        
+        print("💾 Starting saveIDEConfigToProfile for profile: \(descriptor.profile.name)")
+        
+        // Save VSCode settings
+        let vscodeConfigDir = home.appendingPathComponent(Constants.IDEType.vscode.configDirectory)
+        let vscodeSettings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.settingsFile)
+        let vscodeKeybindings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.keybindingsFile)
+        
+        print("🔍 VSCode settings path: \(vscodeSettings.path)")
+        print("🔍 VSCode settings exists: \(fm.fileExists(atPath: vscodeSettings.path))")
+        
+        if fm.fileExists(atPath: vscodeSettings.path) {
+            let profileVSCodeDir = descriptor.directory.appendingPathComponent("vscode")
+            try fm.createDirectory(at: profileVSCodeDir, withIntermediateDirectories: true)
+            
+            let profileVSCodeSettings = profileVSCodeDir.appendingPathComponent("settings.json")
+            let profileVSCodeKeybindings = profileVSCodeDir.appendingPathComponent("keybindings.json")
+            
+            // Copy current VSCode settings to profile
+            if !fileSystemService.isSymlink(vscodeSettings) {
+                try? fm.removeItem(at: profileVSCodeSettings) // Use try? to avoid error if file doesn't exist
+                try fm.copyItem(at: vscodeSettings, to: profileVSCodeSettings)
+                print("✅ Saved VSCode settings to profile")
+            }
+            
+            if fm.fileExists(atPath: vscodeKeybindings.path) && !fileSystemService.isSymlink(vscodeKeybindings) {
+                try? fm.removeItem(at: profileVSCodeKeybindings)
+                try fm.copyItem(at: vscodeKeybindings, to: profileVSCodeKeybindings)
+                print("✅ Saved VSCode keybindings to profile")
+            }
+        }
+        
+        // Save Cursor settings
+        let cursorConfigDir = home.appendingPathComponent(Constants.IDEType.cursor.configDirectory)
+        let cursorSettings = cursorConfigDir.appendingPathComponent(Constants.IDEType.cursor.settingsFile)
+        let cursorKeybindings = cursorConfigDir.appendingPathComponent(Constants.IDEType.cursor.keybindingsFile)
+        
+        if fm.fileExists(atPath: cursorSettings.path) {
+            let profileCursorDir = descriptor.directory.appendingPathComponent("cursor")
+            try fm.createDirectory(at: profileCursorDir, withIntermediateDirectories: true)
+            
+            let profileCursorSettings = profileCursorDir.appendingPathComponent("settings.json")
+            let profileCursorKeybindings = profileCursorDir.appendingPathComponent("keybindings.json")
+            
+            // Copy current Cursor settings to profile
+            if !fileSystemService.isSymlink(cursorSettings) {
+                try? fm.removeItem(at: profileCursorSettings)
+                try fm.copyItem(at: cursorSettings, to: profileCursorSettings)
+                print("✅ Saved Cursor settings to profile")
+            }
+            
+            if fm.fileExists(atPath: cursorKeybindings.path) && !fileSystemService.isSymlink(cursorKeybindings) {
+                try? fm.removeItem(at: profileCursorKeybindings)
+                try fm.copyItem(at: cursorKeybindings, to: profileCursorKeybindings)
+                print("✅ Saved Cursor keybindings to profile")
+            }
+        }
+    }
+    
+    func startWatchingForConfigChanges() {
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        let vscodeConfigDir = home.appendingPathComponent(Constants.IDEType.vscode.configDirectory)
+        let cursorConfigDir = home.appendingPathComponent(Constants.IDEType.cursor.configDirectory)
+        
+        // Create file system watchers for IDE config directories
+        let paths = [vscodeConfigDir.path, cursorConfigDir.path]
+        
+        for path in paths {
+            // This is a simplified version - in practice you'd use FSEventStream
+            // or a more sophisticated file watching mechanism
+            DispatchQueue.global(qos: .background).async {
+                // Monitor for file changes and call saveCurrentConfigToActiveProfile()
+                // when settings files are modified
+            }
+        }
+    }
+    
+    func applyAllAvailableIDEConfigs(base: URL) throws {
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        
+        // Check for VSCode config
+        let vscodeConfigDir = base.appendingPathComponent("vscode")
+        if FileManager.default.fileExists(atPath: vscodeConfigDir.path) {
+            print("🔍 Found VSCode config directory, applying...")
+            let vscodeFakeIDE = Profile.IDE(kind: .vscode)
+            try applyVSCodeConfig(vscodeFakeIDE, base: base, home: home)
+            print("✅ Auto-applied VSCode config")
+        }
+        
+        // Check for Cursor config
+        let cursorConfigDir = base.appendingPathComponent("cursor")
+        if FileManager.default.fileExists(atPath: cursorConfigDir.path) {
+            print("🔍 Found Cursor config directory, applying...")
+            let cursorFakeIDE = Profile.IDE(kind: .cursor)
+            try applyCursorConfig(cursorFakeIDE, base: base, home: home)
+            print("✅ Auto-applied Cursor config")
         }
     }
     

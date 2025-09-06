@@ -38,7 +38,8 @@ final class StatusBarController {
             }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] activeProfile in
-                self?.updateActiveProfileCheckmarks()
+                // Reconstruct entire menu when active profile changes
+                self?.constructMenu()
             }
             .store(in: &cancellables)
         
@@ -76,10 +77,6 @@ final class StatusBarController {
         }
 
         statusItem.menu = menu
-        
-        DispatchQueue.main.async {
-            self.updateActiveProfileCheckmarks()
-        }
     }
     
     private func updateActiveProfileCheckmarks() {
@@ -172,6 +169,14 @@ final class StatusBarController {
             
             submenu.addItem(.separator())
         }
+        
+        // Save Current Config should be available for all profiles
+        let saveConfig = NSMenuItem(title: "Save Current Config to This Profile", action: #selector(saveCurrentConfigToProfile(_:)), keyEquivalent: "")
+        saveConfig.target = self
+        saveConfig.representedObject = descriptor
+        submenu.addItem(saveConfig)
+        
+        submenu.addItem(.separator())
         
         let openFolder = NSMenuItem(title: "Open Profile Folder", action: #selector(openProfileFolder(_:)), keyEquivalent: "")
         openFolder.target = self
@@ -363,6 +368,39 @@ final class StatusBarController {
                     }
                 } catch {
                 }
+            }
+        }
+    }
+    
+    @objc private func saveCurrentConfig() {
+        Task { @MainActor in
+            do {
+                try await viewModel.saveCurrentConfig()
+                await viewModel.showSuccess(
+                    title: "Config Saved",
+                    message: "Current IDE settings have been saved to the active profile."
+                )
+            } catch {
+                // Create a custom error for showError
+                let saveError = ProfileServiceError.fileOperationFailed("Save current config", error)
+                await viewModel.showError(saveError)
+            }
+        }
+    }
+    
+    @objc private func saveCurrentConfigToProfile(_ sender: NSMenuItem) {
+        guard let descriptor = sender.representedObject as? ProfileDescriptor else { return }
+        
+        Task { @MainActor in
+            do {
+                try await viewModel.saveCurrentConfigToProfile(descriptor)
+                await viewModel.showSuccess(
+                    title: "Config Saved",
+                    message: "Current IDE settings have been saved to '\(descriptor.profile.name)' profile."
+                )
+            } catch {
+                let saveError = ProfileServiceError.fileOperationFailed("Save current config to profile", error)
+                await viewModel.showError(saveError)
             }
         }
     }
