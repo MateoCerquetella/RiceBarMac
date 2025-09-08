@@ -286,7 +286,6 @@ final class ProfileService: ObservableObject {
         let targetHome = URL(fileURLWithPath: NSHomeDirectory())
         
         if cleanConfig {
-            try backupAndCleanConfig(atHome: targetHome)
         }
         
         if let replacements = profile.replacements, !replacements.isEmpty {
@@ -298,8 +297,8 @@ final class ProfileService: ObservableObject {
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
                     do {
-                        try fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: true)
-                        actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path, backup: nil))
+                        try fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: false)
+                        actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path))
                     } catch {
                         // Fallback to overlay for directories that can't be symlinked as a whole
                         let overlayActions = try overlayDirectory(from: src, to: dst)
@@ -327,6 +326,9 @@ final class ProfileService: ObservableObject {
         if let ide = profile.ide {
             try applyIDEConfig(ide, base: descriptor.directory)
         }
+        
+        // Auto-detect and apply all available IDE configs
+        try applyAllAvailableIDEConfigs(base: descriptor.directory)
         
         
         if let scriptRel = profile.startupScript {
@@ -394,7 +396,6 @@ final class ProfileService: ObservableObject {
                     let targetHome = URL(fileURLWithPath: NSHomeDirectory())
                     
                     if cleanConfig {
-                        try self.backupAndCleanConfig(atHome: targetHome)
                     }
                     
                     if let replacements = profile.replacements, !replacements.isEmpty {
@@ -406,8 +407,8 @@ final class ProfileService: ObservableObject {
                             var isDir: ObjCBool = false
                             if FileManager.default.fileExists(atPath: src.path, isDirectory: &isDir), isDir.boolValue {
                                 do {
-                                    try self.fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: true)
-                                    actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path, backup: nil))
+                                    try self.fileSystemService.createSymlinkTree(from: src, to: dst, createBackup: false)
+                                    actions.append(ApplyAction(kind: .created, source: src.path, destination: dst.path))
                                 } catch {
                                     // Fallback to overlay for directories that can't be symlinked as a whole
                                     let overlayActions = try self.overlayDirectory(from: src, to: dst)
@@ -429,12 +430,21 @@ final class ProfileService: ObservableObject {
                     }
                     
                     if let term = profile.terminal {
+                        print("🖥️ Found terminal config in profile: \(term.kind)")
                         try self.applyTerminalConfig(term, base: descriptor.directory)
+                    } else {
+                        print("ℹ️ No terminal config found in profile")
                     }
                     
                     if let ide = profile.ide {
+                        print("💻 Found IDE config in profile: \(ide.kind)")
                         try self.applyIDEConfig(ide, base: descriptor.directory)
+                    } else {
+                        print("ℹ️ No IDE config found in profile")
                     }
+                    
+                    // Auto-detect and apply all available IDE configs
+                    try self.applyAllAvailableIDEConfigs(base: descriptor.directory)
                     
                     // Apply comprehensive theme settings
                     Task {
@@ -475,10 +485,6 @@ final class ProfileService: ObservableObject {
                 try? fileSystemService.removeItemIfExists(at: dest)
             }
             
-            // Restore backup if it exists
-            if let backup = action.backup.map({ URL(fileURLWithPath: $0) }), fm.fileExists(atPath: backup.path) {
-                try fm.moveItem(at: backup, to: dest)
-            }
         }
     }
     
@@ -844,20 +850,6 @@ private extension ProfileService {
         }
     }
     
-    func backupAndCleanConfig(atHome home: URL) throws {
-        let fm = FileManager.default
-        let configDir = home.appendingPathComponent(".config", isDirectory: true)
-        var isDir: ObjCBool = false
-        
-        if fm.fileExists(atPath: configDir.path, isDirectory: &isDir), isDir.boolValue {
-            let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-            let backup = home.appendingPathComponent(".config.ricebar-backup-\(timestamp)", isDirectory: true)
-            try? fm.removeItem(at: backup)
-            try fm.moveItem(at: configDir, to: backup)
-        }
-        
-        try fm.createDirectory(at: configDir, withIntermediateDirectories: true)
-    }
     
     func applyWallpaper(url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { 
@@ -969,7 +961,6 @@ private extension ProfileService {
         
         try fileSystemService.ensureParentDirectoryExists(for: destination)
         
-        var backupPath: String? = nil
         var kind: ApplyAction.Kind = .created
         
         // Check if destination exists (file or symlink)
@@ -979,22 +970,15 @@ private extension ProfileService {
                 do {
                     let currentTarget = try fileSystemService.readSymlink(destination)
                     if currentTarget == source {
-                        return ApplyAction(kind: .updated, source: source.path, destination: destination.path, backup: nil)
+                        return ApplyAction(kind: .updated, source: source.path, destination: destination.path)
                     }
                 } catch {
                     // Continue with replacement if we can't read the symlink
                 }
             }
             
-            // Backup only real files, not symlinks
-            if !fileSystemService.isSymlink(destination) {
-                let backup = destination.appendingPathExtension("ricebar-backup")
-                try? fileSystemService.removeItemIfExists(at: backup)
-                try fm.moveItem(at: destination, to: backup)
-                backupPath = backup.path
-            } else {
-                try fileSystemService.removeItemIfExists(at: destination)
-            }
+            // Remove existing file or symlink
+            try fileSystemService.removeItemIfExists(at: destination)
             kind = .updated
         }
         
@@ -1002,7 +986,7 @@ private extension ProfileService {
         try fm.createSymbolicLink(at: destination, withDestinationURL: source)
         touchIfNeededForReload(destination)
         
-        return ApplyAction(kind: kind, source: source.path, destination: destination.path, backup: backupPath)
+        return ApplyAction(kind: kind, source: source.path, destination: destination.path)
     }
     
     func overlayDirectory(from sourceDir: URL, to targetDir: URL) throws -> [ApplyAction] {
@@ -1040,15 +1024,14 @@ private extension ProfileService {
     
     func overlaySymlinkDirectory(from sourceDir: URL, to targetDir: URL) throws -> [ApplyAction] {
         // Use the FileSystemService implementation and convert SymlinkActions to ApplyActions
-        let symlinkActions = try fileSystemService.overlaySymlinkDirectory(from: sourceDir, to: targetDir, createBackup: true)
+        let symlinkActions = try fileSystemService.overlaySymlinkDirectory(from: sourceDir, to: targetDir, createBackup: false)
         
         return symlinkActions.map { symlinkAction in
             let kind: ApplyAction.Kind = symlinkAction.kind == .created ? .created : .updated
             return ApplyAction(
                 kind: kind,
                 source: symlinkAction.source,
-                destination: symlinkAction.destination,
-                backup: symlinkAction.backup
+                destination: symlinkAction.destination
             )
         }
     }
@@ -1083,7 +1066,6 @@ private extension ProfileService {
     func shouldSkipInSnapshot(name: String) -> Bool {
         if name == ".DS_Store" { return true }
         if name.hasSuffix(".bak") { return true }
-        if name.hasPrefix("alacritty.ricebar-backup-") { return true }
         return false
     }
     
@@ -1109,16 +1091,25 @@ private extension ProfileService {
     }
     
     func applyTerminalConfig(_ terminal: Profile.Terminal, base: URL) throws {
+        print("🖥️ Applying terminal config for: \(terminal.kind)")
         switch terminal.kind {
         case .alacritty:
             let home = URL(fileURLWithPath: NSHomeDirectory())
             if let themeRel = terminal.theme {
                 let src = base.appendingPathComponent(themeRel)
+                print("🎨 Applying Alacritty theme from: \(themeRel)")
+                print("📍 Source path: \(src.path)")
+                print("📍 Target: \(home.path)/.config/alacritty/")
                 let keptExt = try copyAlacrittyConfig(from: src, toHome: home)
                 archiveAlternateAlacrittyConfig(keepExt: keptExt, home: home)
+                print("✅ Alacritty theme applied successfully")
             } else if let auto = findDefaultAlacrittyTheme(in: base) {
+                print("🎨 Applying default Alacritty theme from: \(auto.path)")
                 let keptExt = try copyAlacrittyConfig(from: auto, toHome: home)
                 archiveAlternateAlacrittyConfig(keepExt: keptExt, home: home)
+                print("✅ Default Alacritty theme applied successfully")
+            } else {
+                print("⚠️ No Alacritty theme found to apply")
             }
         case .terminalApp:
             break
@@ -1159,21 +1150,23 @@ private extension ProfileService {
         
         guard fm.fileExists(atPath: alt.path) else { return }
         
-        try? fm.createDirectory(at: ConfigAccess.backupsRoot, withIntermediateDirectories: true)
-        let timestamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let backup = ConfigAccess.backupsRoot.appendingPathComponent("alacritty_\(altName).\(timestamp)")
-        try? fm.removeItem(at: backup)
-        try? fm.moveItem(at: alt, to: backup)
+        // Remove the existing alacritty config
+        try? fm.removeItem(at: alt)
     }
     
     func applyIDEConfig(_ ide: Profile.IDE, base: URL) throws {
+        print("💻 Applying IDE config for: \(ide.kind)")
         let home = URL(fileURLWithPath: NSHomeDirectory())
         
         switch ide.kind {
         case .vscode:
+            print("🎨 Applying VSCode theme: \(ide.theme ?? "default")")
             try applyVSCodeConfig(ide, base: base, home: home)
+            print("✅ VSCode config applied successfully")
         case .cursor:
+            print("🎨 Applying Cursor theme: \(ide.theme ?? "default")")
             try applyCursorConfig(ide, base: base, home: home)
+            print("✅ Cursor config applied successfully")
         }
     }
     
@@ -1828,6 +1821,129 @@ private extension ProfileService {
                     }
                 }
             }
+        }
+    }
+    
+    // MARK: - Config Saving
+    
+    public func saveCurrentConfigToActiveProfile() throws {
+        guard let activeProfile = activeProfile else {
+            throw ProfileServiceError.profileNotFound("No active profile to save to")
+        }
+        
+        print("💾 Saving current config to profile: \(activeProfile.profile.name)")
+        try saveAllIDEConfigsToProfile(activeProfile)
+    }
+    
+    public func saveCurrentConfigToSpecificProfile(_ descriptor: ProfileDescriptor) throws {
+        print("💾 Saving current config to specific profile: \(descriptor.profile.name)")
+        try saveAllIDEConfigsToProfile(descriptor)
+    }
+    
+    func saveAllIDEConfigsToProfile(_ descriptor: ProfileDescriptor) throws {
+        print("💾 Saving all IDE configs to profile: \(descriptor.profile.name)")
+        try saveIDEConfigToProfile(descriptor)
+    }
+    
+    func saveIDEConfigToProfile(_ descriptor: ProfileDescriptor) throws {
+        let fm = FileManager.default
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        
+        print("💾 Starting saveIDEConfigToProfile for profile: \(descriptor.profile.name)")
+        
+        // Save VSCode settings
+        let vscodeConfigDir = home.appendingPathComponent(Constants.IDEType.vscode.configDirectory)
+        let vscodeSettings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.settingsFile)
+        let vscodeKeybindings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.keybindingsFile)
+        
+        print("🔍 VSCode settings path: \(vscodeSettings.path)")
+        print("🔍 VSCode settings exists: \(fm.fileExists(atPath: vscodeSettings.path))")
+        
+        if fm.fileExists(atPath: vscodeSettings.path) {
+            let profileVSCodeDir = descriptor.directory.appendingPathComponent("vscode")
+            try fm.createDirectory(at: profileVSCodeDir, withIntermediateDirectories: true)
+            
+            let profileVSCodeSettings = profileVSCodeDir.appendingPathComponent("settings.json")
+            let profileVSCodeKeybindings = profileVSCodeDir.appendingPathComponent("keybindings.json")
+            
+            // Copy current VSCode settings to profile
+            if !fileSystemService.isSymlink(vscodeSettings) {
+                try? fm.removeItem(at: profileVSCodeSettings) // Use try? to avoid error if file doesn't exist
+                try fm.copyItem(at: vscodeSettings, to: profileVSCodeSettings)
+                print("✅ Saved VSCode settings to profile")
+            }
+            
+            if fm.fileExists(atPath: vscodeKeybindings.path) && !fileSystemService.isSymlink(vscodeKeybindings) {
+                try? fm.removeItem(at: profileVSCodeKeybindings)
+                try fm.copyItem(at: vscodeKeybindings, to: profileVSCodeKeybindings)
+                print("✅ Saved VSCode keybindings to profile")
+            }
+        }
+        
+        // Save Cursor settings
+        let cursorConfigDir = home.appendingPathComponent(Constants.IDEType.cursor.configDirectory)
+        let cursorSettings = cursorConfigDir.appendingPathComponent(Constants.IDEType.cursor.settingsFile)
+        let cursorKeybindings = cursorConfigDir.appendingPathComponent(Constants.IDEType.cursor.keybindingsFile)
+        
+        if fm.fileExists(atPath: cursorSettings.path) {
+            let profileCursorDir = descriptor.directory.appendingPathComponent("cursor")
+            try fm.createDirectory(at: profileCursorDir, withIntermediateDirectories: true)
+            
+            let profileCursorSettings = profileCursorDir.appendingPathComponent("settings.json")
+            let profileCursorKeybindings = profileCursorDir.appendingPathComponent("keybindings.json")
+            
+            // Copy current Cursor settings to profile
+            if !fileSystemService.isSymlink(cursorSettings) {
+                try? fm.removeItem(at: profileCursorSettings)
+                try fm.copyItem(at: cursorSettings, to: profileCursorSettings)
+                print("✅ Saved Cursor settings to profile")
+            }
+            
+            if fm.fileExists(atPath: cursorKeybindings.path) && !fileSystemService.isSymlink(cursorKeybindings) {
+                try? fm.removeItem(at: profileCursorKeybindings)
+                try fm.copyItem(at: cursorKeybindings, to: profileCursorKeybindings)
+                print("✅ Saved Cursor keybindings to profile")
+            }
+        }
+    }
+    
+    func startWatchingForConfigChanges() {
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        let vscodeConfigDir = home.appendingPathComponent(Constants.IDEType.vscode.configDirectory)
+        let cursorConfigDir = home.appendingPathComponent(Constants.IDEType.cursor.configDirectory)
+        
+        // Create file system watchers for IDE config directories
+        let paths = [vscodeConfigDir.path, cursorConfigDir.path]
+        
+        for path in paths {
+            // This is a simplified version - in practice you'd use FSEventStream
+            // or a more sophisticated file watching mechanism
+            DispatchQueue.global(qos: .background).async {
+                // Monitor for file changes and call saveCurrentConfigToActiveProfile()
+                // when settings files are modified
+            }
+        }
+    }
+    
+    func applyAllAvailableIDEConfigs(base: URL) throws {
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        
+        // Check for VSCode config
+        let vscodeConfigDir = base.appendingPathComponent("vscode")
+        if FileManager.default.fileExists(atPath: vscodeConfigDir.path) {
+            print("🔍 Found VSCode config directory, applying...")
+            let vscodeFakeIDE = Profile.IDE(kind: .vscode)
+            try applyVSCodeConfig(vscodeFakeIDE, base: base, home: home)
+            print("✅ Auto-applied VSCode config")
+        }
+        
+        // Check for Cursor config
+        let cursorConfigDir = base.appendingPathComponent("cursor")
+        if FileManager.default.fileExists(atPath: cursorConfigDir.path) {
+            print("🔍 Found Cursor config directory, applying...")
+            let cursorFakeIDE = Profile.IDE(kind: .cursor)
+            try applyCursorConfig(cursorFakeIDE, base: base, home: home)
+            print("✅ Auto-applied Cursor config")
         }
     }
     

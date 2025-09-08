@@ -67,25 +67,6 @@ final class FileSystemUtilitiesTests: XCTestCase {
         XCTAssertEqual(copiedContent, testContent)
     }
     
-    func testCopyFileWithBackup() {
-        let sourceFile = tempDirectory.appendingPathComponent("source.txt")
-        let destFile = tempDirectory.appendingPathComponent("dest.txt")
-        let backupFile = destFile.appendingPathExtension("bak")
-        
-        let sourceContent = "new content"
-        let existingContent = "existing content"
-        
-        try? sourceContent.write(to: sourceFile, atomically: true, encoding: .utf8)
-        try? existingContent.write(to: destFile, atomically: true, encoding: .utf8)
-        
-        XCTAssertNoThrow(try FileSystemUtilities.copyFile(from: sourceFile, to: destFile, createBackup: true))
-        
-        let newContent = try? String(contentsOf: destFile, encoding: .utf8)
-        XCTAssertEqual(newContent, sourceContent)
-        
-        let backupContent = try? String(contentsOf: backupFile, encoding: .utf8)
-        XCTAssertEqual(backupContent, existingContent)
-    }
     
     func testReadString() {
         let testFile = tempDirectory.appendingPathComponent("test.txt")

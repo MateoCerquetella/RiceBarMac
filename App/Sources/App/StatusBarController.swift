@@ -9,7 +9,8 @@ final class StatusBarController {
     private let statusItem: NSStatusItem
     private let viewModel: StatusBarViewModel
     private var cancellables = Set<AnyCancellable>()
-    // Removed settings UI components
+    private lazy var settingsWindowController = SettingsWindowController()
+    private let configService = ConfigService.shared
 
     init(viewModel: StatusBarViewModel = StatusBarViewModel()) {
         self.viewModel = viewModel
@@ -37,7 +38,8 @@ final class StatusBarController {
             }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] activeProfile in
-                self?.updateActiveProfileCheckmarks()
+                // Reconstruct entire menu when active profile changes
+                self?.constructMenu()
             }
             .store(in: &cancellables)
         
@@ -75,10 +77,6 @@ final class StatusBarController {
         }
 
         statusItem.menu = menu
-        
-        DispatchQueue.main.async {
-            self.updateActiveProfileCheckmarks()
-        }
     }
     
     private func updateActiveProfileCheckmarks() {
@@ -118,12 +116,10 @@ final class StatusBarController {
             return [empty]
         }
         
-        let config = ConfigService.shared.config
-        
         return viewModel.sortedProfiles.enumerated().map { (index, descriptor) in
             let title = descriptor.profile.name
             let profileKey = "profile\(index + 1)"
-            let configShortcut = config.shortcuts.profileShortcuts[profileKey] ?? ""
+            let configShortcut = configService.config.shortcuts.profileShortcuts[profileKey] ?? ""
             
             var keyEquivalent = ""
             var modifierMask: NSEvent.ModifierFlags = []
@@ -174,6 +170,14 @@ final class StatusBarController {
             submenu.addItem(.separator())
         }
         
+        // Save Current Config should be available for all profiles
+        let saveConfig = NSMenuItem(title: "Save Current Config to This Profile", action: #selector(saveCurrentConfigToProfile(_:)), keyEquivalent: "")
+        saveConfig.target = self
+        saveConfig.representedObject = descriptor
+        submenu.addItem(saveConfig)
+        
+        submenu.addItem(.separator())
+        
         let openFolder = NSMenuItem(title: "Open Profile Folder", action: #selector(openProfileFolder(_:)), keyEquivalent: "")
         openFolder.target = self
         openFolder.representedObject = descriptor
@@ -192,21 +196,87 @@ final class StatusBarController {
     private func createActionMenuItems() -> [NSMenuItem] {
         var items: [NSMenuItem] = []
         
-        // Simplified menu - keep only essential actions
-        let snapshot = NSMenuItem(title: "Create from Current Setup", action: #selector(promptCreateFromCurrent), keyEquivalent: "n")
+        let createProfileMenu = NSMenuItem(title: "Create Profile", action: nil, keyEquivalent: "")
+        let createSubmenu = NSMenu()
+        
+        let newEmpty = NSMenuItem(title: "Empty Profile…", action: #selector(promptCreateEmpty), keyEquivalent: "")
+        newEmpty.target = self
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.quickActions.createEmptyProfile) {
+            newEmpty.keyEquivalent = parsed.key
+            newEmpty.keyEquivalentModifierMask = parsed.modifiers
+        }
+        createSubmenu.addItem(newEmpty)
+        
+        let snapshot = NSMenuItem(title: "From Current Setup…", action: #selector(promptCreateFromCurrent), keyEquivalent: "")
         snapshot.target = self
-        items.append(snapshot)
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.quickActions.createFromCurrentSetup) {
+            snapshot.keyEquivalent = parsed.key
+            snapshot.keyEquivalentModifierMask = parsed.modifiers
+        }
+        createSubmenu.addItem(snapshot)
+        
+        createProfileMenu.submenu = createSubmenu
+        items.append(createProfileMenu)
         
         items.append(.separator())
         
-        let open = NSMenuItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder), keyEquivalent: "o")
+        let nextProfile = NSMenuItem(title: "Next Profile", action: #selector(switchToNextProfile), keyEquivalent: "")
+        nextProfile.target = self
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.navigationShortcuts.nextProfile) {
+            nextProfile.keyEquivalent = parsed.key
+            nextProfile.keyEquivalentModifierMask = parsed.modifiers
+        }
+        items.append(nextProfile)
+        
+        let prevProfile = NSMenuItem(title: "Previous Profile", action: #selector(switchToPreviousProfile), keyEquivalent: "")
+        prevProfile.target = self
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.navigationShortcuts.previousProfile) {
+            prevProfile.keyEquivalent = parsed.key
+            prevProfile.keyEquivalentModifierMask = parsed.modifiers
+        }
+        items.append(prevProfile)
+        
+        items.append(.separator())
+        
+        let reload = NSMenuItem(title: "Reload Profiles", action: #selector(reloadProfiles), keyEquivalent: "")
+        reload.target = self
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.navigationShortcuts.reloadProfiles) {
+            reload.keyEquivalent = parsed.key
+            reload.keyEquivalentModifierMask = parsed.modifiers
+        }
+        items.append(reload)
+        
+        let open = NSMenuItem(title: "Open Profiles Folder", action: #selector(openProfilesFolder), keyEquivalent: "")
         open.target = self
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.navigationShortcuts.openProfilesFolder) {
+            open.keyEquivalent = parsed.key
+            open.keyEquivalentModifierMask = parsed.modifiers
+        }
         items.append(open)
         
         items.append(.separator())
         
-        let quit = NSMenuItem(title: "Quit \(Constants.appName)", action: #selector(quit), keyEquivalent: "q")
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: "")
+        settings.target = self
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.quickActions.openSettings) {
+            settings.keyEquivalent = parsed.key
+            settings.keyEquivalentModifierMask = parsed.modifiers
+        }
+        items.append(settings)
+        
+        let launchAtLogin = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+        launchAtLogin.target = self
+        launchAtLogin.state = viewModel.isLaunchAtLoginEnabled ? .on : .off
+        items.append(launchAtLogin)
+        
+        items.append(.separator())
+        
+        let quit = NSMenuItem(title: "Quit \(Constants.appName)", action: #selector(quit), keyEquivalent: "")
         quit.target = self
+        if let parsed = parseMenuShortcut(configService.config.shortcuts.quickActions.quitApp) {
+            quit.keyEquivalent = parsed.key
+            quit.keyEquivalentModifierMask = parsed.modifiers
+        }
         items.append(quit)
         
         return items
@@ -288,6 +358,39 @@ final class StatusBarController {
                     }
                 } catch {
                 }
+            }
+        }
+    }
+    
+    @objc private func saveCurrentConfig() {
+        Task { @MainActor in
+            do {
+                try await viewModel.saveCurrentConfig()
+                await viewModel.showSuccess(
+                    title: "Config Saved",
+                    message: "Current IDE settings have been saved to the active profile."
+                )
+            } catch {
+                // Create a custom error for showError
+                let saveError = ProfileServiceError.fileOperationFailed("Save current config", error)
+                await viewModel.showError(saveError)
+            }
+        }
+    }
+    
+    @objc private func saveCurrentConfigToProfile(_ sender: NSMenuItem) {
+        guard let descriptor = sender.representedObject as? ProfileDescriptor else { return }
+        
+        Task { @MainActor in
+            do {
+                try await viewModel.saveCurrentConfigToProfile(descriptor)
+                await viewModel.showSuccess(
+                    title: "Config Saved",
+                    message: "Current IDE settings have been saved to '\(descriptor.profile.name)' profile."
+                )
+            } catch {
+                let saveError = ProfileServiceError.fileOperationFailed("Save current config to profile", error)
+                await viewModel.showError(saveError)
             }
         }
     }

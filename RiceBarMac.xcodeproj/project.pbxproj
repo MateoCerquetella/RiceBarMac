@@ -12,7 +12,6 @@
 		205B9A33D254D116AD48D87B /* Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BE3B3286B9F555650B9C7E0 /* Profile.swift */; };
 		2AA8E1537269A18B4C67A3E0 /* ProfileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC630074DEE99B0EC129091D /* ProfileTests.swift */; };
 		2EB7D82C4BDA5C9361E30356 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A401FFB6BC54C621640129E /* Assets.xcassets */; };
-		401843DFD9E0A76FCB155BC5 /* BackupService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81D869300D60DBBB638E7960 /* BackupService.swift */; };
 		5CAA08DB78FAB9FA63ADA40E /* SystemService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FFDFB9CB09EA3ECD0DB47D7 /* SystemService.swift */; };
 		6565061879C1006EFE25A0EB /* RiceBarMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 268D18331B39985EF0EF5B1A /* RiceBarMacApp.swift */; };
 		6A7587A8978C75DDBD7246A7 /* ProfileService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D9DD8D70913FAEE64EB6E2F /* ProfileService.swift */; };
@@ -125,7 +124,6 @@
 		5A8AB322D7B7056C2EFFF252 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				81D869300D60DBBB638E7960 /* BackupService.swift */,
 				AB43E97EFA13FFCD52C57445 /* ConfigService.swift */,
 				CDC3F74316A9A86DE31BD6C3 /* FileSystemService.swift */,
 				9D9DD8D70913FAEE64EB6E2F /* ProfileService.swift */,
@@ -311,7 +309,6 @@
 			files = (
 				B32F895E6811F00E9609D921 /* ApplyActivity.swift in Sources */,
 				7F8A61EEB40D60D2F3020F45 /* ApplyRecord.swift in Sources */,
-				401843DFD9E0A76FCB155BC5 /* BackupService.swift in Sources */,
 				7E1877D66D719FEB41197CBF /* ConfigService.swift in Sources */,
 				9B90D0089306F3D5E4A960EB /* Constants.swift in Sources */,
 				BE0D34E6F46FD074BCEF948D /* FileSystemService.swift in Sources */,
