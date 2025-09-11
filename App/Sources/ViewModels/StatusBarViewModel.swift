@@ -14,6 +14,7 @@ final class StatusBarViewModel: ObservableObject {
     @Published private(set) var activeProfile: ProfileDescriptor?
     @Published private(set) var isApplying = false
     @Published private(set) var isLaunchAtLoginEnabled = false
+    @Published private(set) var launchAtLoginError: Error?
     @Published private(set) var registeredHotKeys: [String] = []
     
     
@@ -62,6 +63,11 @@ final class StatusBarViewModel: ObservableObject {
         systemService.$isLaunchAtLoginEnabled
             .receive(on: DispatchQueue.main)
             .assign(to: \.isLaunchAtLoginEnabled, on: self)
+            .store(in: &cancellables)
+        
+        systemService.$launchAtLoginError
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.launchAtLoginError, on: self)
             .store(in: &cancellables)
         
         systemService.$registeredHotKeys
@@ -263,7 +269,9 @@ final class StatusBarViewModel: ObservableObject {
         do {
             try systemService.toggleLaunchAtLogin()
         } catch {
-            await showError(error)
+            // Error is already tracked in systemService.launchAtLoginError
+            // Don't show additional dialog - UI will display the error state
+            print("Launch at login toggle failed: \(error.localizedDescription)")
         }
     }
     

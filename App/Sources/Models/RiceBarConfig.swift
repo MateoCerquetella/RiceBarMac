@@ -64,13 +64,11 @@ struct QuickActionShortcuts: Codable {
 
 struct GeneralConfig: Codable {
     var launchAtLogin: Bool
-    var showInDock: Bool
     var autoReloadProfiles: Bool
     var showNotifications: Bool
     
     init() {
         self.launchAtLogin = false
-        self.showInDock = false
         self.autoReloadProfiles = true
         self.showNotifications = true
     }

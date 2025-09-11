@@ -14,7 +14,7 @@ final class StatusBarController {
     init(viewModel: StatusBarViewModel = StatusBarViewModel()) {
         self.viewModel = viewModel
         statusItem = NSStatusBar.system.statusItem(withLength: Constants.StatusBarIcon.menuBarLength)
-        statusItem.button?.title = Constants.StatusBarIcon.systemName
+        updateMenuBarIcon()
         
         setupBindings()
         constructMenu()
@@ -47,6 +47,16 @@ final class StatusBarController {
             .removeDuplicates()
             .sink { [weak self] _ in
                 self?.updateLaunchAtLoginCheckmark()
+            }
+            .store(in: &cancellables)
+        
+        // Listen for appearance config changes
+        configService.$config
+            .map(\.appearance.menuBarIcon)
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateMenuBarIcon()
             }
             .store(in: &cancellables)
     }
@@ -113,6 +123,10 @@ final class StatusBarController {
                 break
             }
         }
+    }
+    
+    private func updateMenuBarIcon() {
+        statusItem.button?.title = configService.config.appearance.menuBarIcon
     }
     
     private func createProfileMenuItems() -> [NSMenuItem] {

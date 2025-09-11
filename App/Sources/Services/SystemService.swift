@@ -10,6 +10,8 @@ enum SystemServiceError: LocalizedError {
     case hotKeyRegistrationFailed(String)
     case launchAtLoginFailed
     case launchAtLoginDisableFailed
+    case launchAtLoginRequiresApproval
+    case launchAtLoginNotFound
     case unsupportedVersion
     
     var errorDescription: String? {
@@ -22,6 +24,10 @@ enum SystemServiceError: LocalizedError {
             return "Failed to enable launch at login"
         case .launchAtLoginDisableFailed:
             return "Failed to disable launch at login"
+        case .launchAtLoginRequiresApproval:
+            return "Launch at login requires approval in System Settings"
+        case .launchAtLoginNotFound:
+            return "App not found for launch at login"
         case .unsupportedVersion:
             return "Launch at login requires macOS 13.0 or later"
         }
@@ -43,6 +49,7 @@ final class SystemService: ObservableObject {
     
     @Published private(set) var registeredHotKeys: [String] = []
     @Published private(set) var isLaunchAtLoginEnabled = false
+    @Published private(set) var launchAtLoginError: Error?
     
     
     private var hotkeys: [HotKey] = []
@@ -53,6 +60,13 @@ final class SystemService: ObservableObject {
     private init() {
         updateLaunchAtLoginStatus()
         syncConfigWithSystem()
+        
+        // Initialize error state on startup
+        if #unavailable(macOS 13.0) {
+            DispatchQueue.main.async {
+                self.launchAtLoginError = SystemServiceError.unsupportedVersion
+            }
+        }
     }
     
     
@@ -205,15 +219,38 @@ final class SystemService: ObservableObject {
     
     func updateLaunchAtLoginStatus() {
         let enabled: Bool
+        var error: Error?
+        
         if #available(macOS 13.0, *) {
-            enabled = SMAppService.mainApp.status == .enabled
+            let status = SMAppService.mainApp.status
+            print("SMAppService status: \(status)")
+            
+            switch status {
+            case .enabled:
+                enabled = true
+                error = nil  // Clear any previous errors
+            case .notRegistered:
+                enabled = false
+                error = nil  // Not an error, just not registered yet
+            case .notFound:
+                enabled = false
+                error = SystemServiceError.launchAtLoginNotFound
+            case .requiresApproval:
+                enabled = false
+                error = SystemServiceError.launchAtLoginRequiresApproval
+            @unknown default:
+                enabled = false
+                error = SystemServiceError.launchAtLoginFailed
+            }
         } else {
             enabled = false
+            error = SystemServiceError.unsupportedVersion
         }
         
         DispatchQueue.main.async {
             let wasEnabled = self.isLaunchAtLoginEnabled
             self.isLaunchAtLoginEnabled = enabled
+            self.launchAtLoginError = error
             
             // Sync config if status changed
             if wasEnabled != enabled {
@@ -232,27 +269,50 @@ final class SystemService: ObservableObject {
     
     func enableLaunchAtLogin() throws {
         guard #available(macOS 13.0, *) else {
+            DispatchQueue.main.async {
+                self.launchAtLoginError = SystemServiceError.unsupportedVersion
+            }
             throw SystemServiceError.unsupportedVersion
         }
         
         do {
+            print("Attempting to register launch at login...")
             try SMAppService.mainApp.register()
+            print("Launch at login registration successful")
+            DispatchQueue.main.async {
+                self.launchAtLoginError = nil
+            }
             updateLaunchAtLoginStatus()
         } catch {
-            throw SystemServiceError.launchAtLoginFailed
+            print("Launch at login registration failed: \(error)")
+            let serviceError = SystemServiceError.launchAtLoginFailed
+            DispatchQueue.main.async {
+                self.launchAtLoginError = serviceError
+            }
+            throw serviceError
         }
     }
     
     func disableLaunchAtLogin() throws {
         guard #available(macOS 13.0, *) else {
+            DispatchQueue.main.async {
+                self.launchAtLoginError = SystemServiceError.unsupportedVersion
+            }
             throw SystemServiceError.unsupportedVersion
         }
         
         do {
             try SMAppService.mainApp.unregister()
+            DispatchQueue.main.async {
+                self.launchAtLoginError = nil
+            }
             updateLaunchAtLoginStatus()
         } catch {
-            throw SystemServiceError.launchAtLoginDisableFailed
+            let serviceError = SystemServiceError.launchAtLoginDisableFailed
+            DispatchQueue.main.async {
+                self.launchAtLoginError = serviceError
+            }
+            throw serviceError
         }
     }
     
@@ -267,12 +327,9 @@ final class SystemService: ObservableObject {
         ConfigService.shared.updateGeneralSetting(\.launchAtLogin, to: isLaunchAtLoginEnabled)
     }
     
-    func setDockVisibility(visible: Bool) {
-        if visible {
-            NSApp.setActivationPolicy(.regular)
-        } else {
-            NSApp.setActivationPolicy(.accessory)
-        }
+    func setDockVisibility() {
+        // Always set as accessory app (menu bar only, never shows in dock)
+        NSApp.setActivationPolicy(.accessory)
     }
 }
 
