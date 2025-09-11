@@ -47,7 +47,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try Constants.ensureDirectoriesExist()
         } catch {
-            print("Warning: Could not create directories: \(error)")
         }
     }
     

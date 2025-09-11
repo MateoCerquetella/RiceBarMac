@@ -98,9 +98,7 @@ final class StatusBarViewModel: ObservableObject {
             if let active = self.activeProfile {
                 if let updatedProfile = self.profiles.first(where: { $0.directory == active.directory }) {
                     self.applyProfile(updatedProfile)
-                } else {
                 }
-            } else {
             }
         }
     }
@@ -271,7 +269,6 @@ final class StatusBarViewModel: ObservableObject {
         } catch {
             // Error is already tracked in systemService.launchAtLoginError
             // Don't show additional dialog - UI will display the error state
-            print("Launch at login toggle failed: \(error.localizedDescription)")
         }
     }
     

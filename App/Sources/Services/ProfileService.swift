@@ -273,10 +273,7 @@ final class ProfileService: ObservableObject {
         
         if let wallpaperRel = profile.wallpaper {
             let url = descriptor.directory.appendingPathComponent(wallpaperRel)
-            print("🖼️ Profile '\(profile.name)' has wallpaper: \(wallpaperRel)")
             try applyWallpaper(url: url)
-        } else {
-            print("ℹ️ Profile '\(profile.name)' has no wallpaper configured")
         }
         
         try applyCodeEditorSettings(from: descriptor)
@@ -338,7 +335,6 @@ final class ProfileService: ObservableObject {
         
         ApplyRecordStore.save(ApplyRecord(timestamp: Date(), actions: actions), to: descriptor.directory)
         
-        print("✅ Profile '\(descriptor.profile.name)' applied successfully")
         setActiveProfile(descriptor)
     }
     
@@ -373,10 +369,7 @@ final class ProfileService: ObservableObject {
                     
                     if let wallpaperRel = profile.wallpaper {
                         let url = descriptor.directory.appendingPathComponent(wallpaperRel)
-                        print("🖼️ Async: Profile '\(profile.name)' has wallpaper: \(wallpaperRel)")
                         try self.applyWallpaper(url: url)
-                    } else {
-                        print("ℹ️ Async: Profile '\(profile.name)' has no wallpaper configured")
                     }
                     
                     if Task.isCancelled {
@@ -430,17 +423,11 @@ final class ProfileService: ObservableObject {
                     }
                     
                     if let term = profile.terminal {
-                        print("🖥️ Found terminal config in profile: \(term.kind)")
                         try self.applyTerminalConfig(term, base: descriptor.directory)
-                    } else {
-                        print("ℹ️ No terminal config found in profile")
                     }
                     
                     if let ide = profile.ide {
-                        print("💻 Found IDE config in profile: \(ide.kind)")
                         try self.applyIDEConfig(ide, base: descriptor.directory)
-                    } else {
-                        print("ℹ️ No IDE config found in profile")
                     }
                     
                     // Auto-detect and apply all available IDE configs
@@ -451,7 +438,6 @@ final class ProfileService: ObservableObject {
                         do {
                             try await ThemeService.shared.applyProfileThemes(profile)
                         } catch {
-                            print("Warning: Failed to apply theme settings: \(error)")
                         }
                     }
                     
@@ -462,7 +448,6 @@ final class ProfileService: ObservableObject {
                     
                     ApplyRecordStore.save(ApplyRecord(timestamp: Date(), actions: actions), to: descriptor.directory)
                     
-                    print("✅ Async: Profile '\(descriptor.profile.name)' applied successfully")
                     self.setActiveProfile(descriptor)
                     
                     continuation.resume(returning: ())
@@ -862,11 +847,8 @@ private extension ProfileService {
     
     func applyWallpaper(url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else { 
-            print("⚠️ Wallpaper file not found: \(url.path)")
             throw ProfileServiceError.fileNotFound(url.path) 
         }
-        
-        print("🖼️ Setting wallpaper: \(url.path)")
         
         var lastError: Error?
         var successCount = 0
@@ -876,20 +858,16 @@ private extension ProfileService {
         for (index, screen) in NSScreen.screens.enumerated() {
             do {
                 try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
-                print("✅ Set wallpaper for screen \(index + 1)/\(screenCount)")
                 successCount += 1
                 
-                // Add small delay to ensure the wallpaper is set properly
                 Thread.sleep(forTimeInterval: 0.1)
             } catch {
-                print("❌ Failed to set wallpaper for screen \(index + 1): \(error)")
                 lastError = error
             }
         }
         
         // If NSWorkspace failed, try AppleScript as fallback
         if successCount == 0 {
-            print("🔄 NSWorkspace failed, trying AppleScript fallback...")
             
             let script = """
             tell application "System Events"
@@ -904,26 +882,13 @@ private extension ProfileService {
                 let result = appleScript.executeAndReturnError(&errorDict)
                 
                 if let errorDict = errorDict {
-                    print("❌ AppleScript failed: \(errorDict)")
                     throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "AppleScript failed: \(errorDict)"]))
                 } else {
-                    print("✅ AppleScript successfully set wallpaper")
-                    
-                    // Add delay to let AppleScript complete
                     Thread.sleep(forTimeInterval: 0.2)
                 }
             } else {
-                print("❌ Failed to create AppleScript")
                 throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create AppleScript"]))
             }
-        } else if successCount < screenCount {
-            print("⚠️ Partial success: wallpaper set on \(successCount)/\(screenCount) screens")
-            if let error = lastError {
-                print("⚠️ Last error: \(error)")
-            }
-        } else {
-            print("✅ Successfully set wallpaper on all \(successCount) screens")
-        }
         
         // Multiple strategies to ensure wallpaper change is visible
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -948,9 +913,6 @@ private extension ProfileService {
             if let appleScript = NSAppleScript(source: dockRestartScript) {
                 var errorDict: NSDictionary?
                 appleScript.executeAndReturnError(&errorDict)
-                if errorDict == nil {
-                    print("✅ Sent desktop refresh command")
-                }
             }
         }
     }
@@ -1100,25 +1062,16 @@ private extension ProfileService {
     }
     
     func applyTerminalConfig(_ terminal: Profile.Terminal, base: URL) throws {
-        print("🖥️ Applying terminal config for: \(terminal.kind)")
         switch terminal.kind {
         case .alacritty:
             let home = URL(fileURLWithPath: NSHomeDirectory())
             if let themeRel = terminal.theme {
                 let src = base.appendingPathComponent(themeRel)
-                print("🎨 Applying Alacritty theme from: \(themeRel)")
-                print("📍 Source path: \(src.path)")
-                print("📍 Target: \(home.path)/.config/alacritty/")
                 let keptExt = try copyAlacrittyConfig(from: src, toHome: home)
                 archiveAlternateAlacrittyConfig(keepExt: keptExt, home: home)
-                print("✅ Alacritty theme applied successfully")
             } else if let auto = findDefaultAlacrittyTheme(in: base) {
-                print("🎨 Applying default Alacritty theme from: \(auto.path)")
                 let keptExt = try copyAlacrittyConfig(from: auto, toHome: home)
                 archiveAlternateAlacrittyConfig(keepExt: keptExt, home: home)
-                print("✅ Default Alacritty theme applied successfully")
-            } else {
-                print("⚠️ No Alacritty theme found to apply")
             }
         case .terminalApp:
             break
@@ -1164,18 +1117,13 @@ private extension ProfileService {
     }
     
     func applyIDEConfig(_ ide: Profile.IDE, base: URL) throws {
-        print("💻 Applying IDE config for: \(ide.kind)")
         let home = URL(fileURLWithPath: NSHomeDirectory())
         
         switch ide.kind {
         case .vscode:
-            print("🎨 Applying VSCode theme: \(ide.theme ?? "default")")
             try applyVSCodeConfig(ide, base: base, home: home)
-            print("✅ VSCode config applied successfully")
         case .cursor:
-            print("🎨 Applying Cursor theme: \(ide.theme ?? "default")")
             try applyCursorConfig(ide, base: base, home: home)
-            print("✅ Cursor config applied successfully")
         }
     }
     
@@ -1840,17 +1788,14 @@ private extension ProfileService {
             throw ProfileServiceError.profileNotFound("No active profile to save to")
         }
         
-        print("💾 Saving current config to profile: \(activeProfile.profile.name)")
         try saveAllIDEConfigsToProfile(activeProfile)
     }
     
     public func saveCurrentConfigToSpecificProfile(_ descriptor: ProfileDescriptor) throws {
-        print("💾 Saving current config to specific profile: \(descriptor.profile.name)")
         try saveAllIDEConfigsToProfile(descriptor)
     }
     
     func saveAllIDEConfigsToProfile(_ descriptor: ProfileDescriptor) throws {
-        print("💾 Saving all IDE configs to profile: \(descriptor.profile.name)")
         try saveIDEConfigToProfile(descriptor)
     }
     
@@ -1858,15 +1803,9 @@ private extension ProfileService {
         let fm = FileManager.default
         let home = URL(fileURLWithPath: NSHomeDirectory())
         
-        print("💾 Starting saveIDEConfigToProfile for profile: \(descriptor.profile.name)")
-        
-        // Save VSCode settings
         let vscodeConfigDir = home.appendingPathComponent(Constants.IDEType.vscode.configDirectory)
         let vscodeSettings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.settingsFile)
         let vscodeKeybindings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.keybindingsFile)
-        
-        print("🔍 VSCode settings path: \(vscodeSettings.path)")
-        print("🔍 VSCode settings exists: \(fm.fileExists(atPath: vscodeSettings.path))")
         
         if fm.fileExists(atPath: vscodeSettings.path) {
             let profileVSCodeDir = descriptor.directory.appendingPathComponent("vscode")
@@ -1875,17 +1814,14 @@ private extension ProfileService {
             let profileVSCodeSettings = profileVSCodeDir.appendingPathComponent("settings.json")
             let profileVSCodeKeybindings = profileVSCodeDir.appendingPathComponent("keybindings.json")
             
-            // Copy current VSCode settings to profile
             if !fileSystemService.isSymlink(vscodeSettings) {
-                try? fm.removeItem(at: profileVSCodeSettings) // Use try? to avoid error if file doesn't exist
+                try? fm.removeItem(at: profileVSCodeSettings)
                 try fm.copyItem(at: vscodeSettings, to: profileVSCodeSettings)
-                print("✅ Saved VSCode settings to profile")
             }
             
             if fm.fileExists(atPath: vscodeKeybindings.path) && !fileSystemService.isSymlink(vscodeKeybindings) {
                 try? fm.removeItem(at: profileVSCodeKeybindings)
                 try fm.copyItem(at: vscodeKeybindings, to: profileVSCodeKeybindings)
-                print("✅ Saved VSCode keybindings to profile")
             }
         }
         
@@ -1901,17 +1837,14 @@ private extension ProfileService {
             let profileCursorSettings = profileCursorDir.appendingPathComponent("settings.json")
             let profileCursorKeybindings = profileCursorDir.appendingPathComponent("keybindings.json")
             
-            // Copy current Cursor settings to profile
             if !fileSystemService.isSymlink(cursorSettings) {
                 try? fm.removeItem(at: profileCursorSettings)
                 try fm.copyItem(at: cursorSettings, to: profileCursorSettings)
-                print("✅ Saved Cursor settings to profile")
             }
             
             if fm.fileExists(atPath: cursorKeybindings.path) && !fileSystemService.isSymlink(cursorKeybindings) {
                 try? fm.removeItem(at: profileCursorKeybindings)
                 try fm.copyItem(at: cursorKeybindings, to: profileCursorKeybindings)
-                print("✅ Saved Cursor keybindings to profile")
             }
         }
     }
@@ -1940,19 +1873,15 @@ private extension ProfileService {
         // Check for VSCode config
         let vscodeConfigDir = base.appendingPathComponent("vscode")
         if FileManager.default.fileExists(atPath: vscodeConfigDir.path) {
-            print("🔍 Found VSCode config directory, applying...")
             let vscodeFakeIDE = Profile.IDE(kind: .vscode)
             try applyVSCodeConfig(vscodeFakeIDE, base: base, home: home)
-            print("✅ Auto-applied VSCode config")
         }
         
         // Check for Cursor config
         let cursorConfigDir = base.appendingPathComponent("cursor")
         if FileManager.default.fileExists(atPath: cursorConfigDir.path) {
-            print("🔍 Found Cursor config directory, applying...")
             let cursorFakeIDE = Profile.IDE(kind: .cursor)
             try applyCursorConfig(cursorFakeIDE, base: base, home: home)
-            print("✅ Auto-applied Cursor config")
         }
     }
     

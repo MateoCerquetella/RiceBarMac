@@ -120,72 +120,45 @@ final class SystemService: ObservableObject {
     func registerNavigationHotKeys(onNextProfile: @escaping () -> Void, onPreviousProfile: @escaping () -> Void, onReloadProfiles: @escaping () -> Void) {
         let config = ConfigService.shared.config
         
-        print("🔧 Registering navigation hotkeys...")
-        
-        // Test the shortcuts first
-        print("🧪 Testing shortcuts:")
-        testShortcut(config.shortcuts.navigationShortcuts.nextProfile)
-        testShortcut(config.shortcuts.navigationShortcuts.previousProfile)
-        testShortcut(config.shortcuts.navigationShortcuts.reloadProfiles)
         
         // Register Next Profile hotkey
         if !config.shortcuts.navigationShortcuts.nextProfile.isEmpty {
-            print("📱 Next Profile shortcut: \(config.shortcuts.navigationShortcuts.nextProfile)")
             do {
                 let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.nextProfile)
                 let hotKey = HotKey(keyCombo: combo)
                 hotKey.keyDownHandler = {
-                    print("🎯 Next Profile hotkey triggered!")
                     onNextProfile()
                 }
                 hotkeys.append(hotKey)
-                print("✅ Next Profile hotkey registered successfully")
             } catch {
-                print("❌ Failed to register Next Profile hotkey: \(error)")
             }
-        } else {
-            print("⚠️ Next Profile shortcut is empty")
         }
         
         // Register Previous Profile hotkey
         if !config.shortcuts.navigationShortcuts.previousProfile.isEmpty {
-            print("📱 Previous Profile shortcut: \(config.shortcuts.navigationShortcuts.previousProfile)")
             do {
                 let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.previousProfile)
                 let hotKey = HotKey(keyCombo: combo)
                 hotKey.keyDownHandler = {
-                    print("🎯 Previous Profile hotkey triggered!")
                     onPreviousProfile()
                 }
                 hotkeys.append(hotKey)
-                print("✅ Previous Profile hotkey registered successfully")
             } catch {
-                print("❌ Failed to register Previous Profile hotkey: \(error)")
             }
-        } else {
-            print("⚠️ Previous Profile shortcut is empty")
         }
         
         // Register Reload Profiles hotkey
         if !config.shortcuts.navigationShortcuts.reloadProfiles.isEmpty {
-            print("📱 Reload Profiles shortcut: \(config.shortcuts.navigationShortcuts.reloadProfiles)")
             do {
                 let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.reloadProfiles)
                 let hotKey = HotKey(keyCombo: combo)
                 hotKey.keyDownHandler = {
-                    print("🎯 Reload Profiles hotkey triggered!")
                     onReloadProfiles()
                 }
                 hotkeys.append(hotKey)
-                print("✅ Reload Profiles hotkey registered successfully")
             } catch {
-                print("❌ Failed to register Reload Profiles hotkey: \(error)")
             }
-        } else {
-            print("⚠️ Reload Profiles shortcut is empty")
         }
-        
-        print("🔧 Navigation hotkeys registration complete. Total hotkeys: \(hotkeys.count)")
     }
     
     func clearHotKeys() {
@@ -196,24 +169,16 @@ final class SystemService: ObservableObject {
     }
     
     func validateHotKey(_ keyString: String) -> Bool {
-        print("🔍 Validating hotkey: '\(keyString)'")
         do {
             let combo = try parseKeyCombo(keyString)
-            print("✅ Hotkey validation successful: \(combo)")
             return true
         } catch {
-            print("❌ Hotkey validation failed: \(error)")
             return false
         }
     }
     
     func testShortcut(_ shortcut: String) {
-        print("🧪 Testing shortcut: '\(shortcut)'")
-        if validateHotKey(shortcut) {
-            print("✅ Shortcut is valid")
-        } else {
-            print("❌ Shortcut is invalid")
-        }
+        _ = validateHotKey(shortcut)
     }
     
     
@@ -223,7 +188,6 @@ final class SystemService: ObservableObject {
         
         if #available(macOS 13.0, *) {
             let status = SMAppService.mainApp.status
-            print("SMAppService status: \(status)")
             
             switch status {
             case .enabled:
@@ -276,15 +240,12 @@ final class SystemService: ObservableObject {
         }
         
         do {
-            print("Attempting to register launch at login...")
             try SMAppService.mainApp.register()
-            print("Launch at login registration successful")
             DispatchQueue.main.async {
                 self.launchAtLoginError = nil
             }
             updateLaunchAtLoginStatus()
         } catch {
-            print("Launch at login registration failed: \(error)")
             let serviceError = SystemServiceError.launchAtLoginFailed
             DispatchQueue.main.async {
                 self.launchAtLoginError = serviceError
@@ -337,11 +298,8 @@ final class SystemService: ObservableObject {
 private extension SystemService {
     
     func parseKeyCombo(_ string: String) throws -> KeyCombo {
-        print("🔍 Parsing key combo: '\(string)'")
         let parts = string.lowercased().split(separator: "+").map { String($0) }
-        print("🔍 Parts: \(parts)")
         guard !parts.isEmpty else { 
-            print("❌ Empty key combo")
             throw SystemServiceError.hotKeyParsingFailed(string) 
         }
         
@@ -349,37 +307,28 @@ private extension SystemService {
         var keyString: String?
         
         for part in parts {
-            print("🔍 Processing part: '\(part)'")
             switch part {
             case "ctrl", "control": 
                 modifiers.insert(.control)
-                print("🔍 Added control modifier")
             case "cmd", "command": 
                 modifiers.insert(.command)
-                print("🔍 Added command modifier")
             case "opt", "option", "alt": 
                 modifiers.insert(.option)
-                print("🔍 Added option modifier")
             case "shift": 
                 modifiers.insert(.shift)
-                print("🔍 Added shift modifier")
             default: 
                 keyString = part
-                print("🔍 Key string: '\(part)'")
             }
         }
         
         guard let keyString = keyString else { 
-            print("❌ No key string found")
             throw SystemServiceError.hotKeyParsingFailed(string) 
         }
         
         guard let key = mapKey(keyString) else { 
-            print("❌ Failed to map key: '\(keyString)'")
             throw SystemServiceError.hotKeyParsingFailed(string) 
         }
         
-        print("✅ Successfully parsed key combo: \(key) with modifiers: \(modifiers)")
         return KeyCombo(key: key, modifiers: modifiers)
     }
     
