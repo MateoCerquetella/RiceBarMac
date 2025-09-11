@@ -490,7 +490,6 @@ final class ProfileService: ObservableObject {
     
     
     func setActiveProfile(_ descriptor: ProfileDescriptor?) {
-        
         if Thread.isMainThread {
             self.activeProfile = descriptor
         } else {
@@ -690,16 +689,26 @@ private extension ProfileService {
     }
     
     private func restoreActiveProfileFromDefaults() {
-        guard let path = UserDefaults.standard.string(forKey: userDefaultsKey) else { 
-            return 
+        // First, try to restore from saved UserDefaults
+        if let path = UserDefaults.standard.string(forKey: userDefaultsKey) {
+            let url = URL(fileURLWithPath: path)
+            
+            if let descriptor = profiles.first(where: { $0.directory == url }) {
+                activeProfile = descriptor
+                return
+            } else {
+                // Remove invalid saved path
+                UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+            }
         }
-        let url = URL(fileURLWithPath: path)
         
-        
-        if let descriptor = profiles.first(where: { $0.directory == url }) {
-            activeProfile = descriptor
-        } else {
-            UserDefaults.standard.removeObject(forKey: userDefaultsKey)
+        // If no saved active profile or it's invalid, auto-select first profile if available
+        if activeProfile == nil && !profiles.isEmpty {
+            let firstProfile = profiles.sorted { $0.profile.order < $1.profile.order }.first!
+            activeProfile = firstProfile
+            
+            // Save the auto-selected profile
+            UserDefaults.standard.set(firstProfile.directory.path, forKey: userDefaultsKey)
         }
     }
     

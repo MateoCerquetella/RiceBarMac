@@ -1,7 +1,7 @@
 name: RiceBarMac
 options:
     minimumXcodeGenVersion: 2.37.0
-    bundleIdPrefix: com.ricebar
+    bundleIdPrefix: com.mateocerquetella
     developmentLanguage: en
     deploymentTarget:
         macOS: '14.0'
@@ -27,7 +27,7 @@ targets:
         settings:
             base:
                 PRODUCT_NAME: RiceBarMac
-                PRODUCT_BUNDLE_IDENTIFIER: com.ricebar.RiceBarMac
+                PRODUCT_BUNDLE_IDENTIFIER: com.mateocerquetella.RiceBarMac
                 CODE_SIGN_STYLE: Automatic
                 SWIFT_VERSION: 5.9
                 INFOPLIST_FILE: App/Info.plist
@@ -51,7 +51,7 @@ targets:
             properties:
                 CFBundleName: RiceBarMac
                 CFBundleDisplayName: RiceBarMac
-                CFBundleIdentifier: com.ricebar.RiceBarMac
+                CFBundleIdentifier: com.mateocerquetella.RiceBarMac
                 CFBundleVersion: '1'
                 CFBundleShortVersionString: '0.1.0'
                 LSMinimumSystemVersion: '14.0'
@@ -71,7 +71,7 @@ targets:
         settings:
             base:
                 GENERATE_INFOPLIST_FILE: YES
-                PRODUCT_BUNDLE_IDENTIFIER: com.ricebar.RiceBarMacTests
+                PRODUCT_BUNDLE_IDENTIFIER: com.mateocerquetella.RiceBarMacTests
                 ARCHS: 'x86_64 arm64'
                 VALID_ARCHS: 'x86_64 arm64'
         dependencies:

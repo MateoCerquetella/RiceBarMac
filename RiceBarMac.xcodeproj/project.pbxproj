@@ -48,7 +48,6 @@
 		54B8CEBEDF14D653D5904C76 /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		5FFDFB9CB09EA3ECD0DB47D7 /* SystemService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemService.swift; sourceTree = "<group>"; };
 		6C007FDFEBC40D65FCA96770 /* RiceBarMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RiceBarMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		81D869300D60DBBB638E7960 /* BackupService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupService.swift; sourceTree = "<group>"; };
 		87FF12B9E55064A525A6AB9F /* ApplyRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplyRecord.swift; sourceTree = "<group>"; };
 		8E0693C0DF87522673380697 /* RiceBarMac_Debug.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RiceBarMac_Debug.entitlements; sourceTree = "<group>"; };
 		905A29320716E040680009D2 /* RiceBarConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiceBarConfig.swift; sourceTree = "<group>"; };
@@ -133,33 +132,17 @@
 			path = Services;
 			sourceTree = "<group>";
 		};
-		69F721075A57E6F5C051686A /* Views */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
 		825165D1D4FE1E63DB75A951 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
 				0BE3B3286B9F555650B9C7E0 /* Profile.swift */,
 				168D2FB3CD116ABF454CF3EE /* App */,
-				A54FA3DC97CA580EB5747889 /* Controllers */,
 				412CE66A88466E31243AD422 /* Models */,
 				5A8AB322D7B7056C2EFFF252 /* Services */,
 				F31D3BF51F1C17A287D41223 /* Utils */,
 				4F15660FFB5B530388F167A7 /* ViewModels */,
-				69F721075A57E6F5C051686A /* Views */,
 			);
 			path = Sources;
-			sourceTree = "<group>";
-		};
-		A54FA3DC97CA580EB5747889 /* Controllers */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = Controllers;
 			sourceTree = "<group>";
 		};
 		A757EAB19785B3AAC42B67A4 /* Products */ = {
@@ -350,7 +333,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				ONLY_ACTIVE_ARCH = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ricebar.RiceBarMac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mateocerquetella.RiceBarMac;
 				PRODUCT_NAME = RiceBarMac;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;
@@ -370,7 +353,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ricebar.RiceBarMacTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mateocerquetella.RiceBarMacTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RiceBarMac.app/Contents/MacOS/RiceBarMac";
 				VALID_ARCHS = "x86_64 arm64";
@@ -514,7 +497,7 @@
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.ricebar.RiceBarMacTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mateocerquetella.RiceBarMacTests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RiceBarMac.app/Contents/MacOS/RiceBarMac";
 				VALID_ARCHS = "x86_64 arm64";
@@ -538,7 +521,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.ricebar.RiceBarMac;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mateocerquetella.RiceBarMac;
 				PRODUCT_NAME = RiceBarMac;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.9;

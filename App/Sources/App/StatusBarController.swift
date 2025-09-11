@@ -9,7 +9,6 @@ final class StatusBarController {
     private let statusItem: NSStatusItem
     private let viewModel: StatusBarViewModel
     private var cancellables = Set<AnyCancellable>()
-    private lazy var settingsWindowController = SettingsWindowController()
     private let configService = ConfigService.shared
 
     init(viewModel: StatusBarViewModel = StatusBarViewModel()) {
@@ -56,11 +55,18 @@ final class StatusBarController {
         let menu = NSMenu()
         menu.autoenablesItems = false
 
+        // Create title view with unique ID to force recreation
         let titleItem = NSMenuItem()
-        titleItem.view = NSHostingView(rootView: TitleMenuView(viewModel: viewModel))
+        let titleView = TitleMenuView(viewModel: viewModel)
+        let hostingView = NSHostingView(rootView: titleView)
+        
+        // Force the hosting view to update
+        hostingView.rootView = titleView
+        titleItem.view = hostingView
         titleItem.isEnabled = false
         menu.addItem(titleItem)
         menu.addItem(.separator())
+        
 
         // Keep only essential actions - remove profile manager UI
 
@@ -300,6 +306,72 @@ final class StatusBarController {
     @objc private func quit() {
         NSApp.terminate(nil)
     }
+    
+    @objc private func toggleLaunchAtLogin() {
+        Task {
+            await viewModel.toggleLaunchAtLogin()
+        }
+    }
+    
+    @objc private func promptCreateEmpty() {
+        Task { @MainActor in
+            guard let name = await viewModel.promptForProfileName(
+                title: "Create Empty Profile",
+                message: "Enter a name for the new empty profile.",
+                placeholder: "New profile name"
+            ) else { return }
+            
+            do {
+                _ = try await viewModel.createEmptyProfile(name: name)
+                await viewModel.showSuccess(title: "Profile Created", message: "Empty profile created successfully.")
+            } catch {
+                await viewModel.showError(error)
+            }
+        }
+    }
+    
+    @objc private func switchToNextProfile() {
+        viewModel.switchToNextProfile()
+    }
+    
+    @objc private func switchToPreviousProfile() {
+        viewModel.switchToPreviousProfile()
+    }
+    
+    @objc private func reloadProfiles() {
+        viewModel.refreshData()
+    }
+    
+    @objc private func openSettings() {
+        // For SwiftUI Apps, we need to use the proper pattern
+        NSApp.activate(ignoringOtherApps: true)
+        
+        // Try keyboard shortcut first (Cmd+,) which is the standard settings shortcut
+        let event = CGEvent(keyboardEventSource: nil, virtualKey: 43, keyDown: true) // Comma key
+        event?.flags = .maskCommand
+        event?.post(tap: .cghidEventTap)
+        
+        // Release the key
+        let keyUpEvent = CGEvent(keyboardEventSource: nil, virtualKey: 43, keyDown: false)
+        keyUpEvent?.flags = .maskCommand
+        keyUpEvent?.post(tap: .cghidEventTap)
+        
+        // If that doesn't work, try opening via menu bar
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            if let mainMenu = NSApp.mainMenu {
+                // Look for app menu (first menu)
+                if let appMenu = mainMenu.items.first?.submenu {
+                    // Find "Preferences..." or "Settings..." item
+                    for item in appMenu.items {
+                        if item.title.contains("Preferences") || item.title.contains("Settings") {
+                            item.target?.perform(item.action, with: item)
+                            return
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     @objc private func promptCopyCurrentProfile() {
         guard let current = viewModel.activeProfile else { return }
@@ -490,24 +562,29 @@ private struct TitleMenuView: View {
                     }
                 }
             }
-            if let activeName = viewModel.activeProfileName, !activeName.isEmpty {
-                HStack {
-                    Text("Active: \(activeName)")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    if viewModel.isApplying {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.green)
-                            .font(.caption)
-                    }
-                }
-            } else {
-                Text("Select a profile")
+            
+            // Show active profile status - force refresh by accessing properties directly  
+            HStack {
+                Text(statusText)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
+                
+                if viewModel.isApplying {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                }
             }
         }
         .padding(.vertical, 6)
         .padding(.horizontal, 12)
+    }
+    
+    private var statusText: String {
+        if let activeProfile = viewModel.activeProfile {
+            return "Active: \(activeProfile.profile.name)"
+        } else {
+            return "Select a profile"
+        }
     }
 }

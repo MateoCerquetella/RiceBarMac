@@ -147,7 +147,6 @@ final class StatusBarViewModel: ObservableObject {
     private var currentApplicationTask: Task<Void, Never>?
     
     func applyProfile(_ descriptor: ProfileDescriptor) {
-        
         if let current = activeProfile, current.directory == descriptor.directory {
             if ApplyActivity.recentlyApplied(within: 2.0) {
                 return

@@ -5,7 +5,8 @@
   ### Lightning-fast macOS menu bar app for effortless desktop profile switching
   
   [![macOS](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://www.apple.com/macos/)
-  [![Swift](https://img.shields.io/badge/Swift-5.0+-orange.svg)](https://swift.org/)
+  [![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org/)
+  [![Xcode](https://img.shields.io/badge/Xcode-15.0+-blue.svg)](https://developer.apple.com/xcode/)
   [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
   [![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
   
@@ -70,39 +71,52 @@ RiceBarMac operates as a **symlink-based overlay system** that manages your rice
 
 ### 🎨 **Profile Management**
 
+-   **Menu Bar Interface**: Clean, accessible menu bar app with rice bowl icon 🍚
 -   **Multiple Profiles**: Create and manage unlimited rice profiles
--   **Instant Switching**: Switch between profiles with keyboard shortcuts
--   **Profile Ordering**: Customize the order of profiles in the menu
--   **Profile Validation**: Automatic validation of profile configurations
+-   **Instant Switching**: Switch between profiles with keyboard shortcuts or menu clicks
+-   **Profile Ordering**: Customize the order of profiles in the menu via `order` property
+-   **Profile Creation**: Create empty profiles or capture current system configuration
+-   **Profile Actions**: Reapply, delete, open folder, save current config, set wallpaper
 
 ### 🔧 **File Management**
 
 -   **Config File Symlinking**: Create symbolic links from `.config` directories and files to your system
 -   **Home Directory Overlay**: Automatic symlinking of `home/` directory contents
--   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 configuration support
+-   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 configuration support  
 -   **Backup System**: Automatic backup of existing files to `~/.ricebarmac/backups/` before creating symlinks
 -   **Startup Scripts**: Execute custom scripts when profiles are applied
+-   **File Validation**: Comprehensive validation of profile configurations and file paths
 
 ### 🖼️ **Visual Customization**
 
--   **Wallpaper Switching**: Change desktop wallpapers instantly
--   **Multiple Formats**: Support for PNG, JPG, HEIC, GIF, BMP, TIFF
+-   **Wallpaper Switching**: Change desktop wallpapers instantly with drag-and-drop or file picker
+-   **Multiple Formats**: Support for PNG, JPG, HEIC, GIF, BMP, TIFF formats
 -   **Terminal Themes**: Alacritty, Terminal.app, iTerm2 theme switching
--   **IDE Themes**: VS Code and Cursor theme management
+-   **IDE Themes**: VS Code and Cursor theme management via settings.json
 
 ### ⌨️ **Keyboard Shortcuts**
 
--   **Profile Shortcuts**: Direct profile switching (⌘+1, ⌘+2, etc.)
--   **Navigation Shortcuts**: Next/Previous profile cycling
--   **Quick Actions**: Create profiles, open settings, reload profiles
--   **Global Hotkeys**: Works system-wide, even when other apps are active
+-   **Profile Shortcuts**: Direct profile switching (⌘+1, ⌘+2, etc.) for up to 9 profiles
+-   **Navigation Shortcuts**: Next/Previous profile cycling, reload profiles, open folder
+-   **Quick Actions**: Create profiles, open settings, quit app
+-   **Global Hotkeys**: System-wide shortcuts that work even when other apps are active
+-   **Menu Shortcuts**: All menu items have configurable keyboard shortcuts
 
-### 🔧 **Advanced Capabilities**
+### 🔧 **System Integration**
 
--   **JSON Configuration**: Easy-to-edit configuration files
--   **Error Handling**: Robust error handling and recovery
--   **Debug Logging**: Comprehensive logging for troubleshooting
--   **Universal Binary**: Works on both Intel and Apple Silicon Macs
+-   **Launch at Login**: Seamless integration with macOS login items (macOS 13.0+)
+-   **Dock Visibility**: Option to show/hide from Dock while maintaining menu bar presence
+-   **Settings Window**: Clean, minimal settings interface for system preferences
+-   **Status Tracking**: Real-time status updates and progress indicators
+-   **Error Handling**: Robust error handling with user-friendly messages and recovery suggestions
+
+### 🛠️ **Advanced Capabilities**
+
+-   **JSON Configuration**: Easy-to-edit configuration files with full schema
+-   **Hotkey Registration**: Advanced global hotkey system with conflict detection
+-   **Debug Logging**: Comprehensive logging for troubleshooting and development
+-   **Universal Binary**: Native support for both Intel and Apple Silicon Macs
+-   **Async Operations**: Non-blocking profile application with progress tracking
 
 ## 📦 Installation
 
@@ -156,31 +170,49 @@ RiceBarMac operates as a **symlink-based overlay system** that manages your rice
 
 ### First Launch
 
-1. **Launch RiceBarMac** - The app will appear in your menu bar
-2. **Right-click the icon** to access the main menu
-3. **Open Settings** to configure your first profile
+1. **Launch RiceBarMac** - The app will appear in your menu bar with a rice bowl icon 🍚
+2. **Click the menu bar icon** to access the main menu
+3. **Create your first profile** using the "Create Profile" menu options
 
 ### Creating Profiles
 
-1. **Go to Settings** → **Profiles tab**
-2. **Click "Add Profile"** to create a new rice configuration
-3. **Configure your settings**:
-    - **Theme**: Select your color scheme
-    - **Wallpaper**: Choose your background image
-    - **System Settings**: Configure additional preferences
+**From the menu bar, you can:**
+
+1. **Create Profile** → **Empty Profile...** to start from scratch
+2. **Create Profile** → **From Current Setup...** to capture your existing configuration
+3. **Profile folders** are automatically created in `~/.ricebarmac/profiles/`
+
+### Managing Profiles
+
+**Each profile in the menu has a submenu with options:**
+- **Reapply**: Reapply the currently active profile
+- **Set Wallpaper...**: Change the wallpaper for the profile
+- **Save Current Config to This Profile**: Update profile with current system state
+- **Open Profile Folder**: Open the profile directory in Finder
+- **Delete Profile...**: Remove the profile (with confirmation)
 
 ### Setting Up Shortcuts
 
-1. **Go to Settings** → **Shortcuts tab**
-2. **Click on any shortcut field** to record a new shortcut
-3. **Press your desired keys** (e.g., ⌘+1 for Profile 1)
-4. **The shortcut saves automatically** - no need to click "Save"
+**Keyboard shortcuts are configured in the main configuration file:**
+- **Profile shortcuts**: ⌘+1, ⌘+2, etc. for direct profile switching
+- **Navigation shortcuts**: Cycle through profiles and reload
+- **Quick actions**: Create profiles, open settings, quit app
+
+### System Settings
+
+**Access settings through:**
+- **Menu bar** → **Settings...** 
+- **Settings window includes:**
+  - **Launch at Login**: Toggle automatic startup with macOS
+  - **Registered Hotkeys**: View count of active global shortcuts
+  - **About**: App version and build information
 
 ### Navigation Shortcuts
 
--   **Next Profile**: ⌘+⌥+⌃+] (or customize)
--   **Previous Profile**: ⌘+⌥+⌃+[ (or customize)
--   **Reload Profiles**: ⌘+⌥+⌃+R (or customize)
+**Default navigation shortcuts (customizable in config):**
+-   **Next Profile**: ⌘+⌥+⌃+] 
+-   **Previous Profile**: ⌘+⌥+⌃+[
+-   **Reload Profiles**: ⌘+⌥+⌃+R
 
 ## 🛠️ Configuration
 
@@ -231,19 +263,38 @@ Profiles are stored at `~/.ricebarmac/profiles/<ProfileName>/` with this structu
 
 ### Shortcut Configuration
 
+Configuration file located at `~/.ricebarmac/config.json`:
+
 ```json
 {
     "shortcuts": {
         "profileShortcuts": {
             "profile1": "cmd+1",
             "profile2": "cmd+2",
-            "profile3": "cmd+3"
+            "profile3": "cmd+3",
+            "profile4": "cmd+4",
+            "profile5": "cmd+5",
+            "profile6": "cmd+6",
+            "profile7": "cmd+7",
+            "profile8": "cmd+8",
+            "profile9": "cmd+9"
         },
         "navigationShortcuts": {
             "nextProfile": "cmd+option+control+]",
             "previousProfile": "cmd+option+control+[",
-            "reloadProfiles": "cmd+option+control+r"
+            "reloadProfiles": "cmd+option+control+r",
+            "openProfilesFolder": "cmd+option+control+o"
+        },
+        "quickActions": {
+            "createEmptyProfile": "cmd+option+control+e",
+            "createFromCurrentSetup": "cmd+option+control+n",
+            "openSettings": "cmd+option+control+,",
+            "quitApp": "cmd+option+control+q"
         }
+    },
+    "general": {
+        "launchAtLogin": false,
+        "showInDock": false
     }
 }
 ```
@@ -288,16 +339,28 @@ RiceBarMac integrates with popular development tools and configurations:
 **App not launching?**
 
 -   Check if it's blocked by Gatekeeper
--   Verify macOS version compatibility
--   Try building from source
+-   Verify macOS version compatibility (requires macOS 14.0+)
+-   Try building from source with Xcode 15.0+
+
+**Launch at Login not working?**
+
+-   Requires macOS 13.0 or later for automatic registration
+-   On older versions, manually add to System Preferences > Users & Groups > Login Items
+-   Check if the toggle is properly enabled in Settings
 
 ### Debug Mode
 
 Enable debug logging by running from terminal:
 
 ```bash
+# If installed in Applications
 /Applications/RiceBarMac.app/Contents/MacOS/RiceBarMac
+
+# If running from build directory
+./RiceBarMac.app/Contents/MacOS/RiceBarMac
 ```
+
+**Console logs** can be viewed in Console.app by filtering for "RiceBarMac".
 
 ## 🤝 Contributing
 

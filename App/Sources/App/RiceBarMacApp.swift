@@ -84,7 +84,7 @@ struct SettingsView: View {
     var body: some View {
         Form {
             VStack(alignment: .leading, spacing: 16) {
-                GroupBox("Profile Management") {
+                GroupBox("Profile Information") {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("Active Profile:")
@@ -119,12 +119,14 @@ struct SettingsView: View {
                 
                 GroupBox("System Settings") {
                     VStack(alignment: .leading, spacing: 8) {
-                        Toggle("Launch at Login", isOn: .constant(viewModel.isLaunchAtLoginEnabled))
-                            .onTapGesture {
+                        Toggle("Launch at Login", isOn: Binding(
+                            get: { viewModel.isLaunchAtLoginEnabled },
+                            set: { _ in
                                 Task {
                                     await viewModel.toggleLaunchAtLogin()
                                 }
                             }
+                        ))
                         
                         HStack {
                             Text("Registered Hotkeys:")
@@ -160,7 +162,7 @@ struct SettingsView: View {
             }
         }
         .padding(24)
-        .frame(width: 650, height: 550)
+        .frame(width: 500, height: 450)
         .navigationTitle(Constants.appName)
     }
 }
