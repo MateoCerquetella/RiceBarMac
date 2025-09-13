@@ -153,7 +153,6 @@ jobs:
           sha256 "${{ steps.checksum.outputs.sha256 }}"
           version "${{ steps.version.outputs.version }}"
           
-          depends_on macos: ">= :big_sur"
           
           def install
             # Install the menu bar app to Applications folder
