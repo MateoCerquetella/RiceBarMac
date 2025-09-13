@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   release:
     runs-on: macos-latest
@@ -79,25 +83,37 @@ jobs:
         echo "Version: $version"
     
     - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
+        name: "🍚 RiceBarMac ${{ github.ref_name }}"
+        body: |
+          ## 🍚 RiceBarMac ${{ github.ref_name }}
+          
+          Lightning-fast macOS menu bar app for effortless desktop profile switching.
+          
+          ### ✨ What's New
+          - Improved stability and performance
+          - Bug fixes and enhancements
+          
+          ### 📦 Installation
+          1. Download `RiceBarMac.zip`
+          2. Extract and move to Applications folder
+          3. Run the app and grant necessary permissions
+          
+          ### 🔍 Verification
+          **SHA256 Checksum:** `${{ steps.checksum.outputs.sha256 }}`
+          
+          ### 📋 Requirements
+          - macOS 14.0 or later
+          - Administrator permissions for first setup
+          
+          Full documentation available in the [README](https://github.com/MateoCerquetella/RiceBarMac/blob/main/README.md).
+        files: |
+          RiceBarMac.zip
         draft: false
         prerelease: false
-    
-    - name: Upload Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./RiceBarMac.zip
-        asset_name: RiceBarMac.zip
-        asset_content_type: application/zip
+        generate_release_notes: true
     
     - name: Update Homebrew Formula
       env:
