@@ -64,9 +64,26 @@ jobs:
     
     - name: Create zip
       run: |
+        # Check if the app exists and list contents
+        echo "Contents of build/export:"
+        ls -la build/export/
+        
+        # Verify the app bundle exists
+        if [ ! -d "build/export/RiceBarMac.app" ]; then
+          echo "Error: RiceBarMac.app not found in build/export/"
+          echo "Available files:"
+          find build/export -name "*.app" -type d
+          exit 1
+        fi
+        
+        # Create the zip file
         cd build/export
         zip -r ../../RiceBarMac.zip RiceBarMac.app
         cd ../..
+        
+        # Verify zip contents
+        echo "Zip file contents:"
+        unzip -l RiceBarMac.zip
     
     - name: Calculate checksum
       id: checksum
@@ -136,10 +153,26 @@ jobs:
           sha256 "${{ steps.checksum.outputs.sha256 }}"
           version "${{ steps.version.outputs.version }}"
           
-          depends_on :macos
+          depends_on :macos => ">= :sonoma"
           
           def install
-            prefix.install "RiceBarMac.app"
+            # Check if the app bundle exists
+            if File.directory?("RiceBarMac.app")
+              prefix.install "RiceBarMac.app"
+            else
+              # Look for any .app bundle in case of naming issues
+              app_bundles = Dir.glob("*.app")
+              if app_bundles.empty?
+                odie "No .app bundle found in the downloaded archive"
+              else
+                # Install the first .app bundle found
+                prefix.install app_bundles.first
+                # Create a symlink with the expected name if needed
+                unless app_bundles.first == "RiceBarMac.app"
+                  ln_s prefix/app_bundles.first, prefix/"RiceBarMac.app"
+                end
+              end
+            end
           end
           
           def caveats
