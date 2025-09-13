@@ -156,18 +156,7 @@ jobs:
           
           def install
             # Install the menu bar app to Applications folder
-            if File.directory?("RiceBarMac.app")
-              # For menu bar apps, install directly to Applications
-              system "cp", "-R", "RiceBarMac.app", "/Applications/"
-            else
-              # Look for any .app bundle in case of naming issues
-              app_bundles = Dir.glob("*.app")
-              if app_bundles.empty?
-                odie "No .app bundle found in the downloaded archive"
-              else
-                system "cp", "-R", app_bundles.first, "/Applications/"
-              end
-            end
+            system "cp", "-R", "RiceBarMac.app", "/Applications/"
           end
           
           def caveats
