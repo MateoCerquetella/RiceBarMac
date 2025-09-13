@@ -104,7 +104,11 @@ RiceBarMac operates as a **symlink-based overlay system** that manages your rice
 ### Quick Install via Homebrew (Recommended)
 
 ```bash
-brew install --cask mateocerquetella/ricebarmac/ricebarmac
+# Add the tap first
+brew tap mateocerquetella/ricebarmac
+
+# Install RiceBarMac
+brew install --cask ricebarmac
 ```
 
 ### Manual Installation

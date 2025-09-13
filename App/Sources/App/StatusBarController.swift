@@ -324,6 +324,11 @@ final class StatusBarController {
     @objc private func toggleLaunchAtLogin() {
         Task {
             await viewModel.toggleLaunchAtLogin()
+            
+            // Update checkmark immediately after toggle for immediate visual feedback
+            await MainActor.run {
+                self.updateLaunchAtLoginCheckmark()
+            }
         }
     }
     

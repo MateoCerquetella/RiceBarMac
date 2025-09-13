@@ -492,8 +492,8 @@ struct SimpleShortcutField: View {
     let shortcut: String
     let onChanged: (String) -> Void
     
-    @State private var editableShortcut: String = ""
-    @State private var isEditing: Bool = false
+    @State private var isRecording: Bool = false
+    @State private var recordedShortcut: String = ""
     
     private func formatShortcut(_ shortcut: String) -> String {
         return shortcut
@@ -510,34 +510,34 @@ struct SimpleShortcutField: View {
                 .fontWeight(.medium)
                 .frame(width: 160, alignment: .leading)
             
-            if isEditing {
-                TextField("Enter shortcut", text: $editableShortcut)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 200)
-                    .onSubmit {
-                        onChanged(editableShortcut)
-                        isEditing = false
+            if isRecording {
+                KeyboardShortcutRecorder(
+                    onShortcutRecorded: { newShortcut in
+                        recordedShortcut = newShortcut
+                        onChanged(newShortcut)
+                        DispatchQueue.main.async {
+                            isRecording = false
+                        }
+                    },
+                    onCancel: {
+                        DispatchQueue.main.async {
+                            isRecording = false
+                        }
                     }
-                    .onAppear {
-                        editableShortcut = shortcut
+                )
+                .frame(width: 200, height: 34)
+                .onAppear {
+                    // Give the view a moment to appear before trying to focus
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        // Focus will be handled by updateNSView
                     }
-                
-                Button("Save") {
-                    onChanged(editableShortcut)
-                    isEditing = false
                 }
-                .buttonStyle(.borderedProminent)
-                
-                Button("Cancel") {
-                    isEditing = false
-                }
-                .buttonStyle(.bordered)
             } else {
                 Button(action: {
-                    isEditing = true
+                    isRecording = true
                 }) {
                     HStack {
-                        Text(shortcut.isEmpty ? "None" : formatShortcut(shortcut))
+                        Text(shortcut.isEmpty ? "Click to record shortcut" : formatShortcut(shortcut))
                             .foregroundColor(shortcut.isEmpty ? .secondary : .primary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                         
@@ -562,6 +562,225 @@ struct SimpleShortcutField: View {
                 .frame(width: 200)
             }
         }
+    }
+}
+
+struct KeyboardShortcutRecorder: NSViewRepresentable {
+    let onShortcutRecorded: (String) -> Void
+    let onCancel: () -> Void
+    
+    func makeNSView(context: Context) -> ShortcutRecorderView {
+        let view = ShortcutRecorderView()
+        view.onShortcutRecorded = onShortcutRecorded
+        view.onCancel = onCancel
+        return view
+    }
+    
+    func updateNSView(_ nsView: ShortcutRecorderView, context: Context) {
+        // Ensure the view can become first responder
+        DispatchQueue.main.async {
+            nsView.window?.makeFirstResponder(nsView)
+        }
+    }
+}
+
+class ShortcutRecorderView: NSView {
+    var onShortcutRecorded: ((String) -> Void)?
+    var onCancel: (() -> Void)?
+    
+    private var isRecording = false
+    private var eventMonitor: Any?
+    
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setupView()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupView()
+    }
+    
+    private func setupView() {
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.controlBackgroundColor.cgColor
+        layer?.cornerRadius = 6
+        layer?.borderColor = NSColor.controlAccentColor.cgColor
+        layer?.borderWidth = 2
+        
+        isRecording = true
+        startEventMonitoring()
+    }
+    
+    override var acceptsFirstResponder: Bool {
+        return true
+    }
+    
+    override func becomeFirstResponder() -> Bool {
+        return true
+    }
+    
+    private func startEventMonitoring() {
+        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
+            guard let self = self, self.isRecording else { return event }
+            
+            if event.type == .keyDown {
+                // Ignore modifier-only key presses and escape
+                if event.keyCode == 53 { // Escape key
+                    self.stopEventMonitoring()
+                    self.onCancel?()
+                    return nil
+                }
+                
+                // Ignore modifier-only key presses
+                let modifierKeyCodes: Set<UInt16> = [55, 56, 58, 59, 60, 61, 62]
+                if modifierKeyCodes.contains(event.keyCode) {
+                    return nil
+                }
+                
+                let shortcutString = self.formatKeyEvent(event)
+                self.stopEventMonitoring()
+                self.onShortcutRecorded?(shortcutString)
+                self.isRecording = false
+                return nil
+            }
+            
+            return event
+        }
+    }
+    
+    private func stopEventMonitoring() {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+    }
+    
+    deinit {
+        stopEventMonitoring()
+    }
+    
+    override func keyDown(with event: NSEvent) {
+        // This will be handled by the event monitor
+        super.keyDown(with: event)
+    }
+    
+    override func flagsChanged(with event: NSEvent) {
+        // Handle modifier keys - but don't record modifier-only shortcuts
+        super.flagsChanged(with: event)
+    }
+    
+    private func formatKeyEvent(_ event: NSEvent) -> String {
+        var components: [String] = []
+        
+        // Add modifiers
+        if event.modifierFlags.contains(.command) {
+            components.append("cmd")
+        }
+        if event.modifierFlags.contains(.option) {
+            components.append("opt")
+        }
+        if event.modifierFlags.contains(.control) {
+            components.append("ctrl")
+        }
+        if event.modifierFlags.contains(.shift) {
+            components.append("shift")
+        }
+        
+        // Add the key
+        let keyString = keyCodeToString(event.keyCode)
+        if !keyString.isEmpty {
+            components.append(keyString)
+        }
+        
+        return components.joined(separator: "+")
+    }
+    
+    private func keyCodeToString(_ keyCode: UInt16) -> String {
+        switch keyCode {
+        case 0: return "a"
+        case 1: return "s"
+        case 2: return "d"
+        case 3: return "f"
+        case 4: return "h"
+        case 5: return "g"
+        case 6: return "z"
+        case 7: return "x"
+        case 8: return "c"
+        case 9: return "v"
+        case 11: return "b"
+        case 12: return "q"
+        case 13: return "w"
+        case 14: return "e"
+        case 15: return "r"
+        case 16: return "y"
+        case 17: return "t"
+        case 18: return "1"
+        case 19: return "2"
+        case 20: return "3"
+        case 21: return "4"
+        case 22: return "6"
+        case 23: return "5"
+        case 24: return "="
+        case 25: return "9"
+        case 26: return "7"
+        case 27: return "-"
+        case 28: return "8"
+        case 29: return "0"
+        case 30: return "]"
+        case 31: return "o"
+        case 32: return "u"
+        case 33: return "["
+        case 34: return "i"
+        case 35: return "p"
+        case 36: return "return"
+        case 37: return "l"
+        case 38: return "j"
+        case 39: return "'"
+        case 40: return "k"
+        case 41: return ";"
+        case 42: return "\\"
+        case 43: return ","
+        case 44: return "/"
+        case 45: return "n"
+        case 46: return "m"
+        case 47: return "."
+        case 48: return "tab"
+        case 49: return "space"
+        case 50: return "`"
+        case 51: return "delete"
+        case 53: return "escape"
+        case 123: return "left"
+        case 124: return "right"
+        case 125: return "down"
+        case 126: return "up"
+        default: return ""
+        }
+    }
+    
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        
+        let text = "Press shortcut keys..."
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 14),
+            .foregroundColor: NSColor.secondaryLabelColor
+        ]
+        
+        let textSize = text.size(withAttributes: attributes)
+        let textRect = NSRect(
+            x: (bounds.width - textSize.width) / 2,
+            y: (bounds.height - textSize.height) / 2,
+            width: textSize.width,
+            height: textSize.height
+        )
+        
+        text.draw(in: textRect, withAttributes: attributes)
+    }
+    
+    override func mouseDown(with event: NSEvent) {
+        // Cancel recording on click outside
+        onCancel?()
     }
 }
 

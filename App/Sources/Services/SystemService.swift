@@ -76,26 +76,34 @@ final class SystemService: ObservableObject {
         var registeredKeys: [String] = []
         let config = ConfigService.shared.config
         
+        // Register profile shortcuts (1-9)
         for (index, descriptor) in profiles.prefix(9).enumerated() {
             let profileKey = "profile\(index + 1)"
-            guard let shortcutString = config.shortcuts.profileShortcuts[profileKey] else { continue }
+            guard let shortcutString = config.shortcuts.profileShortcuts[profileKey] else { 
+                print("No shortcut configured for \(profileKey)")
+                continue 
+            }
             
             do {
                 let combo = try parseKeyCombo(shortcutString)
                 let hotKey = HotKey(keyCombo: combo)
                 
                 hotKey.keyDownHandler = { 
+                    print("Profile hotkey triggered: \(shortcutString) → \(descriptor.profile.name)")
                     onTrigger(descriptor) 
                 }
                 
                 hotkeys.append(hotKey)
                 registeredKeys.append("\(shortcutString) → \(descriptor.profile.name)")
+                print("Successfully registered hotkey: \(shortcutString) → \(descriptor.profile.name)")
                 
             } catch {
+                print("Failed to register profile hotkey '\(shortcutString)' for \(descriptor.profile.name): \(error)")
                 continue
             }
         }
         
+        // Register individual profile hotkeys
         for descriptor in profiles {
             guard let comboString = descriptor.profile.hotkey else { continue }
             
@@ -103,60 +111,75 @@ final class SystemService: ObservableObject {
                 let combo = try parseKeyCombo(comboString)
                 let hotKey = HotKey(keyCombo: combo)
                 hotKey.keyDownHandler = { 
+                    print("Individual profile hotkey triggered: \(comboString) → \(descriptor.profile.name)")
                     onTrigger(descriptor) 
                 }
                 hotkeys.append(hotKey)
                 registeredKeys.append("\(comboString) → \(descriptor.profile.name)")
+                print("Successfully registered individual hotkey: \(comboString) → \(descriptor.profile.name)")
                 
             } catch {
+                print("Failed to register individual hotkey '\(comboString)' for \(descriptor.profile.name): \(error)")
             }
         }
         
         DispatchQueue.main.async {
             self.registeredHotKeys = registeredKeys
+            print("Total registered hotkeys: \(registeredKeys.count)")
         }
     }
     
     func registerNavigationHotKeys(onNextProfile: @escaping () -> Void, onPreviousProfile: @escaping () -> Void, onReloadProfiles: @escaping () -> Void) {
         let config = ConfigService.shared.config
         
-        
         // Register Next Profile hotkey
-        if !config.shortcuts.navigationShortcuts.nextProfile.isEmpty {
+        let nextProfileShortcut = config.shortcuts.navigationShortcuts.nextProfile
+        if !nextProfileShortcut.isEmpty {
             do {
-                let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.nextProfile)
+                let combo = try parseKeyCombo(nextProfileShortcut)
                 let hotKey = HotKey(keyCombo: combo)
                 hotKey.keyDownHandler = {
+                    print("Next profile hotkey triggered: \(nextProfileShortcut)")
                     onNextProfile()
                 }
                 hotkeys.append(hotKey)
+                print("Successfully registered navigation hotkey: \(nextProfileShortcut) → Next Profile")
             } catch {
+                print("Failed to register next profile hotkey '\(nextProfileShortcut)': \(error)")
             }
         }
         
         // Register Previous Profile hotkey
-        if !config.shortcuts.navigationShortcuts.previousProfile.isEmpty {
+        let previousProfileShortcut = config.shortcuts.navigationShortcuts.previousProfile
+        if !previousProfileShortcut.isEmpty {
             do {
-                let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.previousProfile)
+                let combo = try parseKeyCombo(previousProfileShortcut)
                 let hotKey = HotKey(keyCombo: combo)
                 hotKey.keyDownHandler = {
+                    print("Previous profile hotkey triggered: \(previousProfileShortcut)")
                     onPreviousProfile()
                 }
                 hotkeys.append(hotKey)
+                print("Successfully registered navigation hotkey: \(previousProfileShortcut) → Previous Profile")
             } catch {
+                print("Failed to register previous profile hotkey '\(previousProfileShortcut)': \(error)")
             }
         }
         
         // Register Reload Profiles hotkey
-        if !config.shortcuts.navigationShortcuts.reloadProfiles.isEmpty {
+        let reloadProfilesShortcut = config.shortcuts.navigationShortcuts.reloadProfiles
+        if !reloadProfilesShortcut.isEmpty {
             do {
-                let combo = try parseKeyCombo(config.shortcuts.navigationShortcuts.reloadProfiles)
+                let combo = try parseKeyCombo(reloadProfilesShortcut)
                 let hotKey = HotKey(keyCombo: combo)
                 hotKey.keyDownHandler = {
+                    print("Reload profiles hotkey triggered: \(reloadProfilesShortcut)")
                     onReloadProfiles()
                 }
                 hotkeys.append(hotKey)
+                print("Successfully registered navigation hotkey: \(reloadProfilesShortcut) → Reload Profiles")
             } catch {
+                print("Failed to register reload profiles hotkey '\(reloadProfilesShortcut)': \(error)")
             }
         }
     }
@@ -170,7 +193,7 @@ final class SystemService: ObservableObject {
     
     func validateHotKey(_ keyString: String) -> Bool {
         do {
-            let combo = try parseKeyCombo(keyString)
+            _ = try parseKeyCombo(keyString)
             return true
         } catch {
             return false
@@ -298,7 +321,11 @@ final class SystemService: ObservableObject {
 private extension SystemService {
     
     func parseKeyCombo(_ string: String) throws -> KeyCombo {
-        let parts = string.lowercased().split(separator: "+").map { String($0) }
+        let trimmedString = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = trimmedString.lowercased().split(separator: "+").map { 
+            String($0).trimmingCharacters(in: .whitespacesAndNewlines) 
+        }
+        
         guard !parts.isEmpty else { 
             throw SystemServiceError.hotKeyParsingFailed(string) 
         }
@@ -310,30 +337,43 @@ private extension SystemService {
             switch part {
             case "ctrl", "control": 
                 modifiers.insert(.control)
-            case "cmd", "command": 
+            case "cmd", "command", "⌘": 
                 modifiers.insert(.command)
-            case "opt", "option", "alt": 
+            case "opt", "option", "alt", "⌥": 
                 modifiers.insert(.option)
-            case "shift": 
+            case "shift", "⇧": 
                 modifiers.insert(.shift)
+            case "fn", "function":
+                modifiers.insert(.function)
             default: 
-                keyString = part
+                // Only set keyString if it hasn't been set yet (last non-modifier wins)
+                if keyString == nil || !isModifierString(part) {
+                    keyString = part
+                }
             }
         }
         
-        guard let keyString = keyString else { 
+        guard let finalKeyString = keyString, !finalKeyString.isEmpty else { 
             throw SystemServiceError.hotKeyParsingFailed(string) 
         }
         
-        guard let key = mapKey(keyString) else { 
-            throw SystemServiceError.hotKeyParsingFailed(string) 
+        guard let key = mapKey(finalKeyString) else { 
+            throw SystemServiceError.hotKeyParsingFailed("\(string) - unrecognized key: '\(finalKeyString)'") 
         }
         
         return KeyCombo(key: key, modifiers: modifiers)
     }
     
+    private func isModifierString(_ string: String) -> Bool {
+        let modifierStrings = ["ctrl", "control", "cmd", "command", "⌘", "opt", "option", "alt", "⌥", "shift", "⇧", "fn", "function"]
+        return modifierStrings.contains(string.lowercased())
+    }
+    
     func mapKey(_ s: String) -> Key? {
-        if let number = Int(s), (0...9).contains(number) {
+        let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Handle numbers
+        if let number = Int(trimmed), (0...9).contains(number) {
             switch number {
             case 0: return .zero
             case 1: return .one
@@ -349,7 +389,8 @@ private extension SystemService {
             }
         }
         
-        if s.count == 1, let c = s.uppercased().unicodeScalars.first {
+        // Handle single character keys
+        if trimmed.count == 1, let c = trimmed.uppercased().unicodeScalars.first {
             switch c {
             case "A": return .a
             case "B": return .b
@@ -392,20 +433,21 @@ private extension SystemService {
             }
         }
         
-        switch s.uppercased() {
-        case "SPACE": return .space
+        // Handle special keys and aliases
+        switch trimmed.uppercased() {
+        case "SPACE", " ": return .space
         case "TAB": return .tab
         case "RETURN", "ENTER": return .return
         case "ESCAPE", "ESC": return .escape
-        case "DELETE", "DEL": return .delete
-        case "UP": return .upArrow
-        case "DOWN": return .downArrow
-        case "LEFT": return .leftArrow
-        case "RIGHT": return .rightArrow
+        case "DELETE", "DEL", "BACKSPACE": return .delete
+        case "UP", "UPARROW": return .upArrow
+        case "DOWN", "DOWNARROW": return .downArrow
+        case "LEFT", "LEFTARROW": return .leftArrow
+        case "RIGHT", "RIGHTARROW": return .rightArrow
         case "HOME": return .home
         case "END": return .end
-        case "PAGEUP": return .pageUp
-        case "PAGEDOWN": return .pageDown
+        case "PAGEUP", "PGUP": return .pageUp
+        case "PAGEDOWN", "PGDN": return .pageDown
         case "F1": return .f1
         case "F2": return .f2
         case "F3": return .f3
@@ -418,6 +460,18 @@ private extension SystemService {
         case "F10": return .f10
         case "F11": return .f11
         case "F12": return .f12
+        // Additional common special characters
+        case "[", "LEFTBRACKET": return .leftBracket
+        case "]", "RIGHTBRACKET": return .rightBracket
+        case "\\", "BACKSLASH": return .backslash
+        case ";", "SEMICOLON": return .semicolon
+        case "'", "QUOTE", "APOSTROPHE": return .quote
+        case ",", "COMMA": return .comma
+        case ".", "PERIOD", "DOT": return .period
+        case "/", "SLASH": return .slash
+        case "`", "GRAVE", "BACKTICK": return .grave
+        case "-", "MINUS", "DASH", "HYPHEN": return .minus
+        case "=", "EQUAL", "EQUALS": return .equal
         default: return nil
         }
     }

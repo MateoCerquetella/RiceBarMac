@@ -697,6 +697,74 @@ final class ProfileService: ObservableObject {
             return nil
         }
     }
+    
+    // MARK: - Config Saving
+    
+    func saveCurrentConfigToActiveProfile() throws {
+        guard let activeProfile = activeProfile else {
+            throw ProfileServiceError.profileNotFound("No active profile to save to")
+        }
+        
+        try saveAllIDEConfigsToProfile(activeProfile)
+    }
+    
+    func saveCurrentConfigToSpecificProfile(_ descriptor: ProfileDescriptor) throws {
+        try saveAllIDEConfigsToProfile(descriptor)
+    }
+    
+    private func saveAllIDEConfigsToProfile(_ descriptor: ProfileDescriptor) throws {
+        try saveIDEConfigToProfile(descriptor)
+    }
+    
+    private func saveIDEConfigToProfile(_ descriptor: ProfileDescriptor) throws {
+        let fm = FileManager.default
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        
+        let vscodeConfigDir = home.appendingPathComponent(Constants.IDEType.vscode.configDirectory)
+        let vscodeSettings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.settingsFile)
+        let vscodeKeybindings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.keybindingsFile)
+        
+        if fm.fileExists(atPath: vscodeSettings.path) {
+            let profileVSCodeDir = descriptor.directory.appendingPathComponent("vscode")
+            try fm.createDirectory(at: profileVSCodeDir, withIntermediateDirectories: true)
+            
+            let profileVSCodeSettings = profileVSCodeDir.appendingPathComponent("settings.json")
+            let profileVSCodeKeybindings = profileVSCodeDir.appendingPathComponent("keybindings.json")
+            
+            if !fileSystemService.isSymlink(vscodeSettings) {
+                try? fm.removeItem(at: profileVSCodeSettings)
+                try fm.copyItem(at: vscodeSettings, to: profileVSCodeSettings)
+            }
+            
+            if fm.fileExists(atPath: vscodeKeybindings.path) && !fileSystemService.isSymlink(vscodeKeybindings) {
+                try? fm.removeItem(at: profileVSCodeKeybindings)
+                try fm.copyItem(at: vscodeKeybindings, to: profileVSCodeKeybindings)
+            }
+        }
+        
+        // Save Cursor settings
+        let cursorConfigDir = home.appendingPathComponent(Constants.IDEType.cursor.configDirectory)
+        let cursorSettings = cursorConfigDir.appendingPathComponent(Constants.IDEType.cursor.settingsFile)
+        let cursorKeybindings = cursorConfigDir.appendingPathComponent(Constants.IDEType.cursor.keybindingsFile)
+        
+        if fm.fileExists(atPath: cursorSettings.path) {
+            let profileCursorDir = descriptor.directory.appendingPathComponent("cursor")
+            try fm.createDirectory(at: profileCursorDir, withIntermediateDirectories: true)
+            
+            let profileCursorSettings = profileCursorDir.appendingPathComponent("settings.json")
+            let profileCursorKeybindings = profileCursorDir.appendingPathComponent("keybindings.json")
+            
+            if !fileSystemService.isSymlink(cursorSettings) {
+                try? fm.removeItem(at: profileCursorSettings)
+                try fm.copyItem(at: cursorSettings, to: profileCursorSettings)
+            }
+            
+            if fm.fileExists(atPath: cursorKeybindings.path) && !fileSystemService.isSymlink(cursorKeybindings) {
+                try? fm.removeItem(at: profileCursorKeybindings)
+                try fm.copyItem(at: cursorKeybindings, to: profileCursorKeybindings)
+            }
+        }
+    }
 }
 
 
@@ -1778,74 +1846,6 @@ private extension ProfileService {
                     if extensions.count > 10 {
                     }
                 }
-            }
-        }
-    }
-    
-    // MARK: - Config Saving
-    
-    public func saveCurrentConfigToActiveProfile() throws {
-        guard let activeProfile = activeProfile else {
-            throw ProfileServiceError.profileNotFound("No active profile to save to")
-        }
-        
-        try saveAllIDEConfigsToProfile(activeProfile)
-    }
-    
-    public func saveCurrentConfigToSpecificProfile(_ descriptor: ProfileDescriptor) throws {
-        try saveAllIDEConfigsToProfile(descriptor)
-    }
-    
-    func saveAllIDEConfigsToProfile(_ descriptor: ProfileDescriptor) throws {
-        try saveIDEConfigToProfile(descriptor)
-    }
-    
-    func saveIDEConfigToProfile(_ descriptor: ProfileDescriptor) throws {
-        let fm = FileManager.default
-        let home = URL(fileURLWithPath: NSHomeDirectory())
-        
-        let vscodeConfigDir = home.appendingPathComponent(Constants.IDEType.vscode.configDirectory)
-        let vscodeSettings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.settingsFile)
-        let vscodeKeybindings = vscodeConfigDir.appendingPathComponent(Constants.IDEType.vscode.keybindingsFile)
-        
-        if fm.fileExists(atPath: vscodeSettings.path) {
-            let profileVSCodeDir = descriptor.directory.appendingPathComponent("vscode")
-            try fm.createDirectory(at: profileVSCodeDir, withIntermediateDirectories: true)
-            
-            let profileVSCodeSettings = profileVSCodeDir.appendingPathComponent("settings.json")
-            let profileVSCodeKeybindings = profileVSCodeDir.appendingPathComponent("keybindings.json")
-            
-            if !fileSystemService.isSymlink(vscodeSettings) {
-                try? fm.removeItem(at: profileVSCodeSettings)
-                try fm.copyItem(at: vscodeSettings, to: profileVSCodeSettings)
-            }
-            
-            if fm.fileExists(atPath: vscodeKeybindings.path) && !fileSystemService.isSymlink(vscodeKeybindings) {
-                try? fm.removeItem(at: profileVSCodeKeybindings)
-                try fm.copyItem(at: vscodeKeybindings, to: profileVSCodeKeybindings)
-            }
-        }
-        
-        // Save Cursor settings
-        let cursorConfigDir = home.appendingPathComponent(Constants.IDEType.cursor.configDirectory)
-        let cursorSettings = cursorConfigDir.appendingPathComponent(Constants.IDEType.cursor.settingsFile)
-        let cursorKeybindings = cursorConfigDir.appendingPathComponent(Constants.IDEType.cursor.keybindingsFile)
-        
-        if fm.fileExists(atPath: cursorSettings.path) {
-            let profileCursorDir = descriptor.directory.appendingPathComponent("cursor")
-            try fm.createDirectory(at: profileCursorDir, withIntermediateDirectories: true)
-            
-            let profileCursorSettings = profileCursorDir.appendingPathComponent("settings.json")
-            let profileCursorKeybindings = profileCursorDir.appendingPathComponent("keybindings.json")
-            
-            if !fileSystemService.isSymlink(cursorSettings) {
-                try? fm.removeItem(at: profileCursorSettings)
-                try fm.copyItem(at: cursorSettings, to: profileCursorSettings)
-            }
-            
-            if fm.fileExists(atPath: cursorKeybindings.path) && !fileSystemService.isSymlink(cursorKeybindings) {
-                try? fm.removeItem(at: profileCursorKeybindings)
-                try fm.copyItem(at: cursorKeybindings, to: profileCursorKeybindings)
             }
         }
     }

@@ -19,15 +19,15 @@ struct ShortcutConfig: Codable {
     
     init() {
         self.profileShortcuts = [
-            "profile1": "cmd+1",
-            "profile2": "cmd+2",
-            "profile3": "cmd+3",
-            "profile4": "cmd+4",
-            "profile5": "cmd+5",
-            "profile6": "cmd+6",
-            "profile7": "cmd+7",
-            "profile8": "cmd+8",
-            "profile9": "cmd+9"
+            "profile1": "",
+            "profile2": "",
+            "profile3": "",
+            "profile4": "",
+            "profile5": "",
+            "profile6": "",
+            "profile7": "",
+            "profile8": "",
+            "profile9": ""
         ]
         self.navigationShortcuts = NavigationShortcuts()
         self.quickActions = QuickActionShortcuts()
@@ -41,10 +41,10 @@ struct NavigationShortcuts: Codable {
     var reloadProfiles: String
     
     init() {
-        self.nextProfile = "cmd+]"
-        self.previousProfile = "cmd+["
-        self.openProfilesFolder = "cmd+o"
-        self.reloadProfiles = "cmd+r"
+        self.nextProfile = ""
+        self.previousProfile = ""
+        self.openProfilesFolder = ""
+        self.reloadProfiles = ""
     }
 }
 
@@ -55,10 +55,10 @@ struct QuickActionShortcuts: Codable {
     var quitApp: String
     
     init() {
-        self.createEmptyProfile = "cmd+e"
-        self.createFromCurrentSetup = "cmd+n"
-        self.openSettings = "cmd+,"
-        self.quitApp = "cmd+q"
+        self.createEmptyProfile = ""
+        self.createFromCurrentSetup = ""
+        self.openSettings = ""
+        self.quitApp = ""
     }
 }
 
