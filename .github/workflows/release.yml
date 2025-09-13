@@ -144,47 +144,41 @@ jobs:
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
         
-        # Update the formula
-        cat > Formula/ricebarmac.rb << EOF
-        class Ricebarmac < Formula
+        # Update the cask
+        cat > Casks/ricebarmac.rb << EOF
+        cask "ricebarmac" do
+          version "${{ steps.version.outputs.version }}"
+          sha256 "${{ steps.checksum.outputs.sha256 }}"
+          
+          url "https://github.com/mateocerquetella/RiceBarMac/releases/download/v${{ steps.version.outputs.version }}/RiceBarMac.zip"
+          name "RiceBarMac"
           desc "macOS menu bar app for managing rice configurations"
           homepage "https://github.com/mateocerquetella/RiceBarMac"
-          url "https://github.com/mateocerquetella/RiceBarMac/releases/download/v${{ steps.version.outputs.version }}/RiceBarMac.zip"
-          sha256 "${{ steps.checksum.outputs.sha256 }}"
-          version "${{ steps.version.outputs.version }}"
-          
-          
-          def install
-            app = Pathname.pwd/"RiceBarMac.app"
-            target = "/Applications/RiceBarMac.app"
+
+          depends_on macos: ">= :big_sur"
+
+          app "RiceBarMac.app"
+
+          zap trash: [
+            "~/.ricebarmac",
+            "~/Library/Preferences/com.mateocerquetella.RiceBarMac.plist",
+          ]
+
+          caveats <<~EOS
+            RiceBarMac is a menu bar application.
             
-            # Remove existing app if it exists
-            system "rm", "-rf", target if File.exist?(target)
+            The app will appear in your menu bar (top right) with a rice bowl icon 🍚
             
-            # Copy the app to Applications
-            system "cp", "-R", app.to_s, "/Applications/"
-          end
-          
-          def caveats
-            <<~EOS
-              RiceBarMac is a menu bar application.
-              
-              To start RiceBarMac:
-                open -a RiceBarMac
-              
-              The app will appear in your menu bar (top right) with a rice bowl icon 🍚
-              
-              To start automatically on login:
-                - Open the app and go to Settings
-                - Enable "Launch at Login"
-              
-              Note: You may need to grant accessibility permissions when first launched.
-            EOS
-          end
+            To start automatically on login:
+              - Open the app and go to Settings
+              - Enable "Launch at Login"
+            
+            Note: You may need to grant accessibility permissions when first launched.
+          EOS
         end
         EOF
         
         # Commit and push changes
-        git add Formula/ricebarmac.rb
-        git commit -m "Update formula to version ${{ steps.version.outputs.version }}"
+        git add Casks/ricebarmac.rb
+        git commit -m "Update cask to version ${{ steps.version.outputs.version }}"
         git push https://x-access-token:${{ secrets.HOMEBREW_GITHUB_TOKEN }}@github.com/mateocerquetella/homebrew-ricebarmac.git main
