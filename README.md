@@ -101,7 +101,21 @@ RiceBarMac operates as a **symlink-based overlay system** that manages your rice
 -   macOS 14.0 or later
 -   Xcode 15.0+ (for development)
 
-### Quick Start
+### Quick Install via Homebrew (Recommended)
+
+```bash
+brew install --cask mateocerquetella/ricebarmac/ricebarmac
+```
+
+### Manual Installation
+
+#### Option 1: Download Pre-built Release
+
+1. Download the latest `RiceBarMac.zip` from [Releases](https://github.com/MateoCerquetella/RiceBarMac/releases)
+2. Extract and move `RiceBarMac.app` to `/Applications/`
+3. Launch the app - it will appear in your menu bar 🍚
+
+#### Option 2: Build from Source
 
 1. **Clone the repository**
 
