@@ -155,8 +155,9 @@ jobs:
           
           
           def install
-            # Install the menu bar app to Applications folder
-            system "cp", "-R", "RiceBarMac.app", "/Applications/"
+            # Install to prefix first, then create symlink to Applications
+            prefix.install "RiceBarMac.app"
+            (Applications/"RiceBarMac.app").install_symlink prefix/"RiceBarMac.app"
           end
           
           def caveats
@@ -164,7 +165,7 @@ jobs:
               RiceBarMac is a menu bar application.
               
               To start RiceBarMac:
-                open /Applications/RiceBarMac.app
+                open -a RiceBarMac
               
               The app will appear in your menu bar (top right) with a rice bowl icon 🍚
               
