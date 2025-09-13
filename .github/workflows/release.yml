@@ -155,9 +155,14 @@ jobs:
           
           
           def install
-            # Install to prefix first, then create symlink to Applications
-            prefix.install "RiceBarMac.app"
-            (Applications/"RiceBarMac.app").install_symlink prefix/"RiceBarMac.app"
+            app = Pathname.pwd/"RiceBarMac.app"
+            target = "/Applications/RiceBarMac.app"
+            
+            # Remove existing app if it exists
+            system "rm", "-rf", target if File.exist?(target)
+            
+            # Copy the app to Applications
+            system "cp", "-R", app.to_s, "/Applications/"
           end
           
           def caveats
