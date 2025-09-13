@@ -648,6 +648,55 @@ final class ProfileService: ObservableObject {
         
         return Date.distantPast
     }
+    
+    func getCurrentWallpaper() -> URL? {
+        guard let mainScreen = NSScreen.main else { return nil }
+        
+        do {
+            guard let wallpaperURL = try NSWorkspace.shared.desktopImageURL(for: mainScreen) else {
+                return nil
+            }
+            
+            if FileManager.default.fileExists(atPath: wallpaperURL.path) {
+                return wallpaperURL
+            } else {
+                return nil
+            }
+        } catch {
+            
+            return getCurrentWallpaperViaAppleScript()
+        }
+    }
+    
+    private func getCurrentWallpaperViaAppleScript() -> URL? {
+        let script = """
+        tell application "System Events"
+            tell current desktop
+                get picture
+            end tell
+        end tell
+        """
+        
+        var errorDict: NSDictionary?
+        guard let appleScript = NSAppleScript(source: script) else { return nil }
+        
+        let result = appleScript.executeAndReturnError(&errorDict)
+        
+        if let errorDict = errorDict {
+            return nil
+        }
+        
+        guard let wallpaperPath = result.stringValue, !wallpaperPath.isEmpty else {
+            return nil
+        }
+        
+        let wallpaperURL = URL(fileURLWithPath: wallpaperPath)
+        if FileManager.default.fileExists(atPath: wallpaperURL.path) {
+            return wallpaperURL
+        } else {
+            return nil
+        }
+    }
 }
 
 
@@ -889,6 +938,7 @@ private extension ProfileService {
             } else {
                 throw ProfileServiceError.wallpaperSetFailed(NSError(domain: "AppleScript", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create AppleScript"]))
             }
+        }
         
         // Multiple strategies to ensure wallpaper change is visible
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -1500,55 +1550,6 @@ private extension ProfileService {
         let quotedPath = "'\(url.path.replacingOccurrences(of: "'", with: "'\\''"))'"
         process.arguments = ["-lc", quotedPath]
         try process.run()
-    }
-    
-    func getCurrentWallpaper() -> URL? {
-        guard let mainScreen = NSScreen.main else { return nil }
-        
-        do {
-            guard let wallpaperURL = try NSWorkspace.shared.desktopImageURL(for: mainScreen) else {
-                return nil
-            }
-            
-            if FileManager.default.fileExists(atPath: wallpaperURL.path) {
-                return wallpaperURL
-            } else {
-                return nil
-            }
-        } catch {
-            
-            return getCurrentWallpaperViaAppleScript()
-        }
-    }
-    
-    private func getCurrentWallpaperViaAppleScript() -> URL? {
-        let script = """
-        tell application "System Events"
-            tell current desktop
-                get picture
-            end tell
-        end tell
-        """
-        
-        var errorDict: NSDictionary?
-        guard let appleScript = NSAppleScript(source: script) else { return nil }
-        
-        let result = appleScript.executeAndReturnError(&errorDict)
-        
-        if let errorDict = errorDict {
-            return nil
-        }
-        
-        guard let wallpaperPath = result.stringValue, !wallpaperPath.isEmpty else {
-            return nil
-        }
-        
-        let wallpaperURL = URL(fileURLWithPath: wallpaperPath)
-        if FileManager.default.fileExists(atPath: wallpaperURL.path) {
-            return wallpaperURL
-        } else {
-            return nil
-        }
     }
     
     
