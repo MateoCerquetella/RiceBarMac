@@ -1,6 +1,8 @@
 <div align="center">
   
-  # 🍚 RiceBarMac
+  <img src="docs/assets/ricebarmac-icon.png" alt="RiceBarMac Icon" width="128" height="128">
+  
+  # RiceBarMac
   
   ### Lightning-fast macOS menu bar app for effortless desktop profile switching
   
@@ -22,7 +24,7 @@ RiceBarMac operates as a **symlink-based overlay system** that manages your rice
 
 ### 🎯 **Core Functionality**
 
--   **Menu Bar Integration**: Runs silently in your menu bar with a rice bowl icon 🍚
+-   **Menu Bar Integration**: Runs silently in your menu bar with a rice bowl icon
 -   **Profile Management**: Stores rice configurations in `~/.ricebarmac/profiles/`
 -   **Symlink Management**: Creates symbolic links from profile files to your actual system locations
 -   **Hotkey Registration**: Uses macOS global hotkey system for instant switching
@@ -71,7 +73,7 @@ RiceBarMac operates as a **symlink-based overlay system** that manages your rice
 
 ### 🎨 **Profile Management**
 
--   **Menu Bar Interface**: Clean, accessible menu bar app with rice bowl icon 🍚
+-   **Menu Bar Interface**: Clean, accessible menu bar app with rice bowl icon
 -   **Multiple Profiles**: Create and manage unlimited rice profiles
 -   **Instant Switching**: Switch between profiles with keyboard shortcuts or menu clicks
 -   **Profile Ordering**: Customize the order of profiles in the menu via `order` property
@@ -117,7 +119,7 @@ brew install --cask ricebarmac
 
 1. Download the latest `RiceBarMac.zip` from [Releases](https://github.com/MateoCerquetella/RiceBarMac/releases)
 2. Extract and move `RiceBarMac.app` to `/Applications/`
-3. Launch the app - it will appear in your menu bar 🍚
+3. Launch the app - it will appear in your menu bar
 
 #### Option 2: Build from Source
 
