@@ -14,6 +14,8 @@
   
 </div>
 
+> **⚠️ BETA WARNING**: RiceBarMac is currently in beta. Please backup your `.config` directory and any important configuration files before use. The author is not responsible for any data loss or system damage. Use at your own risk.
+
 ## 🚀 Overview
 
 RiceBarMac is a powerful macOS menu bar application that manages your **desktop rice configurations** by creating symbolic links from profile directories to your actual system locations. It's designed for developers and power users who maintain multiple aesthetic setups and want to switch between them instantly using keyboard shortcuts.
