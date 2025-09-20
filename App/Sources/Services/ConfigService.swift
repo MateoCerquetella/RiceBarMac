@@ -33,7 +33,7 @@ final class ConfigService: ObservableObject {
     
     private init() {
         let homeURL = FileManager.default.homeDirectoryForCurrentUser
-        let riceBarURL = homeURL.appendingPathComponent(".ricebar")
+        let riceBarURL = homeURL.appendingPathComponent(".ricebarmac")
         self.configURL = riceBarURL.appendingPathComponent("config.json")
         
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -41,7 +41,7 @@ final class ConfigService: ObservableObject {
         do {
             try FileManager.default.createDirectory(at: riceBarURL, withIntermediateDirectories: true)
         } catch {
-            print("Warning: Could not create .ricebar directory: \(error)")
+            print("Warning: Could not create .ricebarmac directory: \(error)")
         }
         
         self.config = Self.loadConfig(from: configURL) ?? .default
