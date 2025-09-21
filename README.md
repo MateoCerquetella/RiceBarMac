@@ -25,12 +25,12 @@ RiceBarMac is a powerful macOS menu bar application that manages your **desktop 
 ### Terminal Configuration Switching
 See how RiceBarMac instantly switches terminal configurations and themes:
 
-https://github.com/user-attachments/assets/video1.mov
+https://github.com/MateoCerquetella/RiceBarMac/blob/main/docs/assets/video1.mov
 
 ### IDE Integration with VS Code and Cursor
 Watch RiceBarMac seamlessly manage IDE settings and themes:
 
-https://github.com/user-attachments/assets/video2.mov
+https://github.com/MateoCerquetella/RiceBarMac/blob/main/docs/assets/video2.mov
 
 ## 🔧 How It Works
 
