@@ -20,6 +20,18 @@
 
 RiceBarMac is a powerful macOS menu bar application that manages your **desktop rice configurations** by creating symbolic links from profile directories to your actual system locations. It's designed for developers and power users who maintain multiple aesthetic setups and want to switch between them instantly using keyboard shortcuts.
 
+## 📺 Demo
+
+### Terminal Configuration Switching
+See how RiceBarMac instantly switches terminal configurations and themes:
+
+https://github.com/user-attachments/assets/video1.mov
+
+### IDE Integration with VS Code and Cursor
+Watch RiceBarMac seamlessly manage IDE settings and themes:
+
+https://github.com/user-attachments/assets/video2.mov
+
 ## 🔧 How It Works
 
 RiceBarMac operates as a **symlink-based overlay system** that manages your rice configurations:
