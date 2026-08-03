@@ -293,6 +293,7 @@ struct SettingsGeneralTabView: View {
                                     Button(descriptor.displayName) {
                                         viewModel.applyProfile(descriptor)
                                     }
+                                    .accessibilityIdentifier("preview-profile-\(descriptor.id)")
                                 }
                             }
                             .disabled(viewModel.sortedProfiles.isEmpty || viewModel.isApplying)
@@ -345,7 +346,9 @@ struct SettingsGeneralTabView: View {
                                         .font(.caption)
                                         .foregroundColor(.red)
                                         .textSelection(.enabled)
-                                        .accessibilityLabel("Invalid profile \(invalid.directory.lastPathComponent): \(invalid.message)")
+                                        .accessibilityElement(children: .ignore)
+                                        .accessibilityLabel("Invalid profile \(invalid.directory.lastPathComponent)")
+                                        .accessibilityValue(invalid.message)
                                         .accessibilityIdentifier("invalid-profile-\(invalid.directory.lastPathComponent)")
                                 }
                             }
