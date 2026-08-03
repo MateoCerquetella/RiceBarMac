@@ -1,0 +1,8 @@
+[
+  {
+    "criterionId": "all",
+    "kind": "review",
+    "passed": true,
+    "summary": "Independent review of the complete b766314..e1d2616789102551d717f94317aa6b99f3eccede diff, accepted decisions, workflows, source, tests, documentation, verification evidence, exact-main GitHub state, and downloaded public artifact found no blocking or non-blocking defects. AC-1 through AC-9 are satisfied: 0.20 (120) is consistent; requested warning copy and tracked/release-metadata emojis are absent; legacy user icon decoding remains compatible; signed-release gates are preserved; PR, main, and publisher runs succeeded; the public checksum, ZIP, plist, architecture, and unsigned-state checks pass; v1.2.0 is absent; no normal signed workflow ran; Homebrew remains 0.1.0-beta; and CLAUDE.md is outside the diff."
+  }
+]
