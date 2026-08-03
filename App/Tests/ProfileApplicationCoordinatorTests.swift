@@ -22,6 +22,7 @@ private final class SnapshotRecorder: @unchecked Sendable {
 final class ProfileApplicationCoordinatorTests: XCTestCase {
     func testConcurrentRequestsAreQueuedAndNeverMutateTogether() async throws {
         let home = try TemporaryHome()
+        _ = try home.createDirectory(".config")
         let firstDestination = home.url.appendingPathComponent(".config/first")
         let secondDestination = home.url.appendingPathComponent(".config/second")
         let firstDescriptor = try makeProfileDescriptor(home: home.url, name: "First", replacementDestination: firstDestination)

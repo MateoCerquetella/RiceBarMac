@@ -78,9 +78,16 @@ final class TransactionStore: TransactionStoring, @unchecked Sendable {
         self.fileSystem = fileSystem
         encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .custom { date, encoder in
+            var container = encoder.singleValueContainer()
+            try container.encode(date.timeIntervalSinceReferenceDate.bitPattern)
+        }
         decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let bitPattern = try container.decode(UInt64.self)
+            return Date(timeIntervalSinceReferenceDate: TimeInterval(bitPattern: bitPattern))
+        }
     }
 
     func journalURL(for id: UUID) -> URL {

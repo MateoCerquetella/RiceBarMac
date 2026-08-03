@@ -88,6 +88,30 @@ final class ProfileTransactionTests: XCTestCase {
         }
     }
 
+    func testStalePlanBeforeFirstMutationRollsBackWithoutRecoveryState() async throws {
+        let home = try TemporaryHome()
+        let destination = home.url.appendingPathComponent(".config/app.conf")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = LiveFileSystemClient()
+        let store = MemoryTransactionStore()
+        let executor = makeExecutor(home: home.url, fileSystem: fileSystem, transactionStore: store)
+        let plan = ProfilePlanner(home: home.url, fileSystem: fileSystem).makePlan(for: descriptor, formerActiveProfilePath: nil)
+        _ = try home.createDirectory(".config")
+
+        do {
+            _ = try await executor.apply(plan)
+            XCTFail("Expected stale-plan rejection")
+        } catch let error as FileSystemClientError {
+            guard case .stalePath = error else {
+                return XCTFail("Expected stalePath, received \(error)")
+            }
+        }
+
+        XCTAssertEqual(try fileSystem.state(at: destination).kind, .absent)
+        XCTAssertTrue(try store.incompleteTransactions().isEmpty)
+        XCTAssertEqual(try store.loadAll().first?.status, .rolledBack)
+    }
+
     func testExternalFailureDoesNotRollbackCommittedFilesystem() async throws {
         let home = try TemporaryHome()
         let destination = try home.write(".config/app.conf", "original")

@@ -309,11 +309,30 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         let backup = URL(fileURLWithPath: action.backupPath)
         let stage = URL(fileURLWithPath: action.stagingPath)
 
+        if record.status == .pending {
+            transaction.actions[index].status = finalStatus
+            transaction.actions[index].errorDescription = nil
+            transaction.updatedAt = now()
+            try transactionStore.save(transaction)
+            return
+        }
+
         if try fileSystem.state(at: stage).exists {
             try fileSystem.removeItem(at: stage)
         }
 
         let backupExists = try fileSystem.state(at: backup).exists
+
+        if record.status == .intentRecorded,
+           record.installedFingerprint == nil,
+           !backupExists {
+            transaction.actions[index].status = finalStatus
+            transaction.actions[index].errorDescription = nil
+            transaction.updatedAt = now()
+            try transactionStore.save(transaction)
+            return
+        }
+
         let current = try fileSystem.state(at: destination)
 
         if let installed = record.installedFingerprint {
