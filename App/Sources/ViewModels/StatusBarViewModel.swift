@@ -232,8 +232,12 @@ final class StatusBarViewModel: ObservableObject {
         Task { @MainActor [weak self] in
             guard let self, self.confirmLegacyMigration() else { return }
             do {
-                _ = try self.profileService.migrateLegacyConfiguration()
-                self.postNotification(title: "Migration Complete", body: "Legacy .ricebar data was copied safely. The original remains available.")
+                let record = try self.profileService.migrateLegacyConfiguration()
+                if let warning = record.errorDescription {
+                    await self.showWarning(title: "Migration Completed with Warning", message: warning)
+                } else {
+                    self.postNotification(title: "Migration Complete", body: "Legacy .ricebar data was copied safely. The original remains available.")
+                }
             } catch {
                 await self.showError(error)
             }

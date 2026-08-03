@@ -120,7 +120,7 @@ final class ProfileTransactionTests: XCTestCase {
         XCTAssertTrue(try store.incompleteTransactions().isEmpty)
     }
 
-    func testRecoveryPreservesDirectoryCreatedAfterIntentCheckpoint() throws {
+    func testRecoveryPreservesExternalDirectoryAfterIntentCheckpoint() throws {
         let home = try TemporaryHome()
         let destination = home.url.appendingPathComponent(".config/generated/app.conf")
         let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
@@ -140,15 +140,11 @@ final class ProfileTransactionTests: XCTestCase {
         transaction.actions[index].status = .intentRecorded
         try store.save(transaction)
 
-        XCTAssertThrowsError(try executor.recover(transactionID: transaction.id)) { error in
-            guard let executionError = error as? TransactionExecutionError,
-                  case .recoveryRequired(let paths, _) = executionError else {
-                return XCTFail("Expected recoveryRequired, received \(error)")
-            }
-            XCTAssertTrue(paths.contains(createdDirectory.path))
-        }
+        let recovered = try executor.recover(transactionID: transaction.id)
+
+        XCTAssertEqual(recovered.status, .rolledBack)
         XCTAssertEqual(try fileSystem.state(at: createdDirectory).kind, .directory)
-        XCTAssertEqual(try store.load(id: transaction.id)?.status, .recoveryRequired)
+        XCTAssertTrue(try store.incompleteTransactions().isEmpty)
     }
 
     func testRecoveryCompletesStagedDirectoryMoveAfterCrash() throws {

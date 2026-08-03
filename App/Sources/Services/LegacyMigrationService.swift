@@ -10,6 +10,7 @@ struct LegacyMigrationRecord: Codable, Equatable, Identifiable, Sendable {
     enum Status: String, Codable, Sendable {
         case executing
         case committed
+        case committedWithWarnings
         case failed
     }
 
@@ -126,10 +127,6 @@ final class LegacyMigrationService: @unchecked Sendable {
                 throw LegacyMigrationError.conflict([currentRoot.path])
             }
             try fileSystem.moveItem(at: stage, to: currentRoot)
-            record.status = .committed
-            record.updatedAt = now()
-            try save(record, to: journalURL)
-            return record
         } catch {
             try? fileSystem.removeItem(at: stage)
             record.status = .failed
@@ -138,6 +135,18 @@ final class LegacyMigrationService: @unchecked Sendable {
             try? save(record, to: journalURL)
             throw LegacyMigrationError.failed("staging or commit", error)
         }
+
+        record.status = .committed
+        record.updatedAt = now()
+        do {
+            try save(record, to: journalURL)
+        } catch {
+            record.status = .committedWithWarnings
+            record.updatedAt = now()
+            record.errorDescription = "Legacy data was installed, but the final migration journal checkpoint failed: \(error.localizedDescription)"
+            try? save(record, to: journalURL)
+        }
+        return record
     }
 
     private func validateLegacySymlinks() throws {

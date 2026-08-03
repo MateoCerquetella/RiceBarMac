@@ -342,7 +342,13 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         if record.status == .intentRecorded,
            record.installedFingerprint == nil,
            !backupExists {
-            guard statesMatch(current, action.beforeState) else {
+            // Non-removal actions touch only their reserved stage while the
+            // durable record is at intentRecorded. A changed destination is
+            // therefore external state that must be preserved. Remove has no
+            // stage, so a missing backup can still represent an interrupted
+            // destination-to-backup move and remains ambiguous.
+            if action.kind == .remove,
+               !statesMatch(current, action.beforeState) {
                 throw FileSystemClientError.stalePath(destination.path)
             }
             try markRestored(at: index, transaction: &transaction, status: finalStatus)
