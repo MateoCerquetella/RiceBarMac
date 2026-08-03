@@ -556,18 +556,35 @@ final class ProfileService: ObservableObject {
         let parent = destination.deletingLastPathComponent()
         let stage = parent.appendingPathComponent(".\(destination.lastPathComponent).ricebarmac-stage-\(identifier)")
         let backup = parent.appendingPathComponent(".\(destination.lastPathComponent).ricebarmac-backup-\(identifier)")
-        try fileSystem.writeDataAtomically(data, to: stage)
+        guard try fileSystem.state(at: stage).kind == .absent,
+              try fileSystem.state(at: backup).kind == .absent else {
+            throw FileSystemClientError.collision(destination.path)
+        }
+
+        var staged = true
         var movedOriginal = false
         do {
+            try fileSystem.writeDataAtomically(data, to: stage)
             if try fileSystem.state(at: destination).exists {
                 try fileSystem.moveItem(at: destination, to: backup)
                 movedOriginal = true
             }
             try fileSystem.moveItem(at: stage, to: destination)
+            staged = false
         } catch {
-            try? fileSystem.removeItem(at: stage)
-            if movedOriginal, (try? fileSystem.state(at: destination).kind) == .absent {
-                try? fileSystem.moveItem(at: backup, to: destination)
+            if staged { try? fileSystem.removeItem(at: stage) }
+            if movedOriginal {
+                do {
+                    guard try fileSystem.state(at: destination).kind == .absent else {
+                        throw FileSystemClientError.stalePath(destination.path)
+                    }
+                    try fileSystem.moveItem(at: backup, to: destination)
+                } catch let rollbackError {
+                    throw ProfileServiceError.fileOperationFailed(
+                        "restore profile-definition backup at \(backup.path)",
+                        rollbackError
+                    )
+                }
             }
             throw error
         }

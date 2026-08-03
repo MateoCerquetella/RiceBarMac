@@ -28,14 +28,13 @@ final class RiceBarMacUITests: XCTestCase {
         attachScreenshot("idle")
 
         openPreview()
-        let apply = app.buttons["Apply"]
-        XCTAssertTrue(apply.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Preview UI Test"].exists)
-        XCTAssertTrue(app.staticTexts["Review the exact plan below. No files have been changed. Replaced items will be moved to the listed backups."].exists)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         attachScreenshot("preview")
 
-        apply.click()
+        // AppKit hosts this modal alert outside the target's XCUI hierarchy on
+        // macOS 14. Return activates its accessible default Apply action.
+        app.typeKey(.return, modifierFlags: [])
         let status = window.descendants(matching: .any)["profile-operation-status"]
         XCTAssertTrue(status.waitForExistence(timeout: 3))
         attachScreenshot("applying")
