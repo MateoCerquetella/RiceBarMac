@@ -83,6 +83,54 @@ final class ConfigurationCompatibilityTests: XCTestCase {
         }
     }
 
+    func testConfigChangeDuringStagingIsNotOverwritten() throws {
+        let home = try TemporaryHome()
+        let root = try home.createDirectory(".ricebarmac")
+        let configURL = root.appendingPathComponent("config.json")
+        try Data(#"{"general":{"showNotifications":true}}"#.utf8).write(to: configURL)
+        let fileSystem = FaultInjectingFileSystemClient()
+        let service = ConfigService(rootURL: root, fileSystem: fileSystem)
+        let external = Data("{ changed-during-staging".utf8)
+        fileSystem.afterMutation = { count, _ in
+            guard count == 1 else { return }
+            try external.write(to: configURL)
+        }
+        service.config.general.showNotifications = false
+
+        XCTAssertFalse(service.saveConfig())
+
+        XCTAssertEqual(try Data(contentsOf: configURL), external)
+        XCTAssertNil(service.lastBackupURL)
+        guard case .invalid = service.loadState else {
+            return XCTFail("A concurrent edit must require an explicit reload")
+        }
+    }
+
+    func testConfigCreatedAfterBackupIsPreservedAlongsideOriginalBackup() throws {
+        let home = try TemporaryHome()
+        let root = try home.createDirectory(".ricebarmac")
+        let configURL = root.appendingPathComponent("config.json")
+        let original = Data(#"{"general":{"showNotifications":true}}"#.utf8)
+        try original.write(to: configURL)
+        let fileSystem = FaultInjectingFileSystemClient()
+        let service = ConfigService(rootURL: root, fileSystem: fileSystem)
+        let external = Data("{ created-after-backup".utf8)
+        fileSystem.afterMutation = { count, _ in
+            guard count == 2 else { return }
+            try external.write(to: configURL)
+        }
+        service.config.general.showNotifications = false
+
+        XCTAssertFalse(service.saveConfig())
+
+        XCTAssertEqual(try Data(contentsOf: configURL), external)
+        let backup = try XCTUnwrap(service.lastBackupURL)
+        XCTAssertEqual(try Data(contentsOf: backup), original)
+        guard case .invalid = service.loadState else {
+            return XCTFail("An ambiguous commit must require explicit recovery")
+        }
+    }
+
     func testOlderProfileDefaultsOrderAndOptionalCollections() throws {
         let profile = try JSONDecoder().decode(Profile.self, from: Data(#"{"name":"Legacy"}"#.utf8))
         XCTAssertEqual(profile.name, "Legacy")

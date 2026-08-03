@@ -134,11 +134,24 @@ final class ConfigService: ObservableObject {
             var movedOriginal = false
 
             do {
-                if try fileSystem.state(at: configURL).exists {
+                guard try fileSystem.state(at: configURL) == expectedConfigState else {
+                    throw ConfigServiceError.configChangedExternally
+                }
+                if expectedConfigState.exists {
                     try fileSystem.moveItem(at: configURL, to: backupURL)
                     movedOriginal = true
+                    guard try fileSystem.state(at: backupURL) == expectedConfigState,
+                          try fileSystem.state(at: configURL).kind == .absent else {
+                        throw ConfigServiceError.configChangedExternally
+                    }
+                }
+                guard try fileSystem.state(at: configURL).kind == .absent else {
+                    throw ConfigServiceError.configChangedExternally
                 }
                 try fileSystem.moveItem(at: stageURL, to: configURL)
+                guard try fileSystem.state(at: configURL) == stagedState else {
+                    throw ConfigServiceError.configChangedExternally
+                }
                 expectedConfigState = stagedState
                 lastBackupURL = movedOriginal ? backupURL : nil
                 loadState = .loaded
@@ -148,11 +161,15 @@ final class ConfigService: ObservableObject {
                 try? fileSystem.removeItem(at: stageURL)
                 if movedOriginal {
                     do {
-                        if try fileSystem.state(at: configURL).exists {
-                            try fileSystem.removeItem(at: configURL)
+                        guard try fileSystem.state(at: configURL).kind == .absent else {
+                            throw FileSystemClientError.stalePath(configURL.path)
+                        }
+                        guard try fileSystem.state(at: backupURL) == expectedConfigState else {
+                            throw FileSystemClientError.stalePath(backupURL.path)
                         }
                         try fileSystem.moveItem(at: backupURL, to: configURL)
                     } catch let rollbackError {
+                        lastBackupURL = backupURL
                         let wrapped = ConfigServiceError.rollbackFailed(original: error, rollback: rollbackError)
                         lastError = wrapped
                         loadState = .invalid(message: wrapped.localizedDescription)
