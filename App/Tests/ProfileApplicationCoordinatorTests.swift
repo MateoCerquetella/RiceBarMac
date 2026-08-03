@@ -88,6 +88,52 @@ final class ProfileApplicationCoordinatorTests: XCTestCase {
         XCTAssertEqual(try fileSystem.state(at: secondDestination).kind, .absent)
     }
 
+    func testInterruptedTransactionBlocksNewWorkUntilRecoveryCompletes() async throws {
+        let home = try TemporaryHome()
+        let destination = home.url.appendingPathComponent(".config/blocked")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = LiveFileSystemClient()
+        let planner = ProfilePlanner(home: home.url, fileSystem: fileSystem)
+        let activeStore = MemoryActiveProfileStore()
+        let store = MemoryTransactionStore()
+        let executor = makeExecutor(
+            home: home.url,
+            fileSystem: fileSystem,
+            transactionStore: store,
+            activeStore: activeStore
+        )
+        let coordinator = ProfileApplicationCoordinator(planner: planner, executor: executor, activeProfileStore: activeStore)
+        let plan = planner.makePlan(for: descriptor, formerActiveProfilePath: nil)
+        var interrupted = ApplyTransaction(plan: plan)
+        interrupted.status = .recoveryRequired
+        interrupted.unresolvedPaths = [plan.actions.last!.destinationPath]
+        try store.save(interrupted)
+
+        do {
+            _ = try await coordinator.preview(descriptor)
+            XCTFail("Preview must be blocked while recovery is required")
+        } catch let error as TransactionExecutionError {
+            guard case .recoveryRequired(let paths, _) = error else {
+                return XCTFail("Expected recoveryRequired, received \(error)")
+            }
+            XCTAssertEqual(paths, interrupted.unresolvedPaths)
+        }
+        do {
+            _ = try await coordinator.apply(plan)
+            XCTFail("Apply must be blocked while recovery is required")
+        } catch let error as TransactionExecutionError {
+            guard case .recoveryRequired(_, _) = error else {
+                return XCTFail("Expected recoveryRequired, received \(error)")
+            }
+        }
+        XCTAssertEqual(try fileSystem.state(at: destination).kind, .absent)
+
+        _ = try await coordinator.recover(transactionID: interrupted.id)
+        let recoveredPreview = try await coordinator.preview(descriptor)
+
+        XCTAssertTrue(recoveredPreview.isValid)
+    }
+
     @MainActor
     func testThousandFileApplyKeepsMainActorResponsive() async throws {
         let home = try TemporaryHome()

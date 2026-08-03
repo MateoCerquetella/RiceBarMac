@@ -282,4 +282,15 @@ final class ProfileTransactionTests: XCTestCase {
         XCTAssertEqual(try fileSystem.state(at: destination).kind, .symbolicLink)
         XCTAssertNotNil(try store.latestUndoable())
     }
+
+    func testTransactionStoreRejectsNonDirectoryJournalStorage() throws {
+        let home = try TemporaryHome()
+        let root = try home.createDirectory(".ricebarmac")
+        try Data("not-a-directory".utf8).write(to: root.appendingPathComponent("transactions"))
+        let store = TransactionStore(rootURL: root, fileSystem: LiveFileSystemClient())
+
+        XCTAssertThrowsError(try store.loadAll()) { error in
+            XCTAssertTrue(error is TransactionStoreError)
+        }
+    }
 }

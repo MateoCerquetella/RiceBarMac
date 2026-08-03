@@ -493,11 +493,27 @@ final class ProfileService: ObservableObject {
     }
 
     private func refreshTransactionMetadata() async {
-        let recovery = (try? await coordinator.incompleteTransactions()) ?? []
-        let undoable = (try? await coordinator.latestUndoable()) != nil
-        await MainActor.run {
-            self.recoveryTransactions = recovery
-            self.canUndo = undoable
+        do {
+            let recovery = try await coordinator.incompleteTransactions()
+            let undoable = try await coordinator.latestUndoable() != nil
+            await MainActor.run {
+                self.recoveryTransactions = recovery
+                self.canUndo = undoable
+            }
+        } catch {
+            await MainActor.run {
+                self.recoveryTransactions = []
+                self.canUndo = false
+                self.operationState = ProfileOperationSnapshot(
+                    phase: .recoveryRequired,
+                    message: "Transaction journals could not be inspected: \(error.localizedDescription)",
+                    completedActions: 0,
+                    totalActions: 0,
+                    queuePosition: nil,
+                    transactionID: nil,
+                    affectedPaths: []
+                )
+            }
         }
     }
 

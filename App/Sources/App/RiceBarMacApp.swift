@@ -317,7 +317,7 @@ struct SettingsGeneralTabView: View {
                             }
                             .labelsHidden()
                             .frame(maxWidth: 180)
-                            .disabled(viewModel.sortedProfiles.isEmpty || viewModel.isApplying)
+                            .disabled(viewModel.sortedProfiles.isEmpty || viewModel.isApplying || viewModel.hasRecoveryBlocker)
                             .accessibilityIdentifier("preview-profile-picker")
 
                             Button("Preview…") {
@@ -325,7 +325,7 @@ struct SettingsGeneralTabView: View {
                                     viewModel.applyProfile(selectedProfile)
                                 }
                             }
-                            .disabled(selectedProfile == nil || viewModel.isApplying)
+                            .disabled(selectedProfile == nil || viewModel.isApplying || viewModel.hasRecoveryBlocker)
                             .accessibilityLabel("Preview selected profile before applying")
                             .accessibilityIdentifier("preview-selected-profile")
                         }
@@ -334,7 +334,7 @@ struct SettingsGeneralTabView: View {
                             Button("Undo Last Apply") {
                                 viewModel.undoLastApply()
                             }
-                            .disabled(!viewModel.canUndo || viewModel.isApplying)
+                            .disabled(!viewModel.canUndo || viewModel.isApplying || viewModel.hasRecoveryBlocker)
                             .keyboardShortcut("z", modifiers: [.command, .option])
                             .accessibilityLabel("Undo the last completed profile apply")
                             .accessibilityIdentifier("undo-last-apply")

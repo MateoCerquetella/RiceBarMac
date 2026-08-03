@@ -37,6 +37,22 @@ actor ProfileApplicationCoordinator {
         defer { release() }
         try Task.checkCancellation()
 
+        do {
+            try ensureRecoveryIsComplete()
+        } catch {
+            let paths = recoveryPaths(from: error)
+            publish(ProfileOperationSnapshot(
+                phase: .recoveryRequired,
+                message: error.localizedDescription,
+                completedActions: 0,
+                totalActions: 0,
+                queuePosition: nil,
+                transactionID: nil,
+                affectedPaths: paths
+            ))
+            throw error
+        }
+
         publish(ProfileOperationSnapshot(
             phase: .previewing,
             message: "Validating \(descriptor.displayName)",
@@ -84,6 +100,7 @@ actor ProfileApplicationCoordinator {
         let handler = stateHandler
         let outcome: ProfileApplyOutcome
         do {
+            try ensureRecoveryIsComplete()
             publish(ProfileOperationSnapshot(
                 phase: .applying,
                 message: "Applying \(plan.profileName)",
@@ -146,16 +163,17 @@ actor ProfileApplicationCoordinator {
         try Task.checkCancellation()
 
         let handler = stateHandler
-        publish(ProfileOperationSnapshot(
-            phase: .undoing,
-            message: "Restoring the previous profile state",
-            completedActions: 0,
-            totalActions: 0,
-            queuePosition: nil,
-            transactionID: nil,
-            affectedPaths: []
-        ))
         do {
+            try ensureRecoveryIsComplete()
+            publish(ProfileOperationSnapshot(
+                phase: .undoing,
+                message: "Restoring the previous profile state",
+                completedActions: 0,
+                totalActions: 0,
+                queuePosition: nil,
+                transactionID: nil,
+                affectedPaths: []
+            ))
             let transaction = try executor.undoLatest { completed, total, message in
                 handler?(ProfileOperationSnapshot(
                     phase: .undoing,
@@ -178,15 +196,18 @@ actor ProfileApplicationCoordinator {
             ))
             return transaction
         } catch {
+            let phase: ProfileOperationSnapshot.Phase
             let paths: [String]
             if let executionError = error as? TransactionExecutionError,
                case .recoveryRequired(let unresolved, _) = executionError {
+                phase = .recoveryRequired
                 paths = unresolved
             } else {
+                phase = .failed
                 paths = []
             }
             publish(ProfileOperationSnapshot(
-                phase: paths.isEmpty ? .failed : .recoveryRequired,
+                phase: phase,
                 message: error.localizedDescription,
                 completedActions: 0,
                 totalActions: 0,
@@ -203,8 +224,28 @@ actor ProfileApplicationCoordinator {
         await acquire(requestID: requestID, operation: "Recovery")
         defer { release() }
         try Task.checkCancellation()
+        let handler = stateHandler
         do {
-            let transaction = try executor.recover(transactionID: transactionID)
+            publish(ProfileOperationSnapshot(
+                phase: .rollingBack,
+                message: "Recovering the interrupted transaction",
+                completedActions: 0,
+                totalActions: 0,
+                queuePosition: nil,
+                transactionID: transactionID,
+                affectedPaths: []
+            ))
+            let transaction = try executor.recover(transactionID: transactionID) { completed, total, message in
+                handler?(ProfileOperationSnapshot(
+                    phase: .rollingBack,
+                    message: message,
+                    completedActions: completed,
+                    totalActions: total,
+                    queuePosition: nil,
+                    transactionID: transactionID,
+                    affectedPaths: []
+                ))
+            }
             publish(ProfileOperationSnapshot(
                 phase: .idle,
                 message: "Recovery completed",
@@ -280,5 +321,36 @@ actor ProfileApplicationCoordinator {
     private func publish(_ state: ProfileOperationSnapshot) {
         snapshot = state
         stateHandler?(state)
+    }
+
+    private func ensureRecoveryIsComplete() throws {
+        let incomplete: [ApplyTransaction]
+        do {
+            incomplete = try executor.incompleteTransactions()
+        } catch {
+            throw TransactionExecutionError.recoveryRequired(
+                paths: [],
+                cause: "Transaction journals could not be inspected: \(error.localizedDescription)"
+            )
+        }
+        guard !incomplete.isEmpty else { return }
+
+        let paths = Set(incomplete.flatMap { transaction in
+            transaction.unresolvedPaths.isEmpty
+                ? transaction.actions.map { $0.action.destinationPath }
+                : transaction.unresolvedPaths
+        }).sorted()
+        throw TransactionExecutionError.recoveryRequired(
+            paths: paths,
+            cause: "Finish or resolve the interrupted transaction before starting another profile operation."
+        )
+    }
+
+    private func recoveryPaths(from error: Error) -> [String] {
+        guard let executionError = error as? TransactionExecutionError,
+              case .recoveryRequired(let paths, _) = executionError else {
+            return []
+        }
+        return paths
     }
 }

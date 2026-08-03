@@ -169,6 +169,7 @@ final class StatusBarController {
             item.target = self
             item.representedObject = descriptor
             item.keyEquivalentModifierMask = modifierMask
+            item.isEnabled = !viewModel.isApplying && !viewModel.hasRecoveryBlocker
             
             var tooltipParts: [String] = []
             if !configShortcut.isEmpty {
@@ -215,7 +216,7 @@ final class StatusBarController {
         )
         preview.target = self
         preview.representedObject = descriptor
-        preview.isEnabled = !viewModel.isApplying
+        preview.isEnabled = !viewModel.isApplying && !viewModel.hasRecoveryBlocker
         submenu.addItem(preview)
         submenu.addItem(.separator())
         
@@ -265,7 +266,7 @@ final class StatusBarController {
 
         let undo = NSMenuItem(title: "Undo Last Apply", action: #selector(undoLastApply), keyEquivalent: "")
         undo.target = self
-        undo.isEnabled = viewModel.canUndo && !viewModel.isApplying
+        undo.isEnabled = viewModel.canUndo && !viewModel.isApplying && !viewModel.hasRecoveryBlocker
         items.append(undo)
 
         if viewModel.hasLegacyMigration {

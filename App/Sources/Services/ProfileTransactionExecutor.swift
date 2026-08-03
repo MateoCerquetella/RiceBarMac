@@ -16,7 +16,7 @@ enum TransactionExecutionError: LocalizedError {
             return "Transaction \(id.uuidString) was not found."
         case .recoveryRequired(let paths, let cause):
             let pathList = paths.isEmpty ? "unknown paths" : paths.joined(separator: ", ")
-            return "Automatic recovery could not finish for \(pathList). \(cause)"
+            return "Recovery is required for \(pathList). \(cause)"
         }
     }
 

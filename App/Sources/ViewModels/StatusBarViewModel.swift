@@ -373,6 +373,10 @@ final class StatusBarViewModel: ObservableObject {
         if case .none = migrationAvailability { return false }
         return true
     }
+
+    var hasRecoveryBlocker: Bool {
+        !recoveryTransactions.isEmpty || operationState.phase == .recoveryRequired
+    }
     
     
     func pickWallpaperFile(completion: @escaping (URL?) -> Void) {

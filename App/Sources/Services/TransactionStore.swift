@@ -112,7 +112,14 @@ final class TransactionStore: TransactionStoring, @unchecked Sendable {
     }
 
     func loadAll() throws -> [ApplyTransaction] {
-        guard try fileSystem.state(at: transactionsURL).kind == .directory else { return [] }
+        let state = try fileSystem.state(at: transactionsURL)
+        if state.kind == .absent { return [] }
+        guard state.kind == .directory else {
+            throw TransactionStoreError.invalidJournal(
+                transactionsURL.path,
+                FileSystemClientError.unsupportedObject(transactionsURL.path)
+            )
+        }
         return try fileSystem.contentsOfDirectory(at: transactionsURL)
             .filter { $0.pathExtension.lowercased() == "json" }
             .map { try decode(at: $0) }
