@@ -104,23 +104,23 @@ final class RiceBarMacUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement, in window: XCUIElement) -> Bool {
-        if isVisiblyHittable(element, in: window) { return true }
         let scrollView = window.scrollViews.firstMatch
         guard scrollView.waitForExistence(timeout: 2) else { return false }
+        if isVisiblyHittable(element, in: scrollView) { return true }
 
         let deltas: [CGFloat] = [-250, -250, -250, -250, -250, -250, 250, 250, 250]
         for delta in deltas {
             scrollView.scroll(byDeltaX: 0, deltaY: delta)
-            if isVisiblyHittable(element, in: window) { return true }
+            if isVisiblyHittable(element, in: scrollView) { return true }
         }
-        return isVisiblyHittable(element, in: window)
+        return isVisiblyHittable(element, in: scrollView)
     }
 
-    private func isVisiblyHittable(_ element: XCUIElement, in window: XCUIElement) -> Bool {
+    private func isVisiblyHittable(_ element: XCUIElement, in container: XCUIElement) -> Bool {
         guard element.exists, element.isHittable else { return false }
         let frame = element.frame
         guard !frame.isNull, !frame.isInfinite, frame.width > 0, frame.height > 0 else { return false }
-        return window.frame.insetBy(dx: 2, dy: 2).contains(
+        return container.frame.insetBy(dx: 2, dy: 2).contains(
             CGPoint(x: frame.midX, y: frame.midY)
         )
     }
