@@ -343,6 +343,7 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         }
 
         let stageState = try fileSystem.state(at: stage)
+        let stageWasPresent = stageState.exists
         if stageState.exists {
             guard let installed = record.installedFingerprint,
                   fingerprintsMatch(stageState.fingerprint, installed) else {
@@ -376,6 +377,16 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
                !statesMatch(current, action.beforeState) {
                 throw FileSystemClientError.stalePath(destination.path)
             }
+            try markRestored(at: index, transaction: &transaction, status: finalStatus)
+            return
+        }
+
+        if record.status == .staged,
+           stageWasPresent,
+           !backupExists {
+            // The staged replacement was still at its reserved path, so this
+            // action never touched the destination. Preserve any concurrent
+            // destination change and roll back only the stage we identified.
             try markRestored(at: index, transaction: &transaction, status: finalStatus)
             return
         }
