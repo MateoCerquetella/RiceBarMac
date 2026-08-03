@@ -151,11 +151,9 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
             progress(transaction.actions.count, transaction.actions.count, "Undo complete")
             return transaction
         } catch {
-            try? persist(&transaction, status: .recoveryRequired, error: error.localizedDescription)
-            throw TransactionExecutionError.recoveryRequired(
-                paths: transaction.unresolvedPaths,
-                cause: error.localizedDescription
-            )
+            let recoveryError = normalizedRecoveryError(error, transaction: transaction)
+            try? persist(&transaction, status: .recoveryRequired, error: recoveryError.localizedDescription)
+            throw recoveryError
         }
     }
 
@@ -171,8 +169,9 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
             try persist(&transaction, status: .rolledBack)
             return transaction
         } catch {
-            try? persist(&transaction, status: .recoveryRequired, error: error.localizedDescription)
-            throw TransactionExecutionError.recoveryRequired(paths: transaction.unresolvedPaths, cause: error.localizedDescription)
+            let recoveryError = normalizedRecoveryError(error, transaction: transaction)
+            try? persist(&transaction, status: .recoveryRequired, error: recoveryError.localizedDescription)
+            throw recoveryError
         }
     }
 
@@ -463,6 +462,20 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         }
 
         return safety
+    }
+
+    private func normalizedRecoveryError(
+        _ error: Error,
+        transaction: ApplyTransaction
+    ) -> TransactionExecutionError {
+        if let executionError = error as? TransactionExecutionError,
+           case .recoveryRequired = executionError {
+            return executionError
+        }
+        return TransactionExecutionError.recoveryRequired(
+            paths: transaction.unresolvedPaths,
+            cause: error.localizedDescription
+        )
     }
 
     private func validateSource(

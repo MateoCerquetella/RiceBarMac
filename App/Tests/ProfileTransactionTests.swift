@@ -180,6 +180,10 @@ final class ProfileTransactionTests: XCTestCase {
                 return XCTFail("Expected recoveryRequired, received \(error)")
             }
             XCTAssertTrue(paths.contains(generatedDirectory.path))
+            XCTAssertEqual(
+                error.localizedDescription.components(separatedBy: "Recovery is required").count - 1,
+                1
+            )
         }
 
         XCTAssertEqual(String(data: try Data(contentsOf: userFile), encoding: .utf8), "keep-me")
