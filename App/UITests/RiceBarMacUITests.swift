@@ -36,6 +36,7 @@ final class RiceBarMacUITests: XCTestCase {
         attachScreenshot("preview")
 
         apply.click()
+        XCTAssertTrue(waitForApplyingState(status, timeout: 8))
         attachScreenshot("applying")
         XCTAssertTrue(waitForPath(destination, exists: true, timeout: 8))
         XCTAssertTrue(waitForValue(status, value: "UI Test applied successfully", timeout: 8))
@@ -110,7 +111,7 @@ final class RiceBarMacUITests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
         app.launchEnvironment["RICEBARMAC_TEST_HOME"] = temporaryHome.path
-        app.launchEnvironment["RICEBARMAC_TEST_EFFECT_DELAY_MS"] = "600"
+        app.launchEnvironment["RICEBARMAC_TEST_EFFECT_DELAY_MS"] = "1200"
         app.launch()
     }
 
@@ -178,6 +179,17 @@ final class RiceBarMacUITests: XCTestCase {
 
     private func waitForValue(_ element: XCUIElement, value: String, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "value == %@", value)
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForApplyingState(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(
+            format: "value == %@ OR value BEGINSWITH %@ OR value BEGINSWITH %@",
+            "Applying UI Test",
+            "Create directory ",
+            "Link "
+        )
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
