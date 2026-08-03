@@ -422,8 +422,12 @@ final class StatusBarViewModel: ObservableObject {
         alert.messageText = "Preview \(plan.profileName)"
         alert.informativeText = "Review the exact plan below. No files have been changed. Replaced items will be moved to the listed backups."
         alert.alertStyle = plan.warnings.isEmpty ? .informational : .warning
-        alert.addButton(withTitle: "Apply")
-        alert.addButton(withTitle: "Cancel")
+        let applyButton = alert.addButton(withTitle: "Apply")
+        applyButton.keyEquivalent = "\r"
+        applyButton.setAccessibilityIdentifier("confirm-profile-apply")
+        let cancelButton = alert.addButton(withTitle: "Cancel")
+        cancelButton.keyEquivalent = "\u{1b}"
+        cancelButton.setAccessibilityIdentifier("cancel-profile-apply")
 
         let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 640, height: 280))
         textView.string = plan.previewText

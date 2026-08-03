@@ -28,15 +28,14 @@ final class RiceBarMacUITests: XCTestCase {
         attachScreenshot("idle")
 
         openPreview()
-        RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+        let status = window.descendants(matching: .any)["profile-operation-status"]
+        XCTAssertTrue(waitForValue(status, value: "Preview ready for UI Test", timeout: 8))
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         attachScreenshot("preview")
 
         // AppKit hosts this modal alert outside the target's XCUI hierarchy on
         // macOS 14. Return activates its accessible default Apply action.
         app.typeKey(.return, modifierFlags: [])
-        let status = window.descendants(matching: .any)["profile-operation-status"]
-        XCTAssertTrue(status.waitForExistence(timeout: 3))
         attachScreenshot("applying")
         XCTAssertTrue(waitForPath(destination, exists: true, timeout: 8))
         XCTAssertTrue(waitForValue(status, value: "UI Test applied successfully", timeout: 8))
@@ -105,16 +104,25 @@ final class RiceBarMacUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement, in window: XCUIElement) -> Bool {
-        if element.exists && element.isHittable { return true }
+        if isVisiblyHittable(element, in: window) { return true }
         let scrollView = window.scrollViews.firstMatch
         guard scrollView.waitForExistence(timeout: 2) else { return false }
 
-        let deltas: [CGFloat] = [250, 250, 250, -250, -250, -250, -250, -250, -250]
+        let deltas: [CGFloat] = [-250, -250, -250, -250, -250, -250, 250, 250, 250]
         for delta in deltas {
             scrollView.scroll(byDeltaX: 0, deltaY: delta)
-            if element.exists && element.isHittable { return true }
+            if isVisiblyHittable(element, in: window) { return true }
         }
-        return element.exists && element.isHittable
+        return isVisiblyHittable(element, in: window)
+    }
+
+    private func isVisiblyHittable(_ element: XCUIElement, in window: XCUIElement) -> Bool {
+        guard element.exists, element.isHittable else { return false }
+        let frame = element.frame
+        guard !frame.isNull, !frame.isInfinite, frame.width > 0, frame.height > 0 else { return false }
+        return window.frame.insetBy(dx: 2, dy: 2).contains(
+            CGPoint(x: frame.midX, y: frame.midY)
+        )
     }
 
     private func waitForPath(_ url: URL, exists: Bool, timeout: TimeInterval) -> Bool {
