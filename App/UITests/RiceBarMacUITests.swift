@@ -29,7 +29,7 @@ final class RiceBarMacUITests: XCTestCase {
 
         openPreview()
         let status = window.descendants(matching: .any)["profile-operation-status"]
-        XCTAssertTrue(waitForValue(status, value: "Preview ready for UI Test", timeout: 8))
+        XCTAssertTrue(waitForEnabled(window, enabled: false, timeout: 8))
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         attachScreenshot("preview")
 
@@ -137,6 +137,12 @@ final class RiceBarMacUITests: XCTestCase {
 
     private func waitForValue(_ element: XCUIElement, value: String, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "value == %@", value)
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func waitForEnabled(_ element: XCUIElement, enabled: Bool, timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "enabled == %@", NSNumber(value: enabled))
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
