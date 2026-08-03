@@ -101,9 +101,32 @@ final class RiceBarMacUITests: XCTestCase {
         let menu = window.descendants(matching: .any)["preview-profile-menu"]
         XCTAssertTrue(reveal(menu, in: window))
         menu.click()
-        let profileItem = app.menuItems["Preview \(profileName)"]
-        XCTAssertTrue(profileItem.waitForExistence(timeout: 3))
-        profileItem.click()
+
+        // SwiftUI popup entries have appeared as both MenuItem and Button on
+        // supported macOS releases. Select the visible accessible entry without
+        // depending on that private native representation.
+        let candidates = app.descendants(matching: .any)
+            .matching(NSPredicate(
+                format: "label == %@ OR label == %@",
+                profileName,
+                "Preview \(profileName)"
+            ))
+        let deadline = Date().addingTimeInterval(3)
+        repeat {
+            for index in 0..<candidates.count {
+                let candidate = candidates.element(boundBy: index)
+                if candidate.exists && candidate.isHittable {
+                    candidate.click()
+                    return
+                }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        } while Date() < deadline
+
+        // A native menu remains keyboard operable even if XCTest does not
+        // expose its transient entries in the application hierarchy.
+        app.typeKey(.downArrow, modifierFlags: [])
+        app.typeKey(.return, modifierFlags: [])
     }
 
     private func reveal(_ element: XCUIElement, in window: XCUIElement) -> Bool {
