@@ -131,11 +131,13 @@ brew tap mateocerquetella/ricebarmac
 brew install --cask ricebarmac
 ```
 
+The Homebrew cask tracks signed releases. The explicitly unsigned v1.2.0 owner override is not distributed through Homebrew.
+
 ### Download
 
-Download the versioned `RiceBarMac-<version>.zip` asset from [GitHub Releases](https://github.com/MateoCerquetella/RiceBarMac/releases), extract it, and move `RiceBarMac.app` to `/Applications`.
+Download the versioned asset from [GitHub Releases](https://github.com/MateoCerquetella/RiceBarMac/releases), verify its attached SHA-256 checksum, extract it, and move `RiceBarMac.app` to `/Applications`.
 
-Official release assets are Developer ID signed, hardened, notarized, stapled, and verified by Gatekeeper. The release workflow does not publish an unsigned fallback.
+Normal release assets are Developer ID signed, hardened, notarized, stapled, and verified by Gatekeeper. An asset whose filename and release title explicitly say **Unsigned** is an owner-authorized exception: it is not notarized or Gatekeeper-approved, macOS may block it, and it should be installed only if you understand and accept that risk. The normal tag-triggered workflow never substitutes an unsigned fallback.
 
 ## Build and test
 

@@ -1,0 +1,192 @@
+name: Explicit Unsigned Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag matching project.yml
+        required: true
+        default: v1.2.0
+        type: string
+      acknowledge_unsigned:
+        description: I authorize a public unsigned and unnotarized macOS release
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: unsigned-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  unsigned-release:
+    runs-on: macos-14
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      ACKNOWLEDGE_UNSIGNED: ${{ inputs.acknowledge_unsigned }}
+
+    steps:
+      - name: Checkout exact main revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Require the explicit unsigned override
+        run: |
+          set -euo pipefail
+          if [[ "${ACKNOWLEDGE_UNSIGNED}" != 'true' ]]; then
+            echo 'Unsigned publication was not explicitly acknowledged.' >&2
+            exit 1
+          fi
+          if [[ "${GITHUB_REF}" != 'refs/heads/main' ]]; then
+            echo "Unsigned releases must be dispatched from main, not ${GITHUB_REF}." >&2
+            exit 1
+          fi
+          git fetch origin main --tags
+          if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+            echo 'The checked-out revision is not the current main head.' >&2
+            exit 1
+          fi
+          EXPECTED_TAG="${RELEASE_TAG}" scripts/verify-version.sh
+          existing_tag_commit="$(git rev-list -n 1 "${RELEASE_TAG}" 2>/dev/null || true)"
+          if [[ -n "${existing_tag_commit}" && "${existing_tag_commit}" != "${GITHUB_SHA}" ]]; then
+            echo "${RELEASE_TAG} already targets ${existing_tag_commit}, not ${GITHUB_SHA}." >&2
+            exit 1
+          fi
+
+      - name: Toolchain and generated-project gate
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen --version
+          xcodegen generate
+          git diff --exit-code -- RiceBarMac.xcodeproj
+
+      - name: Run native tests
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/unsigned-unit-tests \
+            -resultBundlePath build/UnsignedUnitTests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:RiceBarMacTests \
+            test | tee unsigned-unit-tests.log
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/unsigned-ui-tests \
+            -resultBundlePath build/UnsignedUITests.xcresult \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            -only-testing:RiceBarMacUITests \
+            test | tee unsigned-ui-tests.log
+
+      - name: Analyze Release
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/unsigned-release-analyze \
+            CODE_SIGNING_ALLOWED=NO \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            analyze | tee unsigned-release-analyze.log
+
+      - name: Archive and verify unsigned universal app
+        id: asset
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Release \
+            -archivePath build/RiceBarMac-unsigned.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            archive | tee unsigned-release-archive.log
+          app='build/RiceBarMac-unsigned.xcarchive/Products/Applications/RiceBarMac.app'
+          EXPECTED_TAG="${RELEASE_TAG}" APP_PATH="${app}" scripts/verify-version.sh
+          architectures="$(lipo -archs "${app}/Contents/MacOS/RiceBarMac")"
+          [[ " ${architectures} " == *' arm64 '* ]]
+          [[ " ${architectures} " == *' x86_64 '* ]]
+          minimum_system="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${app}/Contents/Info.plist")"
+          [[ "${minimum_system}" == '14.0' ]]
+          signature_details="$(codesign --display --verbose=4 "${app}" 2>&1 || true)"
+          if grep -Fq 'Authority=Developer ID Application:' <<<"${signature_details}"; then
+            echo 'The explicit unsigned workflow unexpectedly produced a Developer ID app.' >&2
+            exit 1
+          fi
+          version="${RELEASE_TAG#v}"
+          asset_name="RiceBarMac-${version}-unsigned.zip"
+          ditto -c -k --sequesterRsrc --keepParent "${app}" "${asset_name}"
+          unzip -t "${asset_name}"
+          checksum="$(shasum -a 256 "${asset_name}" | awk '{print $1}')"
+          printf '%s  %s\n' "${checksum}" "${asset_name}" >"${asset_name}.sha256"
+          echo "version=${version}" >>"${GITHUB_OUTPUT}"
+          echo "asset_name=${asset_name}" >>"${GITHUB_OUTPUT}"
+          echo "sha256=${checksum}" >>"${GITHUB_OUTPUT}"
+
+      - name: Publish or verify immutable unsigned release
+        run: |
+          set -euo pipefail
+          asset='${{ steps.asset.outputs.asset_name }}'
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            release_tag="$(gh release view "${RELEASE_TAG}" --json tagName --jq '.tagName')"
+            [[ "${release_tag}" == "${RELEASE_TAG}" ]]
+            echo "Verifying existing ${RELEASE_TAG} release without replacing its asset."
+          else
+            create_args=(--title "RiceBarMac ${RELEASE_TAG} (Unsigned)" --notes-file UNSIGNED_RELEASE_NOTES_1.2.0.md --latest)
+            if git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+              create_args+=(--verify-tag)
+            else
+              create_args+=(--target "${GITHUB_SHA}")
+            fi
+            gh release create "${RELEASE_TAG}" \
+              "${asset}#RiceBarMac ${{ steps.asset.outputs.version }} (unsigned)" \
+              "${asset}.sha256#SHA-256 checksum" \
+              "${create_args[@]}"
+          fi
+          mkdir -p build/public-download
+          gh release download "${RELEASE_TAG}" \
+            --pattern "${asset}" \
+            --dir build/public-download
+          downloaded_checksum="$(shasum -a 256 "build/public-download/${asset}" | awk '{print $1}')"
+          [[ "${downloaded_checksum}" == '${{ steps.asset.outputs.sha256 }}' ]]
+          jq -n \
+            --arg tag "${RELEASE_TAG}" \
+            --arg commit "${GITHUB_SHA}" \
+            --arg asset "${asset}" \
+            --arg sha256 "${downloaded_checksum}" \
+            '{tag: $tag, commit: $commit, asset: $asset, sha256: $sha256, signed: false, notarized: false}' \
+            >build/unsigned-release-evidence.json
+
+      - name: Upload unsigned release evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: unsigned-release-evidence-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            unsigned-*.log
+            build/*.json
+            build/*.xcresult
+            RiceBarMac-*-unsigned.zip.sha256
