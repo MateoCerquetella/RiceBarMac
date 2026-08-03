@@ -515,7 +515,7 @@ final class StatusBarViewModel: ObservableObject {
         
         let secondAlert = NSAlert()
         secondAlert.messageText = "Confirm Deletion"
-        secondAlert.informativeText = "This will permanently move the profile '\(profileName)' and all its contents to the Trash.\n\n⚠️ This action cannot be undone.\n\nAre you absolutely sure you want to continue?"
+        secondAlert.informativeText = "This will permanently move the profile '\(profileName)' and all its contents to the Trash.\n\nWarning: This action cannot be undone.\n\nAre you absolutely sure you want to continue?"
         secondAlert.alertStyle = .critical
         secondAlert.addButton(withTitle: "Yes, Delete Profile")
         secondAlert.addButton(withTitle: "Cancel")

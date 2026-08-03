@@ -153,7 +153,7 @@ struct AppearanceConfig: Codable, Equatable, Sendable {
     var menuItemStyle: MenuItemStyle
     
     init() {
-        self.menuBarIcon = "🍚"
+        self.menuBarIcon = "RB"
         self.showProfileCountInMenu = true
         self.showShortcutsInMenu = true
         self.menuItemStyle = .compact
@@ -165,7 +165,7 @@ struct AppearanceConfig: Codable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        menuBarIcon = try container.decodeIfPresent(String.self, forKey: .menuBarIcon) ?? "🍚"
+        menuBarIcon = try container.decodeIfPresent(String.self, forKey: .menuBarIcon) ?? "RB"
         showProfileCountInMenu = try container.decodeIfPresent(Bool.self, forKey: .showProfileCountInMenu) ?? true
         showShortcutsInMenu = try container.decodeIfPresent(Bool.self, forKey: .showShortcutsInMenu) ?? true
         let style = try container.decodeIfPresent(String.self, forKey: .menuItemStyle)
@@ -184,4 +184,3 @@ enum MenuItemStyle: String, Codable, CaseIterable, Sendable {
         }
     }
 }
-

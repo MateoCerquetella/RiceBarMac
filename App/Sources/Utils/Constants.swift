@@ -196,7 +196,7 @@ enum Constants {
     }
     
     enum StatusBarIcon {
-        static let systemName = "🍚"  // Rice bowl emoji
+        static let systemName = "RB"
         static let accessibilityDescription = "RiceBar"
         static let menuBarLength = NSStatusItem.squareLength
     }

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "revision": 1,
+  "previousRevision": -1,
+  "actor": "empirical-start",
+  "summary": "Started correct-the-just-published-public-release-by-changing-the-marketing",
+  "createdAt": "2026-08-03T13:45:54.633Z",
+  "state": {
+    "schemaVersion": 4,
+    "revision": 1,
+    "activeFeature": "correct-the-just-published-public-release-by-changing-the-marketing",
+    "request": "Correct the just-published public release by changing the marketing version from 1.2.0 to the literal version 0.20 with tag v0.20, keeping build 120 unless repository evidence requires a different monotonic build; remove the quoted unsigned security-notice paragraph from repository release documentation and the published GitHub release notes; remove emoji characters from every tracked text file including README without changing binary assets or program semantics; run all existing validation; publish and publicly verify the corrected unsigned v0.20 release and checksum; only after that succeeds, delete the mistaken v1.2.0 GitHub release and tag. Leave Homebrew and the normal signed release workflow untouched, and preserve the pre-existing untracked CLAUDE.md.",
+    "profile": "complex",
+    "phase": "specify",
+    "status": "waiting",
+    "repairAttempts": 0,
+    "message": null,
+    "implementationActor": null,
+    "specDigest": "d7eb6e7776cf11ddbbe5cc7521c6d138630f743c5b2894a20e4beb7fe77ffbb0",
+    "capabilityArchiveRequired": true,
+    "capabilityDeltaDigest": null,
+    "evidence": [],
+    "updatedAt": "2026-08-03T13:45:54.633Z"
+  }
+}

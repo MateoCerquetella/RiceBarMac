@@ -226,7 +226,7 @@ struct SettingsGeneralTabView: View {
                                     Spacer()
                                     
                                     if viewModel.launchAtLoginError != nil {
-                                        Text("🚫")
+                                        Text("Unavailable")
                                             .font(.caption)
                                             .foregroundColor(.red)
                                     }
@@ -926,7 +926,7 @@ class ShortcutRecorderView: NSView {
 struct SettingsAppearanceTabView: View {
     @ObservedObject var configService: ConfigService
     
-    private let emojiOptions = ["🍚", "⚙️", "🔧", "⭐", "🎯", "🚀", "💎", "🔥", "⚡", "🌟"]
+    private let iconOptions = ["RB", "R", "B", "M", "*", "+", "#", "@", "=", "~"]
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -958,21 +958,21 @@ struct SettingsAppearanceTabView: View {
                             .foregroundColor(.secondary)
                         
                         LazyVGrid(columns: Array(repeating: GridItem(.fixed(50)), count: 5), spacing: 12) {
-                            ForEach(emojiOptions, id: \.self) { emoji in
+                            ForEach(iconOptions, id: \.self) { icon in
                                 Button(action: {
-                                    configService.updateAppearanceSetting(\.menuBarIcon, to: emoji)
+                                    configService.updateAppearanceSetting(\.menuBarIcon, to: icon)
                                 }) {
-                                    Text(emoji)
+                                    Text(icon)
                                         .font(.title2)
                                         .frame(width: 44, height: 44)
                                         .background(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .fill(configService.config.appearance.menuBarIcon == emoji ? 
+                                                .fill(configService.config.appearance.menuBarIcon == icon ?
                                                      Color.accentColor.opacity(0.2) : Color(NSColor.controlBackgroundColor))
                                         )
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .stroke(configService.config.appearance.menuBarIcon == emoji ? 
+                                                .stroke(configService.config.appearance.menuBarIcon == icon ?
                                                        Color.accentColor : Color.clear, lineWidth: 2)
                                         )
                                 }
@@ -1040,7 +1040,7 @@ struct SettingsAboutTabView: View {
                 VStack(alignment: .leading, spacing: 32) {
                     HStack(alignment: .top, spacing: 24) {
                         VStack {
-                            Text("🍚")
+                            Text("RB")
                                 .font(.system(size: 80))
                                 .frame(width: 100, height: 100)
                                 .background(
@@ -1167,7 +1167,7 @@ struct SettingsAboutTabView: View {
                             .fontWeight(.semibold)
                         
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Copyright © 2025 Mateo Cerquetella. All rights reserved.")
+                            Text("Copyright (c) 2025 Mateo Cerquetella. All rights reserved.")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             

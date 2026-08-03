@@ -138,7 +138,7 @@ private extension ProfilePlanner {
             if profile.systemTheme != nil {
                 addWarning(
                     .unsupportedIntegration,
-                    "System-theme declarations are not implemented in v1.2.0 and will not be applied.",
+                    "System-theme declarations are not implemented in v0.20 and will not be applied.",
                     nil
                 )
             }

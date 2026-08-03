@@ -17,7 +17,7 @@ packages:
 settings:
     base:
         DEVELOPMENT_TEAM: ''
-        MARKETING_VERSION: '1.2.0'
+        MARKETING_VERSION: '0.20'
         CURRENT_PROJECT_VERSION: '120'
         ARCHS: 'x86_64 arm64'
 targets:

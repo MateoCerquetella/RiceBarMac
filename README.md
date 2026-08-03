@@ -15,9 +15,9 @@
 
 RiceBarMac is a menu bar app for switching developer and desktop configurations. Profiles live under `~/.ricebarmac/profiles/` and map files from a profile into locations inside your home directory.
 
-Version 1.2.0 makes profile changes previewable, transactional, and reversible. Launching the app or reloading the profile list never applies a profile automatically.
+Version 0.20 makes profile changes previewable, transactional, and reversible. Launching the app or reloading the profile list never applies a profile automatically.
 
-## What v1.2 supports
+## What v0.20 supports
 
 - Read-only Preview with every destination, source, backup, warning, and post-commit effect.
 - Explicit Apply confirmation from the menu bar or Settings.
@@ -33,7 +33,7 @@ Version 1.2.0 makes profile changes previewable, transactional, and reversible. 
 - Config compatibility: missing fields receive defaults, unknown fields are ignored, and malformed `config.json` is never silently replaced.
 - Configurable global shortcuts and launch-at-login support.
 
-Terminal.app, iTerm2, and `systemTheme` declarations are accepted for profile compatibility but are not applied in v1.2.0; Preview reports them as unsupported. Kitty, WezTerm, remote theme downloads, palette extraction, and template substitution are not implemented.
+Terminal.app, iTerm2, and `systemTheme` declarations are accepted for profile compatibility but are not applied in v0.20; Preview reports them as unsupported. Kitty, WezTerm, remote theme downloads, palette extraction, and template substitution are not implemented.
 
 ## Safety model
 
@@ -122,7 +122,7 @@ For VS Code or Cursor, a theme beginning with `@id:` updates `workbench.colorThe
 
 ## Installation
 
-RiceBarMac 1.2.0 requires macOS 14 Sonoma or later and ships as a universal Intel/Apple Silicon app.
+RiceBarMac 0.20 requires macOS 14 Sonoma or later and ships as a universal Intel/Apple Silicon app.
 
 ### Homebrew
 
@@ -131,13 +131,11 @@ brew tap mateocerquetella/ricebarmac
 brew install --cask ricebarmac
 ```
 
-The Homebrew cask tracks signed releases. The explicitly unsigned v1.2.0 owner override is not distributed through Homebrew.
+The Homebrew cask tracks signed releases and is not changed by the manual v0.20 publisher.
 
 ### Download
 
 Download the versioned asset from [GitHub Releases](https://github.com/MateoCerquetella/RiceBarMac/releases), verify its attached SHA-256 checksum, extract it, and move `RiceBarMac.app` to `/Applications`.
-
-Normal release assets are Developer ID signed, hardened, notarized, stapled, and verified by Gatekeeper. An asset whose filename and release title explicitly say **Unsigned** is an owner-authorized exception: it is not notarized or Gatekeeper-approved, macOS may block it, and it should be installed only if you understand and accept that risk. The normal tag-triggered workflow never substitutes an unsigned fallback.
 
 ## Build and test
 

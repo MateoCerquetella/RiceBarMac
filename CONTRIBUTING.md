@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to RiceBarMac! This document provides guidelines and information for contributors.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Development Setup
 
@@ -29,7 +29,7 @@ Thank you for your interest in contributing to RiceBarMac! This document provide
 - Basic knowledge of Swift and SwiftUI
 - Familiarity with macOS development
 
-## 📝 Code Guidelines
+## Code Guidelines
 
 ### Swift Style
 
@@ -56,7 +56,7 @@ Thank you for your interest in contributing to RiceBarMac! This document provide
 - Run the generated-project, unit-test, UI-test, analysis, and universal-archive CI gates
 - Treat `project.yml` as the source of truth and commit the regenerated `RiceBarMac.xcodeproj`
 
-## 🐛 Bug Reports
+## Bug Reports
 
 When reporting bugs, please include:
 
@@ -68,7 +68,7 @@ When reporting bugs, please include:
 
 Use the bug report template when creating issues.
 
-## ✨ Feature Requests
+## Feature Requests
 
 Before suggesting new features:
 
@@ -79,7 +79,7 @@ Before suggesting new features:
 
 Use the feature request template when creating issues.
 
-## 🔄 Pull Request Process
+## Pull Request Process
 
 ### Before Submitting
 
@@ -107,7 +107,7 @@ Use the feature request template when creating issues.
 3. **Testing** on different configurations
 4. **Approval** and merge by maintainers
 
-## 🎯 Areas for Contribution
+## Areas for Contribution
 
 ### High Priority
 - **Performance optimizations**
@@ -126,7 +126,7 @@ Use the feature request template when creating issues.
 - **Developer tooling**
 - **Example configurations**
 
-## 📋 Issue Templates
+## Issue Templates
 
 ### Bug Report
 ```markdown
@@ -166,7 +166,7 @@ Any alternative solutions or features you've considered.
 Any other context or screenshots about the feature request.
 ```
 
-## 🔧 Development Tips
+## Development Tips
 
 ### Debugging
 - Use Xcode's debugger and console
@@ -187,17 +187,17 @@ echo "Test content" > ~/.ricebarmac/profiles/TestProfile/home/.config/test.txt
 - **File Watching**: FSEvents may need debugging
 - **UI Updates**: SwiftUI state management quirks
 
-## 📞 Getting Help
+## Getting Help
 
 - **GitHub Discussions**: For questions and ideas
 - **Issues**: For bugs and feature requests
 - **Code Review**: Request feedback on drafts
 
-## 🎉 Recognition
+## Recognition
 
 Contributors will be:
 - **Listed in CONTRIBUTORS.md**
 - **Mentioned in release notes**
 - **Credited in the app's About section**
 
-Thank you for contributing to RiceBarMac! 🍚
+Thank you for contributing to RiceBarMac!

@@ -1,6 +1,6 @@
-# RiceBarMac 1.2.0
+# RiceBarMac 0.20
 
-RiceBarMac 1.2.0 focuses on making profile changes predictable and recoverable.
+RiceBarMac 0.20 focuses on making profile changes predictable and recoverable.
 
 ## Highlights
 
@@ -17,7 +17,7 @@ RiceBarMac 1.2.0 focuses on making profile changes predictable and recoverable.
 
 ## Distribution integrity
 
-The release workflow requires a universal `arm64`/`x86_64` build, Developer ID signature, hardened runtime, Apple notarization, a stapled ticket, Gatekeeper acceptance, and a matching Homebrew checksum. It fails without those gates rather than publishing an unsigned fallback.
+The normal release workflow requires a universal `arm64`/`x86_64` build, Developer ID signature, hardened runtime, Apple notarization, a stapled ticket, Gatekeeper acceptance, and a matching Homebrew checksum. It fails without those gates rather than publishing an unsigned fallback.
 
 ## Requirements
 
