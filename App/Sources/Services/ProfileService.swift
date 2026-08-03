@@ -468,7 +468,7 @@ final class ProfileService: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             await coordinator.setStateHandler { [weak self] state in
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     self?.operationState = state
                     self?.isApplying = state.phase == .applying || state.phase == .rollingBack || state.phase == .undoing
                 }
@@ -616,7 +616,7 @@ final class ProfileService: ObservableObject {
 
     private func currentWallpaperURL() -> URL? {
         guard let screen = NSScreen.main,
-              let url = try? NSWorkspace.shared.desktopImageURL(for: screen),
+              let url = NSWorkspace.shared.desktopImageURL(for: screen),
               (try? fileSystem.state(at: url).exists) == true else {
             return nil
         }

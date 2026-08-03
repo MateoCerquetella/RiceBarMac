@@ -3,6 +3,23 @@ import XCTest
 @testable import RiceBarMac
 
 final class ProfileTransactionTests: XCTestCase {
+    func testExternalProcessDrainsLargeErrorOutputWithoutBlocking() async throws {
+        let home = try TemporaryHome()
+        let script = try home.write("noisy-startup.zsh", """
+        for i in {1..20000}; do
+          print -u2 -- 'RiceBarMac external-effect output must be drained while the process is running.'
+        done
+        """)
+        let effect = ProfileExternalEffect(
+            id: UUID(),
+            kind: .startupScript,
+            path: script.path,
+            arguments: []
+        )
+
+        try await LiveExternalEffectClient().perform(effect)
+    }
+
     func testApplyBacksUpAndUndoRestoresExactFile() async throws {
         let home = try TemporaryHome()
         let destination = try home.write(".config/app.conf", "original")

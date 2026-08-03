@@ -97,27 +97,117 @@ final class LiveExternalEffectClient: ExternalEffectClient, @unchecked Sendable 
     }
 
     private func run(_ executable: String, arguments: [String]) async throws {
-        try await withCheckedThrowingContinuation { continuation in
-            let process = Process()
-            let errorPipe = Pipe()
-            process.executableURL = URL(fileURLWithPath: executable)
-            process.arguments = arguments
-            process.standardOutput = Pipe()
-            process.standardError = errorPipe
-            process.terminationHandler = { process in
-                let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                if process.terminationStatus == 0 {
-                    continuation.resume(returning: ())
-                } else {
-                    continuation.resume(throwing: ExternalEffectError.processFailed(executable, process.terminationStatus, output))
-                }
-            }
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(throwing: error)
+        let process = Process()
+        let errorPipe = Pipe()
+        let errorOutput = BoundedProcessOutput()
+        let cancellation = ProcessCancellationState()
+        let readHandle = errorPipe.fileHandleForReading
+
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = errorPipe
+        readHandle.readabilityHandler = { handle in
+            let data = handle.availableData
+            if data.isEmpty {
+                handle.readabilityHandler = nil
+            } else {
+                errorOutput.append(data)
             }
         }
+
+        return try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            return try await withCheckedThrowingContinuation { continuation in
+                process.terminationHandler = { process in
+                    readHandle.readabilityHandler = nil
+                    errorOutput.append(readHandle.readDataToEndOfFile())
+                    readHandle.closeFile()
+
+                    if cancellation.isCancelled {
+                        continuation.resume(throwing: CancellationError())
+                    } else if process.terminationStatus == 0 {
+                        continuation.resume(returning: ())
+                    } else {
+                        continuation.resume(throwing: ExternalEffectError.processFailed(
+                            executable,
+                            process.terminationStatus,
+                            errorOutput.string
+                        ))
+                    }
+                }
+                do {
+                    try cancellation.launch(process)
+                } catch {
+                    readHandle.readabilityHandler = nil
+                    errorPipe.fileHandleForWriting.closeFile()
+                    readHandle.closeFile()
+                    continuation.resume(throwing: error)
+                }
+            }
+        } onCancel: {
+            cancellation.cancel(process)
+        }
+    }
+}
+
+private final class BoundedProcessOutput: @unchecked Sendable {
+    private let lock = NSLock()
+    private let byteLimit = 64 * 1_024
+    private var data = Data()
+
+    func append(_ chunk: Data) {
+        guard !chunk.isEmpty else { return }
+        lock.lock()
+        data.append(chunk)
+        if data.count > byteLimit {
+            data = Data(data.suffix(byteLimit))
+        }
+        lock.unlock()
+    }
+
+    var string: String {
+        lock.lock()
+        let snapshot = data
+        lock.unlock()
+        return String(data: snapshot, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+}
+
+private final class ProcessCancellationState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    func launch(_ process: Process) throws {
+        lock.lock()
+        let mayLaunch = !cancelled
+        lock.unlock()
+        guard mayLaunch else { throw CancellationError() }
+
+        try process.run()
+
+        lock.lock()
+        let shouldTerminate = cancelled && process.isRunning
+        lock.unlock()
+        if shouldTerminate {
+            process.terminate()
+        }
+    }
+
+    func cancel(_ process: Process) {
+        lock.lock()
+        cancelled = true
+        let shouldTerminate = process.isRunning
+        lock.unlock()
+        if shouldTerminate {
+            process.terminate()
+        }
+    }
+
+    var isCancelled: Bool {
+        lock.lock()
+        let value = cancelled
+        lock.unlock()
+        return value
     }
 }
