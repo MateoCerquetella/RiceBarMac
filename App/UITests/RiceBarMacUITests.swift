@@ -60,8 +60,9 @@ final class RiceBarMacUITests: XCTestCase {
         let invalidProfile = window.descendants(matching: .any)["invalid-profile-Broken"]
         XCTAssertTrue(reveal(heading, in: window))
         XCTAssertTrue(reveal(invalidProfile, in: window))
-        XCTAssertEqual(invalidProfile.label, "Invalid profile Broken")
-        XCTAssertEqual((invalidProfile.value as? String)?.isEmpty, false)
+        let labelPrefix = "Invalid profile Broken: "
+        XCTAssertTrue(invalidProfile.label.hasPrefix(labelPrefix))
+        XCTAssertGreaterThan(invalidProfile.label.count, labelPrefix.count)
         attachScreenshot("failure")
     }
 
@@ -100,7 +101,7 @@ final class RiceBarMacUITests: XCTestCase {
         let menu = window.descendants(matching: .any)["preview-profile-menu"]
         XCTAssertTrue(reveal(menu, in: window))
         menu.click()
-        let profileItem = menu.menuItems["preview-profile-\(profileName)"]
+        let profileItem = app.menuItems["Preview \(profileName)"]
         XCTAssertTrue(profileItem.waitForExistence(timeout: 3))
         profileItem.click()
     }

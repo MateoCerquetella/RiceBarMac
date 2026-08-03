@@ -290,7 +290,7 @@ struct SettingsGeneralTabView: View {
                         HStack(spacing: 12) {
                             Menu("Preview Profile…") {
                                 ForEach(viewModel.sortedProfiles, id: \.id) { descriptor in
-                                    Button(descriptor.displayName) {
+                                    Button("Preview \(descriptor.displayName)") {
                                         viewModel.applyProfile(descriptor)
                                     }
                                     .accessibilityIdentifier("preview-profile-\(descriptor.id)")
@@ -347,8 +347,9 @@ struct SettingsGeneralTabView: View {
                                         .foregroundColor(.red)
                                         .textSelection(.enabled)
                                         .accessibilityElement(children: .ignore)
-                                        .accessibilityLabel("Invalid profile \(invalid.directory.lastPathComponent)")
-                                        .accessibilityValue(invalid.message)
+                                        .accessibilityLabel(
+                                            "Invalid profile \(invalid.directory.lastPathComponent): \(invalid.message)"
+                                        )
                                         .accessibilityIdentifier("invalid-profile-\(invalid.directory.lastPathComponent)")
                                 }
                             }
