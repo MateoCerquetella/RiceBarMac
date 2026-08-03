@@ -1,0 +1,197 @@
+[
+  {
+    "criterionId": "AC-1",
+    "kind": "test",
+    "passed": true,
+    "summary": "Configuration launch-matrix and native idle tests passed: missing, valid, legacy, malformed, and active-profile startup paths remain read-only until an explicit action."
+  },
+  {
+    "criterionId": "AC-2",
+    "kind": "test",
+    "passed": true,
+    "summary": "Planner and coordinator tests passed for deterministic ordered previews, zero preview mutations, exact backup paths, and Apply reuse of the previewed immutable plan."
+  },
+  {
+    "criterionId": "AC-3",
+    "kind": "test",
+    "passed": true,
+    "summary": "Planner and transaction tests passed for missing sources, canonical-home escapes, unsafe parent links/files, recursive mappings, protected app storage, destination conflicts, stale plans, and commit-boundary races."
+  },
+  {
+    "criterionId": "AC-4",
+    "kind": "test",
+    "passed": true,
+    "summary": "Transaction tests passed for exact regular-file, directory, valid-link, and broken-link backups; unique adjacent paths; staged mutations; and atomically persisted journal transitions."
+  },
+  {
+    "criterionId": "AC-5",
+    "kind": "test",
+    "passed": true,
+    "summary": "Successful-apply, serialization, and UI tests passed: one explicit operation commits once, records completion, suppresses self-feedback, and updates the active profile only after commit."
+  },
+  {
+    "criterionId": "AC-6",
+    "kind": "test",
+    "passed": true,
+    "summary": "Fault injection at reversible boundaries, crash recovery, rollback-race, and native recovery tests passed; rollback is reverse ordered and unresolved user-owned state is preserved for retry."
+  },
+  {
+    "criterionId": "AC-7",
+    "kind": "test",
+    "passed": true,
+    "summary": "Undo tests passed for exact restoration, removal of transaction-owned creations only, active-profile restoration, repeated no-op behavior, and refusal after destination or backup tampering."
+  },
+  {
+    "criterionId": "AC-8",
+    "kind": "test",
+    "passed": true,
+    "summary": "Coordinator tests passed for FIFO serialization, non-overlap, queued cancellation, recovery blocking, deterministic state, and structured asynchronous operation without polling."
+  },
+  {
+    "criterionId": "AC-9",
+    "kind": "test",
+    "passed": true,
+    "summary": "Legacy migration tests passed for read-only detection, explicit staging, destination conflict refusal, source preservation, partial-destination cleanup, and journaled finalization warnings."
+  },
+  {
+    "criterionId": "AC-10",
+    "kind": "test",
+    "passed": true,
+    "summary": "Configuration compatibility tests passed for defaults, unknown fields, malformed-byte preservation, actionable invalid state, backed atomic saves, optimistic locking, and concurrent-create/change races."
+  },
+  {
+    "criterionId": "AC-11",
+    "kind": "test",
+    "passed": true,
+    "summary": "JSON/YAML compatibility and profile-validation tests passed for older defaults and supported wallpaper, editor, replacement, link, extension, and startup-script plan behavior; invalid profiles remain visible."
+  },
+  {
+    "criterionId": "AC-12",
+    "kind": "test",
+    "passed": true,
+    "summary": "Model lifecycle and native reload tests passed, and source review confirmed metadata-only reload, one shared ApplicationModel, watcher teardown, and hotkey clear/re-register without duplicate handlers."
+  },
+  {
+    "criterionId": "AC-13",
+    "kind": "test",
+    "passed": true,
+    "summary": "The 1,000-file coordinator fixture passed with a progressing main-actor heartbeat and no operation overlap; source review found no Thread.sleep, busy-wait, or unstructured Apply path."
+  },
+  {
+    "criterionId": "AC-UI-1",
+    "kind": "test",
+    "passed": true,
+    "summary": "All 3 real-process XCUITests passed for Preview, applying, success, invalid-profile failure, recovery-required, and Undo controls and messages."
+  },
+  {
+    "criterionId": "AC-UI-1",
+    "kind": "browser",
+    "passed": true,
+    "summary": "Decision D-005 approves real native XCUITest as the browser-equivalent for this AppKit/SwiftUI menu-bar app; the suite drove the shipped process through the visible release states."
+  },
+  {
+    "criterionId": "AC-UI-1",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "The exact-head success state shows the active profile only after completion and exposes Undo.",
+    "artifact": ".empirical/evidence/revision-5/success.png"
+  },
+  {
+    "criterionId": "AC-UI-1",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "The exact-head recovery state presents an actionable Restore Previous State control without claiming success.",
+    "artifact": ".empirical/evidence/revision-5/recovery.png"
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "test",
+    "passed": true,
+    "summary": "Accessibility-identifier and keyboard interaction assertions passed in the real application for all tested controls and alerts."
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "browser",
+    "passed": true,
+    "summary": "The approved native browser-equivalent XCUITest interacted with the real Settings window and AppKit alerts through macOS accessibility APIs."
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "Exact-head native idle state.",
+    "artifact": ".empirical/evidence/revision-5/idle.png"
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "Exact-head immutable Preview state.",
+    "artifact": ".empirical/evidence/revision-5/preview.png"
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "Exact-head applying state with operation text and mutation controls disabled.",
+    "artifact": ".empirical/evidence/revision-5/applying.png"
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "Exact-head successful Apply state.",
+    "artifact": ".empirical/evidence/revision-5/success.png"
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "Exact-head invalid-profile failure state.",
+    "artifact": ".empirical/evidence/revision-5/failure.png"
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "Exact-head recovery-required state.",
+    "artifact": ".empirical/evidence/revision-5/recovery.png"
+  },
+  {
+    "criterionId": "AC-UI-2",
+    "kind": "screenshot",
+    "passed": true,
+    "summary": "Exact-head completed Undo state.",
+    "artifact": ".empirical/evidence/revision-5/undo.png"
+  },
+  {
+    "criterionId": "AC-14",
+    "kind": "test",
+    "passed": true,
+    "summary": "Exact head aef08e9 passed CI run 30784824071: XcodeGen drift, Debug build/analyze, 38 unit tests, 3 UI tests, Release build/analyze, macOS 14 metadata, and universal arm64/x86_64 archive verification."
+  },
+  {
+    "criterionId": "AC-15",
+    "kind": "test",
+    "passed": true,
+    "summary": "EXPECTED_TAG=v1.2.0 scripts/verify-version.sh and exact-head CI passed with project.yml canonical version 1.2.0, monotonically increased build 120, generated plist, About metadata, and archive metadata aligned; publication remains intentionally untagged until credentials exist."
+  },
+  {
+    "criterionId": "AC-16",
+    "kind": "test",
+    "passed": true,
+    "summary": "Release-script syntax and independent workflow review passed: credential preflight, exact archived app identity, Developer ID verification, hardened-runtime/entitlement checks, notarization wait, stapling, and Gatekeeper assessment all fail closed before publication."
+  },
+  {
+    "criterionId": "AC-17",
+    "kind": "test",
+    "passed": true,
+    "summary": "Independent release-workflow review passed: the cask update follows immutable asset creation and SHA-256 computation, then enforces version/URL/minimum macOS, brew audit/fetch/install/launch/reinstall, configuration-sentinel preservation, and idempotent tap commits."
+  },
+  {
+    "criterionId": "AC-18",
+    "kind": "test",
+    "passed": true,
+    "summary": "README and v1.2.0 release-note claim review passed against source and tests for Preview, adjacent backups, Undo, explicit migration, recovery, macOS 14+, and supported integrations, without claims for stubbed Terminal.app, iTerm2, or system-theme features."
+  }
+]
