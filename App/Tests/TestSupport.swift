@@ -49,6 +49,7 @@ final class FaultInjectingFileSystemClient: FileSystemClient, @unchecked Sendabl
     private(set) var maximumConcurrentMutations = 0
     var failAtMutation: Int?
     var mutationDelay: TimeInterval = 0
+    var afterMutation: (@Sendable (_ count: Int, _ url: URL) throws -> Void)?
 
     init(base: FileSystemClient = LiveFileSystemClient()) {
         self.base = base
@@ -95,6 +96,7 @@ final class FaultInjectingFileSystemClient: FileSystemClient, @unchecked Sendabl
         let count = mutationCount
         let shouldFail = failAtMutation == count
         let delay = mutationDelay
+        let mutationHook = afterMutation
         lock.unlock()
 
         defer {
@@ -110,6 +112,7 @@ final class FaultInjectingFileSystemClient: FileSystemClient, @unchecked Sendabl
             throw InjectedFileSystemError.failure(count, url.path)
         }
         try operation()
+        try mutationHook?(count, url)
     }
 }
 

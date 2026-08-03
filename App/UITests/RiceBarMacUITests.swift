@@ -88,7 +88,7 @@ final class RiceBarMacUITests: XCTestCase {
         XCTAssertTrue(reveal(undo, in: window))
         undo.click()
 
-        let acknowledge = app.buttons["OK"]
+        let acknowledge = app.dialogs.buttons["dismiss-error"].firstMatch
         XCTAssertTrue(acknowledge.waitForExistence(timeout: 8))
         acknowledge.click()
 

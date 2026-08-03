@@ -410,7 +410,8 @@ final class StatusBarViewModel: ObservableObject {
         }
         
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "OK")
+        let dismissButton = alert.addButton(withTitle: "OK")
+        dismissButton.setAccessibilityIdentifier("dismiss-error")
         alert.runModal()
     }
 

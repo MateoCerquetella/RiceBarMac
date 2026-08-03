@@ -190,18 +190,7 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         try persist(&transaction)
 
         let safety = try validateDestinationParents(for: action, transaction: transaction)
-
-        if let sourcePath = action.sourcePath, let expectedSource = action.sourceState {
-            let source = URL(fileURLWithPath: sourcePath)
-            try safety.validateSource(
-                source,
-                profileDirectory: URL(fileURLWithPath: transaction.plan.profileDirectoryPath, isDirectory: true)
-            )
-            let currentSource = try fileSystem.state(at: source)
-            guard statesMatch(currentSource, expectedSource) else {
-                throw FileSystemClientError.stalePath(sourcePath)
-            }
-        }
+        try validateSource(for: action, transaction: transaction, safety: safety)
 
         let destination = URL(fileURLWithPath: action.destinationPath)
         let backup = URL(fileURLWithPath: action.backupPath)
@@ -245,14 +234,44 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
             try persist(&transaction)
         }
 
+        let commitSafety = try validateDestinationParents(for: action, transaction: transaction)
+        try validateSource(for: action, transaction: transaction, safety: commitSafety)
+        let commitDestination = try fileSystem.state(at: destination)
+        guard statesMatch(commitDestination, action.beforeState) else {
+            throw FileSystemClientError.stalePath(destination.path)
+        }
+
         if action.beforeState.exists {
             try fileSystem.moveItem(at: destination, to: backup)
+            let movedBackup = try fileSystem.state(at: backup)
+            guard statesMatch(movedBackup, action.beforeState),
+                  try fileSystem.state(at: destination).kind == .absent else {
+                throw FileSystemClientError.stalePath(backup.path)
+            }
             transaction.actions[index].status = .backupCreated
             try persist(&transaction)
         }
 
         if action.kind != .remove {
+            let installSafety = try validateDestinationParents(for: action, transaction: transaction)
+            try validateSource(for: action, transaction: transaction, safety: installSafety)
+            guard try fileSystem.state(at: destination).kind == .absent else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+            if action.beforeState.exists {
+                guard statesMatch(try fileSystem.state(at: backup), action.beforeState) else {
+                    throw FileSystemClientError.stalePath(backup.path)
+                }
+            }
+            guard let staged = transaction.actions[index].installedFingerprint,
+                  fingerprintsMatch(try fileSystem.state(at: stage).fingerprint, staged) else {
+                throw FileSystemClientError.stalePath(stage.path)
+            }
             try fileSystem.moveItem(at: stage, to: destination)
+        } else {
+            guard try fileSystem.state(at: destination).kind == .absent else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
         }
         let installed = try fileSystem.state(at: destination).fingerprint
         if let staged = transaction.actions[index].installedFingerprint {
@@ -338,6 +357,12 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
 
         let backupExists = try fileSystem.state(at: backup).exists
         let current = try fileSystem.state(at: destination)
+
+        if backupExists, action.beforeState.exists {
+            guard statesMatch(try fileSystem.state(at: backup), action.beforeState) else {
+                throw FileSystemClientError.stalePath(backup.path)
+            }
+        }
 
         if record.status == .intentRecorded,
            record.installedFingerprint == nil,
@@ -429,6 +454,24 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         return safety
     }
 
+    private func validateSource(
+        for action: PlannedFileAction,
+        transaction: ApplyTransaction,
+        safety: PathSafetyValidator
+    ) throws {
+        guard let sourcePath = action.sourcePath,
+              let expectedSource = action.sourceState else { return }
+        let source = URL(fileURLWithPath: sourcePath)
+        try safety.validateSource(
+            source,
+            profileDirectory: URL(fileURLWithPath: transaction.plan.profileDirectoryPath, isDirectory: true)
+        )
+        let currentSource = try fileSystem.state(at: source)
+        guard statesMatch(currentSource, expectedSource) else {
+            throw FileSystemClientError.stalePath(sourcePath)
+        }
+    }
+
     private func markRestored(
         at index: Int,
         transaction: inout ApplyTransaction,
@@ -454,7 +497,14 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
     }
 
     private func statesMatch(_ current: FileObjectState, _ expected: FileObjectState) -> Bool {
-        fingerprintsMatch(current.fingerprint, expected.fingerprint) && current.permissions == expected.permissions
+        guard fingerprintsMatch(current.fingerprint, expected.fingerprint),
+              current.permissions == expected.permissions else {
+            return false
+        }
+        if expected.kind == .directory {
+            return current.size == expected.size && current.modificationDate == expected.modificationDate
+        }
+        return true
     }
 
     private func fingerprintsMatch(_ current: PathFingerprint, _ expected: PathFingerprint) -> Bool {

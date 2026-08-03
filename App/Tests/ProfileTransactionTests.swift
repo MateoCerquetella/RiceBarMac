@@ -84,6 +84,81 @@ final class ProfileTransactionTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: plan.actions.last!.backupPath))
     }
 
+    func testModifiedBackupBlocksUndoWithoutRemovingInstalledDestination() async throws {
+        let home = try TemporaryHome()
+        let destination = try home.write(".config/app.conf", "original")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = LiveFileSystemClient()
+        let executor = makeExecutor(home: home.url, fileSystem: fileSystem)
+        let plan = ProfilePlanner(home: home.url, fileSystem: fileSystem)
+            .makePlan(for: descriptor, formerActiveProfilePath: nil)
+        _ = try await executor.apply(plan)
+        let backup = URL(fileURLWithPath: plan.actions.last!.backupPath)
+        try Data("modified-backup".utf8).write(to: backup)
+
+        XCTAssertThrowsError(try executor.undoLatest())
+
+        XCTAssertEqual(try fileSystem.state(at: destination).kind, .symbolicLink)
+        XCTAssertEqual(String(data: try Data(contentsOf: backup), encoding: .utf8), "modified-backup")
+    }
+
+    func testDestinationChangeDuringStagingAbortsWithoutOverwritingUserData() async throws {
+        let home = try TemporaryHome()
+        let destination = try home.write(".config/app.conf", "original")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = FaultInjectingFileSystemClient()
+        fileSystem.afterMutation = { count, _ in
+            guard count == 1 else { return }
+            try Data("changed-during-staging".utf8).write(to: destination)
+        }
+        let store = MemoryTransactionStore()
+        let executor = makeExecutor(home: home.url, fileSystem: fileSystem, transactionStore: store)
+        let plan = ProfilePlanner(home: home.url, fileSystem: fileSystem)
+            .makePlan(for: descriptor, formerActiveProfilePath: nil)
+
+        do {
+            _ = try await executor.apply(plan)
+            XCTFail("Expected stale destination rejection")
+        } catch let error as FileSystemClientError {
+            guard case .stalePath = error else {
+                return XCTFail("Expected stalePath, received \(error)")
+            }
+        }
+
+        XCTAssertEqual(String(data: try Data(contentsOf: destination), encoding: .utf8), "changed-during-staging")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: plan.actions.last!.backupPath))
+        XCTAssertEqual(try store.load(id: plan.id)?.status, .rolledBack)
+    }
+
+    func testDestinationCreatedAfterBackupIsPreservedForRecovery() async throws {
+        let home = try TemporaryHome()
+        let destination = try home.write(".config/app.conf", "original")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = FaultInjectingFileSystemClient()
+        fileSystem.afterMutation = { count, _ in
+            guard count == 2 else { return }
+            try Data("created-after-backup".utf8).write(to: destination)
+        }
+        let store = MemoryTransactionStore()
+        let executor = makeExecutor(home: home.url, fileSystem: fileSystem, transactionStore: store)
+        let plan = ProfilePlanner(home: home.url, fileSystem: fileSystem)
+            .makePlan(for: descriptor, formerActiveProfilePath: nil)
+
+        do {
+            _ = try await executor.apply(plan)
+            XCTFail("Expected recovery-required conflict")
+        } catch let error as TransactionExecutionError {
+            guard case .recoveryRequired(let paths, _) = error else {
+                return XCTFail("Expected recoveryRequired, received \(error)")
+            }
+            XCTAssertTrue(paths.contains(destination.path))
+        }
+
+        XCTAssertEqual(String(data: try Data(contentsOf: destination), encoding: .utf8), "created-after-backup")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: plan.actions.last!.backupPath))
+        XCTAssertEqual(try store.load(id: plan.id)?.status, .recoveryRequired)
+    }
+
     func testUndoPreservesFilesAddedToCreatedDirectoryAndRecoveryIsRetryable() async throws {
         let home = try TemporaryHome()
         let generatedDirectory = home.url.appendingPathComponent(".config/generated", isDirectory: true)
