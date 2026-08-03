@@ -237,66 +237,54 @@ final class ProfileService: ObservableObject {
             throw ProfileServiceError.profileAlreadyExists(sanitized)
         }
         try ensureDirectoryHierarchy(profilesURL)
+        let stage = profilesURL.appendingPathComponent(
+            ".\(sanitized).ricebarmac-stage-\(UUID().uuidString.lowercased())",
+            isDirectory: true
+        )
         do {
-            try fileSystem.copyItem(at: descriptor.directory, to: destination)
+            try fileSystem.copyItem(at: descriptor.directory, to: stage)
             let transientNames = [".ricebar-last-apply.json"]
             for name in transientNames {
-                try? fileSystem.removeItem(at: destination.appendingPathComponent(name))
+                try? fileSystem.removeItem(at: stage.appendingPathComponent(name))
             }
+            if var copiedProfile = try loadProfileDefinition(at: stage) {
+                copiedProfile.name = sanitized
+                try saveProfileDefinition(copiedProfile, in: stage)
+            }
+            guard try fileSystem.state(at: destination).kind == .absent else {
+                throw ProfileServiceError.profileAlreadyExists(sanitized)
+            }
+            try fileSystem.moveItem(at: stage, to: destination)
+        } catch let error as ProfileServiceError {
+            try? fileSystem.removeItem(at: stage)
+            throw error
         } catch {
-            try? fileSystem.removeItem(at: destination)
+            try? fileSystem.removeItem(at: stage)
             throw ProfileServiceError.fileOperationFailed("copy profile", error)
         }
         reload()
+        configureWatching(enabled: watchingEnabled)
         return profiles.first(where: { $0.directory.path == destination.path })
             ?? ProfileDescriptor(profile: defaultProfile(for: destination), directory: destination)
     }
 
     func createEmptyProfile(name: String) throws -> ProfileDescriptor {
-        let sanitized = try validatedProfileName(name)
-        let destination = profilesURL.appendingPathComponent(sanitized, isDirectory: true)
-        guard try fileSystem.state(at: destination).kind == .absent else {
-            throw ProfileServiceError.profileAlreadyExists(sanitized)
-        }
-
-        do {
-            try ensureDirectoryHierarchy(profilesURL)
-            try fileSystem.createDirectory(at: destination)
-            try fileSystem.createDirectory(at: destination.appendingPathComponent("home", isDirectory: true))
-            try saveProfile(Profile(name: sanitized), at: destination.appendingPathComponent("profile.json"))
-        } catch {
-            try? fileSystem.removeItem(at: destination)
-            throw ProfileServiceError.fileOperationFailed("create profile", error)
-        }
-        reload()
-        configureWatching(enabled: watchingEnabled)
-        return profiles.first(where: { $0.directory.path == destination.path })
-            ?? ProfileDescriptor(profile: Profile(name: sanitized), directory: destination)
+        try createProfile(name: name, operation: "create profile") { _, _ in }
     }
 
     func createProfileFromCurrent(name: String) throws -> ProfileDescriptor {
-        let descriptor = try createEmptyProfile(name: name)
-        do {
-            var profile = descriptor.profile
+        try createProfile(name: name, operation: "capture current setup") { directory, profile in
             if let wallpaper = currentWallpaperURL() {
                 let extensionName = wallpaper.pathExtension.isEmpty ? "jpg" : wallpaper.pathExtension
-                let wallpaperDestination = descriptor.directory.appendingPathComponent("wallpaper.\(extensionName)")
+                let wallpaperDestination = directory.appendingPathComponent("wallpaper.\(extensionName)")
                 try fileSystem.copyItem(at: wallpaper, to: wallpaperDestination)
                 profile.wallpaper = wallpaperDestination.lastPathComponent
             }
             try snapshotDirectoryIfPresent(
                 homeURL.appendingPathComponent(".config", isDirectory: true),
-                to: descriptor.directory.appendingPathComponent("home/.config", isDirectory: true)
+                to: directory.appendingPathComponent("home/.config", isDirectory: true)
             )
-            try captureEditorSettings(to: descriptor.directory)
-            try saveProfile(profile, at: descriptor.directory.appendingPathComponent("profile.json"))
-            reload()
-            return profiles.first(where: { $0.directory.path == descriptor.directory.path })
-                ?? ProfileDescriptor(profile: profile, directory: descriptor.directory)
-        } catch {
-            try? fileSystem.removeItem(at: descriptor.directory)
-            reload()
-            throw ProfileServiceError.fileOperationFailed("capture current setup", error)
+            try captureEditorSettings(to: directory)
         }
     }
 
@@ -346,6 +334,50 @@ final class ProfileService: ObservableObject {
     func saveCurrentConfigToSpecificProfile(_ descriptor: ProfileDescriptor) throws {
         try captureEditorSettings(to: descriptor.directory)
         reload()
+    }
+
+    private func createProfile(
+        name: String,
+        operation: String,
+        populate: (_ directory: URL, _ profile: inout Profile) throws -> Void
+    ) throws -> ProfileDescriptor {
+        let sanitized = try validatedProfileName(name)
+        let destination = profilesURL.appendingPathComponent(sanitized, isDirectory: true)
+        guard try fileSystem.state(at: destination).kind == .absent else {
+            throw ProfileServiceError.profileAlreadyExists(sanitized)
+        }
+
+        try ensureDirectoryHierarchy(profilesURL)
+        let stage = profilesURL.appendingPathComponent(
+            ".\(sanitized).ricebarmac-stage-\(UUID().uuidString.lowercased())",
+            isDirectory: true
+        )
+        var createdStage = false
+        var profile = Profile(name: sanitized)
+
+        do {
+            try fileSystem.createDirectory(at: stage)
+            createdStage = true
+            try fileSystem.createDirectory(at: stage.appendingPathComponent("home", isDirectory: true))
+            try populate(stage, &profile)
+            try saveProfile(profile, at: stage.appendingPathComponent("profile.json"))
+            guard try fileSystem.state(at: destination).kind == .absent else {
+                throw ProfileServiceError.profileAlreadyExists(sanitized)
+            }
+            try fileSystem.moveItem(at: stage, to: destination)
+            createdStage = false
+        } catch let error as ProfileServiceError {
+            if createdStage { try? fileSystem.removeItem(at: stage) }
+            throw error
+        } catch {
+            if createdStage { try? fileSystem.removeItem(at: stage) }
+            throw ProfileServiceError.fileOperationFailed(operation, error)
+        }
+
+        reload()
+        configureWatching(enabled: watchingEnabled)
+        return profiles.first(where: { $0.directory.path == destination.path })
+            ?? ProfileDescriptor(profile: profile, directory: destination)
     }
 
     // MARK: - Watcher lifecycle
@@ -592,20 +624,53 @@ final class ProfileService: ObservableObject {
             let source = sourceDirectory.appendingPathComponent(name)
             guard try fileSystem.state(at: source).exists else { continue }
             let destination = destinationDirectory.appendingPathComponent(name)
-            if try fileSystem.state(at: destination).exists {
-                try fileSystem.removeItem(at: destination)
-            }
-            try fileSystem.copyItem(at: source, to: destination)
+            try copyReplacing(source, at: destination)
         }
     }
 
     private func snapshotDirectoryIfPresent(_ source: URL, to destination: URL) throws {
         guard try fileSystem.state(at: source).kind == .directory else { return }
-        if try fileSystem.state(at: destination).exists {
-            try fileSystem.removeItem(at: destination)
-        }
+        try copyReplacing(source, at: destination)
+    }
+
+    private func copyReplacing(_ source: URL, at destination: URL) throws {
         try ensureDirectoryHierarchy(destination.deletingLastPathComponent())
-        try fileSystem.copyItem(at: source, to: destination)
+        let identifier = UUID().uuidString.lowercased()
+        let parent = destination.deletingLastPathComponent()
+        let stage = parent.appendingPathComponent(".\(destination.lastPathComponent).ricebarmac-stage-\(identifier)")
+        let backup = parent.appendingPathComponent(".\(destination.lastPathComponent).ricebarmac-backup-\(identifier)")
+        guard try fileSystem.state(at: stage).kind == .absent,
+              try fileSystem.state(at: backup).kind == .absent else {
+            throw FileSystemClientError.collision(destination.path)
+        }
+
+        var staged = true
+        var movedOriginal = false
+        do {
+            try fileSystem.copyItem(at: source, to: stage)
+            if try fileSystem.state(at: destination).exists {
+                try fileSystem.moveItem(at: destination, to: backup)
+                movedOriginal = true
+            }
+            try fileSystem.moveItem(at: stage, to: destination)
+            staged = false
+        } catch {
+            if staged { try? fileSystem.removeItem(at: stage) }
+            if movedOriginal {
+                do {
+                    guard try fileSystem.state(at: destination).kind == .absent else {
+                        throw FileSystemClientError.stalePath(destination.path)
+                    }
+                    try fileSystem.moveItem(at: backup, to: destination)
+                } catch let rollbackError {
+                    throw ProfileServiceError.fileOperationFailed(
+                        "restore capture backup at \(backup.path)",
+                        rollbackError
+                    )
+                }
+            }
+            throw error
+        }
     }
 
     // MARK: - Path helpers

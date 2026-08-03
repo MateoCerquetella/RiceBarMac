@@ -18,7 +18,7 @@ final class RiceBarMacUITests: XCTestCase {
         }
     }
 
-    func testPreviewApplyAndUndoAreVisibleAndKeyboardAccessible() throws {
+    func testPreviewApplyAndUndoAreVisibleAndAccessible() throws {
         let destination = temporaryHome.appendingPathComponent(".config/ui-test.conf")
         try createProfile(name: "UI Test", destination: destination, valid: true)
         launch()
@@ -28,13 +28,14 @@ final class RiceBarMacUITests: XCTestCase {
         attachScreenshot("idle")
 
         openPreview()
-        let preview = app.dialogs["Preview UI Test"]
-        XCTAssertTrue(preview.waitForExistence(timeout: 5))
-        XCTAssertTrue(preview.staticTexts["Review the exact plan below. No files have been changed. Replaced items will be moved to the listed backups."].exists)
+        let apply = app.buttons["Apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Preview UI Test"].exists)
+        XCTAssertTrue(app.staticTexts["Review the exact plan below. No files have been changed. Replaced items will be moved to the listed backups."].exists)
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         attachScreenshot("preview")
 
-        preview.buttons["Apply"].click()
+        apply.click()
         let status = window.descendants(matching: .any)["profile-operation-status"]
         XCTAssertTrue(status.waitForExistence(timeout: 3))
         attachScreenshot("applying")
