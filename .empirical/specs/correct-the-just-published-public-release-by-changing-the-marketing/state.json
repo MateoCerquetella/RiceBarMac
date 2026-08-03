@@ -1,17 +1,78 @@
 {
   "schemaVersion": 4,
-  "revision": 5,
+  "revision": 8,
   "activeFeature": "correct-the-just-published-public-release-by-changing-the-marketing",
   "request": "Correct the just-published public release by changing the marketing version from 1.2.0 to the literal version 0.20 with tag v0.20, keeping build 120 unless repository evidence requires a different monotonic build; remove the quoted unsigned security-notice paragraph from repository release documentation and the published GitHub release notes; remove emoji characters from every tracked text file including README without changing binary assets or program semantics; run all existing validation; publish and publicly verify the corrected unsigned v0.20 release and checksum; only after that succeeds, delete the mistaken v1.2.0 GitHub release and tag. Leave Homebrew and the normal signed release workflow untouched, and preserve the pre-existing untracked CLAUDE.md.",
   "profile": "complex",
-  "phase": "verify",
-  "status": "waiting",
+  "phase": "done",
+  "status": "done",
   "repairAttempts": 0,
-  "message": "Implemented literal v0.20/build 120 metadata, current-copy and notes correction, requested warning removal, ASCII built-in presentation with legacy custom-icon compatibility, a Unicode-aware tracked-text emoji gate wired into CI and both release paths, and preserved normal signing/Homebrew controls; local version, emoji, Actionlint, shell, JSON, and diff checks pass.",
+  "message": "Archived capability changes: application-experience, release-integrity",
   "implementationActor": "agent",
   "specDigest": "943b32f85dba89bb67bb7a9dcf832e28b33026b18f4431674634e1b93a98f278",
   "capabilityArchiveRequired": true,
   "capabilityDeltaDigest": "dde75dfc8eea1bc23f9e29f5f5b984c4299cf9a2cf48dbcf4a9e47cc2b0d0f7c",
-  "evidence": [],
-  "updatedAt": "2026-08-03T13:59:15.138Z"
+  "evidence": [
+    {
+      "criterionId": "AC-1",
+      "kind": "test",
+      "passed": true,
+      "summary": "Exact main commit e1d2616789102551d717f94317aa6b99f3eccede passed EXPECTED_TAG=v0.20 version verification, XcodeGen regeneration with zero drift, archive plist inspection, and release metadata checks: marketing version 0.20, build 120, tag v0.20, and versioned asset names agree."
+    },
+    {
+      "criterionId": "AC-2",
+      "kind": "test",
+      "passed": true,
+      "summary": "Targeted current-product scans found no v1.2.0 reference in README, contributor docs, project metadata, App source, workflows, current v0.20 notes, generated project, or scripts; archived Empirical events and evidence remain unchanged as audit history."
+    },
+    {
+      "criterionId": "AC-3",
+      "kind": "test",
+      "passed": true,
+      "summary": "Repository and public v0.20 release-body scans found none of the requested Security notice, Developer ID warning sentence, macOS-block warning, or install-at-own-risk copy. The public title and asset remain factually labeled Unsigned and make no signed, notarized, or Gatekeeper-approved claim."
+    },
+    {
+      "criterionId": "AC-4",
+      "kind": "test",
+      "passed": true,
+      "summary": "scripts/verify-no-emoji.sh passed locally, in PR CI run 30820622415, exact-main CI run 30821021995, and unsigned publisher run 30821382473. The 38-test suite verified the RB default while preserving a legacy user-supplied Unicode icon, and a GitHub API scan found no emoji in any remaining release title or body."
+    },
+    {
+      "criterionId": "AC-5",
+      "kind": "test",
+      "passed": true,
+      "summary": "Actionlint and exact workflow diff review passed: the manual publisher defaults to v0.20, reads UNSIGNED_RELEASE_NOTES_0.20.md, requires acknowledgement, and does not update Homebrew; the normal workflow retains its credential, Developer ID, hardened runtime, notarization, stapling, Gatekeeper, checksum, and Homebrew gates apart from the v0.20 notes reference and shared emoji gate."
+    },
+    {
+      "criterionId": "AC-6",
+      "kind": "test",
+      "passed": true,
+      "summary": "PR CI 30820622415 and exact-main CI 30821021995 passed generation/drift, emoji/version gates, Debug build/analyze, 38 unit tests, 3 UI tests, Release build/analyze, and universal archive verification. Publisher 30821382473 independently passed 38 unit tests, 3 UI tests, Release analysis, and archive verification."
+    },
+    {
+      "criterionId": "AC-7",
+      "kind": "test",
+      "passed": true,
+      "summary": "Public non-draft, non-prerelease, latest release https://github.com/MateoCerquetella/RiceBarMac/releases/tag/v0.20 and tag v0.20 target e1d2616789102551d717f94317aa6b99f3eccede. Unauthenticated downloads of RiceBarMac-0.20-unsigned.zip and its checksum passed SHA-256 c5bf376d64149d35414993c2c3c68bbaea4cddfc46714c04605411532f0af121 and ZIP integrity; extracted metadata is 0.20 (120), macOS 14.0, universal x86_64/arm64, with no _CodeSignature path."
+    },
+    {
+      "criterionId": "AC-8",
+      "kind": "test",
+      "passed": true,
+      "summary": "Only after AC-7 passed, the v1.2.0 GitHub release was deleted and verified absent, then remote tag refs/tags/v1.2.0 and the local tag were deleted. The old asset URL returns HTTP 404 while refs/tags/v0.20 still targets the exact verified commit."
+    },
+    {
+      "criterionId": "AC-9",
+      "kind": "test",
+      "passed": true,
+      "summary": "Run history shows no new normal signed Release workflow; the separate Homebrew cask remains unchanged at 0.1.0-beta; v0.20 was produced only by the manual workflow. Final worktree checks preserve the pre-existing untracked CLAUDE.md without staging or modification."
+    },
+    {
+      "criterionId": "all",
+      "kind": "review",
+      "passed": true,
+      "summary": "Independent review of the complete b766314..e1d2616789102551d717f94317aa6b99f3eccede diff, accepted decisions, workflows, source, tests, documentation, verification evidence, exact-main GitHub state, and downloaded public artifact found no blocking or non-blocking defects. AC-1 through AC-9 are satisfied: 0.20 (120) is consistent; requested warning copy and tracked/release-metadata emojis are absent; legacy user icon decoding remains compatible; signed-release gates are preserved; PR, main, and publisher runs succeeded; the public checksum, ZIP, plist, architecture, and unsigned-state checks pass; v1.2.0 is absent; no normal signed workflow ran; Homebrew remains 0.1.0-beta; and CLAUDE.md is outside the diff."
+    }
+  ],
+  "updatedAt": "2026-08-03T14:21:16.234Z"
 }
