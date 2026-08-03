@@ -28,6 +28,15 @@ final class ConfigurationCompatibilityTests: XCTestCase {
         }
         XCTAssertEqual(try Data(contentsOf: configURL), original)
         XCTAssertNotNil(service.lastError)
+
+        let previous = service.config
+        service.updateGeneralSetting(\.showNotifications, to: !previous.general.showNotifications)
+
+        XCTAssertEqual(service.config, previous)
+        XCTAssertEqual(try Data(contentsOf: configURL), original)
+        guard case .invalid = service.loadState else {
+            return XCTFail("A rejected save must keep the invalid load state")
+        }
     }
 
     func testMissingConfigurationDoesNotCreateRootOnLoad() throws {
@@ -53,6 +62,25 @@ final class ConfigurationCompatibilityTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: service.lastBackupURL!.path))
         let saved = try JSONDecoder().decode(RiceBarConfig.self, from: Data(contentsOf: configURL))
         XCTAssertFalse(saved.general.showNotifications)
+    }
+
+    func testExternalConfigChangeIsNotOverwritten() throws {
+        let home = try TemporaryHome()
+        let root = try home.createDirectory(".ricebarmac")
+        let configURL = root.appendingPathComponent("config.json")
+        try Data(#"{"general":{"showNotifications":true}}"#.utf8).write(to: configURL)
+        let service = ConfigService(rootURL: root, fileSystem: LiveFileSystemClient())
+        let previous = service.config
+        let external = Data("{ externally-edited".utf8)
+        try external.write(to: configURL)
+
+        service.updateGeneralSetting(\.showNotifications, to: false)
+
+        XCTAssertEqual(service.config, previous)
+        XCTAssertEqual(try Data(contentsOf: configURL), external)
+        guard case .invalid = service.loadState else {
+            return XCTFail("An external change must require an explicit reload")
+        }
     }
 
     func testOlderProfileDefaultsOrderAndOptionalCollections() throws {

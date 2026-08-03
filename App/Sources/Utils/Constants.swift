@@ -6,7 +6,7 @@ enum Constants {
     
     
     static let appName = "RiceBarMac"
-    static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.ricebar.RiceBarMac"
+    static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.mateocerquetella.RiceBarMac"
 
     static let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
 

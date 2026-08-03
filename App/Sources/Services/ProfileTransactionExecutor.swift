@@ -189,13 +189,15 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         transaction.actions[index].status = .intentRecorded
         try persist(&transaction)
 
-        let safety = PathSafetyValidator(home: URL(fileURLWithPath: transaction.plan.userHomePath), fileSystem: fileSystem)
-        guard try safety.parentFingerprintsStillMatch(action.parentFingerprints) else {
-            throw FileSystemClientError.stalePath(action.destinationPath)
-        }
+        let safety = try validateDestinationParents(for: action, transaction: transaction)
 
         if let sourcePath = action.sourcePath, let expectedSource = action.sourceState {
-            let currentSource = try fileSystem.state(at: URL(fileURLWithPath: sourcePath))
+            let source = URL(fileURLWithPath: sourcePath)
+            try safety.validateSource(
+                source,
+                profileDirectory: URL(fileURLWithPath: transaction.plan.profileDirectoryPath, isDirectory: true)
+            )
+            let currentSource = try fileSystem.state(at: source)
             guard statesMatch(currentSource, expectedSource) else {
                 throw FileSystemClientError.stalePath(sourcePath)
             }
@@ -309,11 +311,13 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         let backup = URL(fileURLWithPath: action.backupPath)
         let stage = URL(fileURLWithPath: action.stagingPath)
 
+        if record.status == .restored || record.status == .rolledBack {
+            try markRestored(at: index, transaction: &transaction, status: finalStatus)
+            return
+        }
+
         if record.status == .pending {
-            transaction.actions[index].status = finalStatus
-            transaction.actions[index].errorDescription = nil
-            transaction.updatedAt = now()
-            try transactionStore.save(transaction)
+            try markRestored(at: index, transaction: &transaction, status: finalStatus)
             return
         }
 
@@ -326,10 +330,7 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         if record.status == .intentRecorded,
            record.installedFingerprint == nil,
            !backupExists {
-            transaction.actions[index].status = finalStatus
-            transaction.actions[index].errorDescription = nil
-            transaction.updatedAt = now()
-            try transactionStore.save(transaction)
+            try markRestored(at: index, transaction: &transaction, status: finalStatus)
             return
         }
 
@@ -337,12 +338,21 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
 
         if let installed = record.installedFingerprint {
             if action.beforeState.exists && !backupExists {
+                if statesMatch(current, action.beforeState) {
+                    try markRestored(at: index, transaction: &transaction, status: finalStatus)
+                    return
+                }
                 throw FileSystemClientError.stalePath(backup.path)
             }
-            guard fingerprintsMatch(current.fingerprint, installed) else {
-                throw FileSystemClientError.stalePath(destination.path)
-            }
+
             if current.exists {
+                guard fingerprintsMatch(current.fingerprint, installed) else {
+                    throw FileSystemClientError.stalePath(destination.path)
+                }
+                if action.kind == .createDirectory,
+                   !(try fileSystem.contentsOfDirectory(at: destination)).isEmpty {
+                    throw FileSystemClientError.stalePath(destination.path)
+                }
                 try fileSystem.removeItem(at: destination)
             }
         } else if backupExists {
@@ -364,8 +374,51 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
             }
         }
 
-        transaction.actions[index].status = finalStatus
+        try markRestored(at: index, transaction: &transaction, status: finalStatus)
+    }
+
+    private func validateDestinationParents(
+        for action: PlannedFileAction,
+        transaction: ApplyTransaction
+    ) throws -> PathSafetyValidator {
+        let home = URL(fileURLWithPath: transaction.plan.userHomePath, isDirectory: true)
+        let safety = PathSafetyValidator(home: home, fileSystem: fileSystem)
+        let destination = URL(fileURLWithPath: action.destinationPath)
+
+        _ = try safety.validateDestination(destination)
+        guard try safety.parentFingerprintsStillMatch(action.parentFingerprints) else {
+            throw FileSystemClientError.stalePath(action.destinationPath)
+        }
+
+        let parentKind = try fileSystem.state(at: destination.deletingLastPathComponent()).kind
+        guard parentKind == .directory || parentKind == .symbolicLink else {
+            throw FileSystemClientError.stalePath(destination.deletingLastPathComponent().path)
+        }
+
+        for record in transaction.actions where
+            record.action.kind == .createDirectory &&
+            action.destinationPath.hasPrefix(record.action.destinationPath + "/") {
+            guard let installed = record.installedFingerprint else {
+                throw FileSystemClientError.stalePath(record.action.destinationPath)
+            }
+            let current = try fileSystem.state(at: URL(fileURLWithPath: record.action.destinationPath))
+            guard fingerprintsMatch(current.fingerprint, installed) else {
+                throw FileSystemClientError.stalePath(record.action.destinationPath)
+            }
+        }
+
+        return safety
+    }
+
+    private func markRestored(
+        at index: Int,
+        transaction: inout ApplyTransaction,
+        status: TransactionActionRecord.Status
+    ) throws {
+        let path = transaction.actions[index].action.destinationPath
+        transaction.actions[index].status = status
         transaction.actions[index].errorDescription = nil
+        transaction.unresolvedPaths.removeAll(where: { $0 == path })
         transaction.updatedAt = now()
         try transactionStore.save(transaction)
     }

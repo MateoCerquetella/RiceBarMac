@@ -168,6 +168,7 @@ struct SettingsWindowView: View {
 struct SettingsGeneralTabView: View {
     @ObservedObject var viewModel: StatusBarViewModel
     @ObservedObject var configService: ConfigService
+    @State private var selectedProfileID: String? = nil
     
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -186,6 +187,21 @@ struct SettingsGeneralTabView: View {
             }
             
             Divider()
+
+            if let error = viewModel.configError {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(error.localizedDescription)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                    if let suggestion = error.recoverySuggestion {
+                        Text(suggestion)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("configuration-error")
+            }
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
@@ -287,19 +303,34 @@ struct SettingsGeneralTabView: View {
                             .buttonStyle(.bordered)
                         }
 
-                        HStack(spacing: 12) {
-                            Menu("Preview Profile…") {
+                        HStack(spacing: 8) {
+                            Text("Profile:")
+                                .fontWeight(.medium)
+
+                            Picker("Profile to preview", selection: Binding(
+                                get: { selectedProfile?.id ?? "" },
+                                set: { selectedProfileID = $0 }
+                            )) {
                                 ForEach(viewModel.sortedProfiles, id: \.id) { descriptor in
-                                    Button("Preview \(descriptor.displayName)") {
-                                        viewModel.applyProfile(descriptor)
-                                    }
-                                    .accessibilityIdentifier("preview-profile-\(descriptor.id)")
+                                    Text(descriptor.displayName).tag(descriptor.id)
                                 }
                             }
+                            .labelsHidden()
+                            .frame(maxWidth: 180)
                             .disabled(viewModel.sortedProfiles.isEmpty || viewModel.isApplying)
-                            .accessibilityLabel("Preview a profile before applying")
-                            .accessibilityIdentifier("preview-profile-menu")
+                            .accessibilityIdentifier("preview-profile-picker")
 
+                            Button("Preview…") {
+                                if let selectedProfile {
+                                    viewModel.applyProfile(selectedProfile)
+                                }
+                            }
+                            .disabled(selectedProfile == nil || viewModel.isApplying)
+                            .accessibilityLabel("Preview selected profile before applying")
+                            .accessibilityIdentifier("preview-selected-profile")
+                        }
+
+                        HStack(spacing: 12) {
                             Button("Undo Last Apply") {
                                 viewModel.undoLastApply()
                             }
@@ -395,6 +426,11 @@ struct SettingsGeneralTabView: View {
         default:
             return .secondary
         }
+    }
+
+    private var selectedProfile: ProfileDescriptor? {
+        let id = selectedProfileID ?? viewModel.sortedProfiles.first?.id
+        return viewModel.sortedProfiles.first(where: { $0.id == id })
     }
     
     private func userFriendlyErrorMessage(for error: Error) -> String {

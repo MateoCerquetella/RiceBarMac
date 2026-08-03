@@ -27,7 +27,7 @@ final class RiceBarMacUITests: XCTestCase {
         XCTAssertTrue(window.waitForExistence(timeout: 8))
         attachScreenshot("idle")
 
-        openPreview(profileName: "UI Test")
+        openPreview()
         let preview = app.dialogs["Preview UI Test"]
         XCTAssertTrue(preview.waitForExistence(timeout: 5))
         XCTAssertTrue(preview.staticTexts["Review the exact plan below. No files have been changed. Replaced items will be moved to the listed backups."].exists)
@@ -96,37 +96,12 @@ final class RiceBarMacUITests: XCTestCase {
         }
     }
 
-    private func openPreview(profileName: String) {
+    private func openPreview() {
         let window = app.windows["RiceBarMac Settings"]
-        let menu = window.descendants(matching: .any)["preview-profile-menu"]
-        XCTAssertTrue(reveal(menu, in: window))
-        menu.click()
-
-        // SwiftUI popup entries have appeared as both MenuItem and Button on
-        // supported macOS releases. Select the visible accessible entry without
-        // depending on that private native representation.
-        let candidates = app.descendants(matching: .any)
-            .matching(NSPredicate(
-                format: "label == %@ OR label == %@",
-                profileName,
-                "Preview \(profileName)"
-            ))
-        let deadline = Date().addingTimeInterval(3)
-        repeat {
-            for index in 0..<candidates.count {
-                let candidate = candidates.element(boundBy: index)
-                if candidate.exists && candidate.isHittable {
-                    candidate.click()
-                    return
-                }
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-        } while Date() < deadline
-
-        // A native menu remains keyboard operable even if XCTest does not
-        // expose its transient entries in the application hierarchy.
-        app.typeKey(.downArrow, modifierFlags: [])
-        app.typeKey(.return, modifierFlags: [])
+        let button = window.descendants(matching: .any)["preview-selected-profile"]
+        XCTAssertTrue(reveal(button, in: window))
+        XCTAssertTrue(button.isEnabled)
+        button.click()
     }
 
     private func reveal(_ element: XCUIElement, in window: XCUIElement) -> Bool {

@@ -221,6 +221,9 @@ struct PathSafetyValidator: Sendable {
                 guard resolved.path == home.path || isStrictlyInsideHome(resolved) else {
                     throw FileSystemClientError.unsafeParentSymlink(current.path)
                 }
+                guard try fileSystem.state(at: resolved).kind == .directory else {
+                    throw FileSystemClientError.parentIsNotDirectory(current.path)
+                }
             } else if state.kind != .directory {
                 throw FileSystemClientError.parentIsNotDirectory(current.path)
             }

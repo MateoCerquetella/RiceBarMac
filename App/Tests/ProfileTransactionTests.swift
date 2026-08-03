@@ -67,6 +67,42 @@ final class ProfileTransactionTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: plan.actions.last!.backupPath))
     }
 
+    func testUndoPreservesFilesAddedToCreatedDirectoryAndRecoveryIsRetryable() async throws {
+        let home = try TemporaryHome()
+        let generatedDirectory = home.url.appendingPathComponent(".config/generated", isDirectory: true)
+        let destination = generatedDirectory.appendingPathComponent("app.conf")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = LiveFileSystemClient()
+        let store = MemoryTransactionStore()
+        let executor = makeExecutor(home: home.url, fileSystem: fileSystem, transactionStore: store)
+        let plan = ProfilePlanner(home: home.url, fileSystem: fileSystem)
+            .makePlan(for: descriptor, formerActiveProfilePath: nil)
+        let outcome = try await executor.apply(plan)
+        let userFile = try home.write(".config/generated/user-created.txt", "keep-me")
+
+        do {
+            _ = try executor.undoLatest()
+            XCTFail("Undo must not recursively remove a directory containing new user data")
+        } catch let error as TransactionExecutionError {
+            guard case .recoveryRequired(let paths, _) = error else {
+                return XCTFail("Expected recoveryRequired, received \(error)")
+            }
+            XCTAssertTrue(paths.contains(generatedDirectory.path))
+        }
+
+        XCTAssertEqual(String(data: try Data(contentsOf: userFile), encoding: .utf8), "keep-me")
+        XCTAssertEqual(try fileSystem.state(at: destination).kind, .absent)
+        XCTAssertEqual(try store.incompleteTransactions().first?.status, .recoveryRequired)
+
+        try fileSystem.removeItem(at: userFile)
+        let recovered = try executor.recover(transactionID: outcome.transaction.id)
+
+        XCTAssertEqual(recovered.status, .rolledBack)
+        XCTAssertTrue(recovered.unresolvedPaths.isEmpty)
+        XCTAssertEqual(try fileSystem.state(at: generatedDirectory).kind, .absent)
+        XCTAssertTrue(try store.incompleteTransactions().isEmpty)
+    }
+
     func testInjectedFailuresRestoreOriginalDestination() async throws {
         for boundary in 1...14 {
             let home = try TemporaryHome()

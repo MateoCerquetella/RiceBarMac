@@ -59,6 +59,21 @@ final class ProfilePlannerTests: XCTestCase {
         XCTAssertTrue(plan.issues.contains(where: { $0.code == .unsafeParentSymlink }))
     }
 
+    func testParentSymlinkToFileIsRejected() throws {
+        let home = try TemporaryHome()
+        let target = try home.write("not-a-directory", "value")
+        let linkedParent = home.url.appendingPathComponent("linked")
+        try FileManager.default.createSymbolicLink(at: linkedParent, withDestinationURL: target)
+        let descriptor = try makeProfileDescriptor(
+            home: home.url,
+            replacementDestination: linkedParent.appendingPathComponent("settings")
+        )
+
+        let plan = ProfilePlanner(home: home.url).makePlan(for: descriptor, formerActiveProfilePath: nil)
+
+        XCTAssertTrue(plan.issues.contains(where: { $0.code == .parentIsNotDirectory }))
+    }
+
     func testManagedStorageDestinationIsRejected() throws {
         let home = try TemporaryHome()
         let destination = home.url.appendingPathComponent(".ricebarmac/transactions/overwrite.json")

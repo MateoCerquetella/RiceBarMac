@@ -6,6 +6,7 @@ enum ConfigServiceError: LocalizedError {
     case configFileReadFailed(Error)
     case configFileWriteFailed(Error)
     case invalidConfigFormat(Error)
+    case configChangedExternally
     case rollbackFailed(original: Error, rollback: Error)
 
     var errorDescription: String? {
@@ -18,6 +19,8 @@ enum ConfigServiceError: LocalizedError {
             return "Failed to save the configuration file: \(error.localizedDescription)"
         case .invalidConfigFormat(let error):
             return "The configuration file is invalid and was left unchanged: \(error.localizedDescription)"
+        case .configChangedExternally:
+            return "The configuration changed on disk and was left unchanged. Reload it before saving new settings."
         case .rollbackFailed(let original, let rollback):
             return "Saving failed (\(original.localizedDescription)) and restoring the previous configuration also failed (\(rollback.localizedDescription))."
         }
@@ -27,6 +30,8 @@ enum ConfigServiceError: LocalizedError {
         switch self {
         case .invalidConfigFormat:
             return "Fix or move ~/.ricebarmac/config.json, then choose Reload Profiles. RiceBarMac will not overwrite the malformed file."
+        case .configChangedExternally:
+            return "Choose Reload Profiles to load the on-disk configuration before changing settings again."
         case .rollbackFailed:
             return "Open ~/.ricebarmac and preserve every .ricebarmac-backup file before making another change."
         default:
@@ -54,6 +59,7 @@ final class ConfigService: ObservableObject {
     private let fileSystem: FileSystemClient
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private var expectedConfigState: FileObjectState
 
     static let shared = ConfigService()
 
@@ -72,6 +78,7 @@ final class ConfigService: ObservableObject {
 
         do {
             let state = try fileSystem.state(at: self.configURL)
+            expectedConfigState = state
             if state.kind == .absent {
                 config = .default
                 loadState = .missing
@@ -89,6 +96,7 @@ final class ConfigService: ObservableObject {
                 }
             }
         } catch {
+            expectedConfigState = .absent
             config = .default
             loadState = .invalid(message: error.localizedDescription)
             lastError = .configFileReadFailed(error)
@@ -97,7 +105,17 @@ final class ConfigService: ObservableObject {
 
     @discardableResult
     func saveConfig() -> Bool {
+        // Never replace a file that failed to load. The user must repair or
+        // move it explicitly so an in-memory default cannot erase unknown data.
+        if case .invalid = loadState {
+            return false
+        }
+
         do {
+            let currentState = try fileSystem.state(at: configURL)
+            guard currentState == expectedConfigState else {
+                throw ConfigServiceError.configChangedExternally
+            }
             let data = try encoder.encode(config)
             _ = try decoder.decode(RiceBarConfig.self, from: data)
             try ensureDirectoryHierarchy(rootURL)
@@ -112,6 +130,7 @@ final class ConfigService: ObservableObject {
             }
 
             try fileSystem.writeDataAtomically(data, to: stageURL)
+            let stagedState = try fileSystem.state(at: stageURL)
             var movedOriginal = false
 
             do {
@@ -120,6 +139,7 @@ final class ConfigService: ObservableObject {
                     movedOriginal = true
                 }
                 try fileSystem.moveItem(at: stageURL, to: configURL)
+                expectedConfigState = stagedState
                 lastBackupURL = movedOriginal ? backupURL : nil
                 loadState = .loaded
                 lastError = nil
@@ -135,6 +155,7 @@ final class ConfigService: ObservableObject {
                     } catch let rollbackError {
                         let wrapped = ConfigServiceError.rollbackFailed(original: error, rollback: rollbackError)
                         lastError = wrapped
+                        loadState = .invalid(message: wrapped.localizedDescription)
                         return false
                     }
                 }
@@ -142,6 +163,9 @@ final class ConfigService: ObservableObject {
             }
         } catch let error as ConfigServiceError {
             lastError = error
+            if case .configChangedExternally = error {
+                loadState = .invalid(message: error.localizedDescription)
+            }
             return false
         } catch {
             lastError = .configFileWriteFailed(error)
@@ -152,6 +176,7 @@ final class ConfigService: ObservableObject {
     func reloadConfig() {
         do {
             let state = try fileSystem.state(at: configURL)
+            expectedConfigState = state
             guard state.exists else {
                 config = .default
                 loadState = .missing
@@ -174,36 +199,57 @@ final class ConfigService: ObservableObject {
     }
 
     func resetToDefaults() {
+        let previous = config
         config = .default
-        saveConfig()
+        if !saveConfig() {
+            config = previous
+        }
     }
 
     func updateShortcut(for key: String, to value: String) {
+        let previous = config
         config.shortcuts.profileShortcuts[key] = value
-        saveConfig()
-        shortcutsUpdated.toggle()
+        if saveConfig() {
+            shortcutsUpdated.toggle()
+        } else {
+            config = previous
+        }
     }
 
     func updateNavigationShortcut(_ keyPath: WritableKeyPath<NavigationShortcuts, String>, to value: String) {
+        let previous = config
         config.shortcuts.navigationShortcuts[keyPath: keyPath] = value
-        saveConfig()
-        shortcutsUpdated.toggle()
+        if saveConfig() {
+            shortcutsUpdated.toggle()
+        } else {
+            config = previous
+        }
     }
 
     func updateQuickActionShortcut(_ keyPath: WritableKeyPath<QuickActionShortcuts, String>, to value: String) {
+        let previous = config
         config.shortcuts.quickActions[keyPath: keyPath] = value
-        saveConfig()
-        shortcutsUpdated.toggle()
+        if saveConfig() {
+            shortcutsUpdated.toggle()
+        } else {
+            config = previous
+        }
     }
 
     func updateGeneralSetting<T>(_ keyPath: WritableKeyPath<GeneralConfig, T>, to value: T) {
+        let previous = config
         config.general[keyPath: keyPath] = value
-        saveConfig()
+        if !saveConfig() {
+            config = previous
+        }
     }
 
     func updateAppearanceSetting<T>(_ keyPath: WritableKeyPath<AppearanceConfig, T>, to value: T) {
+        let previous = config
         config.appearance[keyPath: keyPath] = value
-        saveConfig()
+        if !saveConfig() {
+            config = previous
+        }
     }
 
     private func ensureDirectoryHierarchy(_ directory: URL) throws {
