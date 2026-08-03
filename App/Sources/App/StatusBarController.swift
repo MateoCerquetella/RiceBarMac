@@ -117,11 +117,8 @@ final class StatusBarController {
             return 
         }
         
-        var profileItemsFound = 0
-        
-        for (index, item) in menu.items.enumerated() {
+        for item in menu.items {
             if let descriptor = item.representedObject as? ProfileDescriptor {
-                profileItemsFound += 1
                 let isActive = viewModel.isProfileActive(descriptor)
                 let newState: NSControl.StateValue = isActive ? .on : .off
                 
@@ -494,15 +491,14 @@ final class StatusBarController {
         guard let active = viewModel.activeProfile else { return }
         
         viewModel.pickWallpaperFile { [weak self] url in
-            guard let url = url else { return }
+            guard let self, let url else { return }
             
-            Task { @MainActor in
+            Task { @MainActor [self] in
                 do {
-                    let updated = try await self?.viewModel.updateWallpaper(for: active, from: url)
-                    if let updated = updated {
-                        self?.viewModel.applyProfile(updated)
-                    }
+                    let updated = try await viewModel.updateWallpaper(for: active, from: url)
+                    viewModel.applyProfile(updated)
                 } catch {
+                    await viewModel.showError(error)
                 }
             }
         }
