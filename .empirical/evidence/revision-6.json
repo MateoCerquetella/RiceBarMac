@@ -3,6 +3,6 @@
     "criterionId": "all",
     "kind": "review",
     "passed": true,
-    "summary": "Independent final diff review against AC-1 through AC-18, AC-UI-1/2, decisions D-001 through D-005, and all capability deltas found no blocking implementation or documentation defect at aef08e9; signed publication alone awaits external Apple credentials."
+    "summary": "Independent final diff review against AC-1 through AC-18, AC-UI-1/2, decisions D-001 through D-005, and all capability deltas found no blocking implementation or documentation defect through main commit 1f53ee2; the normal tag release remains signed and fail-closed, while the user separately authorized explicit unsigned delivery."
   }
 ]
