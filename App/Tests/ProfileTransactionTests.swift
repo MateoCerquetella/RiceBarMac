@@ -120,6 +120,90 @@ final class ProfileTransactionTests: XCTestCase {
         XCTAssertTrue(try store.incompleteTransactions().isEmpty)
     }
 
+    func testRecoveryPreservesDirectoryCreatedAfterIntentCheckpoint() throws {
+        let home = try TemporaryHome()
+        let destination = home.url.appendingPathComponent(".config/generated/app.conf")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = LiveFileSystemClient()
+        let store = MemoryTransactionStore()
+        let executor = makeExecutor(home: home.url, fileSystem: fileSystem, transactionStore: store)
+        let plan = ProfilePlanner(home: home.url, fileSystem: fileSystem)
+            .makePlan(for: descriptor, formerActiveProfilePath: nil)
+        guard let index = plan.actions.firstIndex(where: { $0.kind == .createDirectory }) else {
+            return XCTFail("Expected a planned directory creation")
+        }
+        let createdDirectory = URL(fileURLWithPath: plan.actions[index].destinationPath, isDirectory: true)
+        try fileSystem.createDirectory(at: createdDirectory)
+
+        var transaction = ApplyTransaction(plan: plan)
+        transaction.status = .executing
+        transaction.actions[index].status = .intentRecorded
+        try store.save(transaction)
+
+        XCTAssertThrowsError(try executor.recover(transactionID: transaction.id)) { error in
+            guard let executionError = error as? TransactionExecutionError,
+                  case .recoveryRequired(let paths, _) = executionError else {
+                return XCTFail("Expected recoveryRequired, received \(error)")
+            }
+            XCTAssertTrue(paths.contains(createdDirectory.path))
+        }
+        XCTAssertEqual(try fileSystem.state(at: createdDirectory).kind, .directory)
+        XCTAssertEqual(try store.load(id: transaction.id)?.status, .recoveryRequired)
+    }
+
+    func testRecoveryCompletesStagedDirectoryMoveAfterCrash() throws {
+        let home = try TemporaryHome()
+        let destination = home.url.appendingPathComponent(".config/generated/app.conf")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = LiveFileSystemClient()
+        let store = MemoryTransactionStore()
+        let executor = makeExecutor(home: home.url, fileSystem: fileSystem, transactionStore: store)
+        let plan = ProfilePlanner(home: home.url, fileSystem: fileSystem)
+            .makePlan(for: descriptor, formerActiveProfilePath: nil)
+        guard let index = plan.actions.firstIndex(where: { $0.kind == .createDirectory }) else {
+            return XCTFail("Expected a planned directory creation")
+        }
+        let createdDirectory = URL(fileURLWithPath: plan.actions[index].destinationPath, isDirectory: true)
+        try fileSystem.createDirectory(at: createdDirectory)
+
+        var transaction = ApplyTransaction(plan: plan)
+        transaction.status = .executing
+        transaction.actions[index].status = .staged
+        transaction.actions[index].installedFingerprint = try fileSystem.state(at: createdDirectory).fingerprint
+        try store.save(transaction)
+
+        let recovered = try executor.recover(transactionID: transaction.id)
+
+        XCTAssertEqual(recovered.status, .rolledBack)
+        XCTAssertEqual(try fileSystem.state(at: createdDirectory).kind, .absent)
+        XCTAssertTrue(try store.incompleteTransactions().isEmpty)
+    }
+
+    func testRecoveryPreservesAmbiguousStageCreatedAfterIntentCheckpoint() throws {
+        let home = try TemporaryHome()
+        let destination = home.url.appendingPathComponent(".config/generated/app.conf")
+        let descriptor = try makeProfileDescriptor(home: home.url, replacementDestination: destination)
+        let fileSystem = LiveFileSystemClient()
+        let store = MemoryTransactionStore()
+        let executor = makeExecutor(home: home.url, fileSystem: fileSystem, transactionStore: store)
+        let plan = ProfilePlanner(home: home.url, fileSystem: fileSystem)
+            .makePlan(for: descriptor, formerActiveProfilePath: nil)
+        guard let index = plan.actions.firstIndex(where: { $0.kind == .createDirectory }) else {
+            return XCTFail("Expected a planned directory creation")
+        }
+        let ambiguousStage = URL(fileURLWithPath: plan.actions[index].stagingPath, isDirectory: true)
+        try fileSystem.createDirectory(at: ambiguousStage)
+
+        var transaction = ApplyTransaction(plan: plan)
+        transaction.status = .executing
+        transaction.actions[index].status = .intentRecorded
+        try store.save(transaction)
+
+        XCTAssertThrowsError(try executor.recover(transactionID: transaction.id))
+        XCTAssertEqual(try fileSystem.state(at: ambiguousStage).kind, .directory)
+        XCTAssertEqual(try store.load(id: transaction.id)?.status, .recoveryRequired)
+    }
+
     func testInjectedFailuresRestoreOriginalDestination() async throws {
         for boundary in 1...14 {
             let home = try TemporaryHome()

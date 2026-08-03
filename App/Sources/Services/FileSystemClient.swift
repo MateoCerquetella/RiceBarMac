@@ -109,18 +109,19 @@ final class LiveFileSystemClient: FileSystemClient, @unchecked Sendable {
     }
 
     func enumeratedContents(at url: URL) throws -> [URL] {
-        guard let enumerator = fileManager.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-            options: [],
-            errorHandler: { _, _ in false }
-        ) else {
-            return []
+        guard try state(at: url).kind == .directory else {
+            throw FileSystemClientError.unsupportedObject(url.path)
         }
 
         var result: [URL] = []
-        for case let item as URL in enumerator {
-            result.append(item)
+        var pendingDirectories = [url]
+        while let directory = pendingDirectories.popLast() {
+            for item in try contentsOfDirectory(at: directory) {
+                result.append(item)
+                if try state(at: item).kind == .directory {
+                    pendingDirectories.append(item)
+                }
+            }
         }
         return result
     }
@@ -152,8 +153,9 @@ final class LiveFileSystemClient: FileSystemClient, @unchecked Sendable {
 
     func writeDataAtomically(_ data: Data, to url: URL) throws {
         let parent = url.deletingLastPathComponent()
-        if try state(at: parent).kind == .absent {
-            try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
+        let parentKind = try state(at: parent).kind
+        guard parentKind == .directory || parentKind == .symbolicLink else {
+            throw FileSystemClientError.parentIsNotDirectory(parent.path)
         }
         try data.write(to: url, options: .atomic)
     }

@@ -182,17 +182,23 @@ jobs:
       - name: Publish GitHub release
         run: |
           set -euo pipefail
-          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            echo "A release already exists for ${GITHUB_REF_NAME}; refusing to replace an immutable asset." >&2
-            exit 1
-          fi
-          gh release create "${GITHUB_REF_NAME}" \
-            "${{ steps.asset.outputs.asset_name }}#RiceBarMac ${{ steps.asset.outputs.version }}" \
-            --verify-tag \
-            --title "RiceBarMac ${GITHUB_REF_NAME}" \
-            --notes-file RELEASE_NOTES_1.2.0.md \
-            --latest
           mkdir -p build/public-download
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            existing_tag="$(gh release view "${GITHUB_REF_NAME}" --json tagName --jq '.tagName')"
+            existing_draft="$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq '.isDraft')"
+            existing_prerelease="$(gh release view "${GITHUB_REF_NAME}" --json isPrerelease --jq '.isPrerelease')"
+            [[ "${existing_tag}" == "${GITHUB_REF_NAME}" ]]
+            [[ "${existing_draft}" == 'false' ]]
+            [[ "${existing_prerelease}" == 'false' ]]
+            echo "Verifying the immutable asset from the existing ${GITHUB_REF_NAME} release."
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              "${{ steps.asset.outputs.asset_name }}#RiceBarMac ${{ steps.asset.outputs.version }}" \
+              --verify-tag \
+              --title "RiceBarMac ${GITHUB_REF_NAME}" \
+              --notes-file RELEASE_NOTES_1.2.0.md \
+              --latest
+          fi
           gh release download "${GITHUB_REF_NAME}" \
             --pattern "${{ steps.asset.outputs.asset_name }}" \
             --dir build/public-download
@@ -252,8 +258,12 @@ jobs:
           git config user.email 'actions@users.noreply.github.com'
           git add Casks/ricebarmac.rb
           git diff --cached --check
-          git commit -m "Update RiceBarMac cask to ${{ steps.asset.outputs.version }}"
-          git push origin HEAD:main
+          if git diff --cached --quiet; then
+            echo 'Homebrew cask already matches the verified release asset.'
+          else
+            git commit -m "Update RiceBarMac cask to ${{ steps.asset.outputs.version }}"
+            git push origin HEAD:main
+          fi
           echo "HOMEBREW_COMMIT=$(git rev-parse HEAD)" >>"${GITHUB_ENV}"
 
       - name: Upload release evidence

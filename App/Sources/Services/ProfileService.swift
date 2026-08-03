@@ -174,13 +174,18 @@ final class ProfileService: ObservableObject {
 
     @discardableResult
     func applyPlan(_ plan: ProfileApplyPlan) async throws -> ProfileApplyOutcome {
-        let outcome = try await coordinator.apply(plan)
-        await MainActor.run {
-            self.activeProfile = self.profiles.first(where: { $0.directory.path == plan.profileDirectoryPath })
-                ?? ProfileDescriptor(profile: Profile(name: plan.profileName), directory: URL(fileURLWithPath: plan.profileDirectoryPath))
+        do {
+            let outcome = try await coordinator.apply(plan)
+            await MainActor.run {
+                self.activeProfile = self.profiles.first(where: { $0.directory.path == plan.profileDirectoryPath })
+                    ?? ProfileDescriptor(profile: Profile(name: plan.profileName), directory: URL(fileURLWithPath: plan.profileDirectoryPath))
+            }
+            await refreshTransactionMetadata()
+            return outcome
+        } catch {
+            await refreshTransactionMetadata()
+            throw error
         }
-        await refreshTransactionMetadata()
-        return outcome
     }
 
     @discardableResult
@@ -191,30 +196,40 @@ final class ProfileService: ObservableObject {
 
     @discardableResult
     func undoLastApply() async throws -> ApplyTransaction {
-        let transaction = try await coordinator.undoLatest()
-        await MainActor.run {
-            if let former = transaction.plan.formerActiveProfilePath {
-                self.activeProfile = self.profiles.first(where: { $0.directory.path == former })
-            } else {
-                self.activeProfile = nil
+        do {
+            let transaction = try await coordinator.undoLatest()
+            await MainActor.run {
+                if let former = transaction.plan.formerActiveProfilePath {
+                    self.activeProfile = self.profiles.first(where: { $0.directory.path == former })
+                } else {
+                    self.activeProfile = nil
+                }
             }
+            await refreshTransactionMetadata()
+            return transaction
+        } catch {
+            await refreshTransactionMetadata()
+            throw error
         }
-        await refreshTransactionMetadata()
-        return transaction
     }
 
     @discardableResult
     func recover(transactionID: UUID) async throws -> ApplyTransaction {
-        let transaction = try await coordinator.recover(transactionID: transactionID)
-        await MainActor.run {
-            if let former = transaction.plan.formerActiveProfilePath {
-                self.activeProfile = self.profiles.first(where: { $0.directory.path == former })
-            } else {
-                self.activeProfile = nil
+        do {
+            let transaction = try await coordinator.recover(transactionID: transactionID)
+            await MainActor.run {
+                if let former = transaction.plan.formerActiveProfilePath {
+                    self.activeProfile = self.profiles.first(where: { $0.directory.path == former })
+                } else {
+                    self.activeProfile = nil
+                }
             }
+            await refreshTransactionMetadata()
+            return transaction
+        } catch {
+            await refreshTransactionMetadata()
+            throw error
         }
-        await refreshTransactionMetadata()
-        return transaction
     }
 
     // MARK: - Explicit legacy migration

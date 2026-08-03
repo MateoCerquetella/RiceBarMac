@@ -215,16 +215,10 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
             throw FileSystemClientError.collision(destination.path)
         }
 
-        if action.kind == .createDirectory {
-            try fileSystem.createDirectory(at: destination)
-            transaction.actions[index].installedFingerprint = try fileSystem.state(at: destination).fingerprint
-            transaction.actions[index].status = .replacementInstalled
-            try persist(&transaction)
-            return
-        }
-
         if action.kind != .remove {
             switch action.kind {
+            case .createDirectory:
+                try fileSystem.createDirectory(at: stage)
             case .replaceWithSymlink:
                 guard let sourcePath = action.sourcePath else {
                     throw FileSystemClientError.unsupportedObject(destination.path)
@@ -243,9 +237,10 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
                 if let permissions = action.beforeState.permissions {
                     try fileSystem.setPermissions(permissions, at: stage)
                 }
-            case .createDirectory, .remove:
+            case .remove:
                 break
             }
+            transaction.actions[index].installedFingerprint = try fileSystem.state(at: stage).fingerprint
             transaction.actions[index].status = .staged
             try persist(&transaction)
         }
@@ -259,7 +254,14 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
         if action.kind != .remove {
             try fileSystem.moveItem(at: stage, to: destination)
         }
-        transaction.actions[index].installedFingerprint = try fileSystem.state(at: destination).fingerprint
+        let installed = try fileSystem.state(at: destination).fingerprint
+        if let staged = transaction.actions[index].installedFingerprint {
+            guard fingerprintsMatch(installed, staged) else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+        } else {
+            transaction.actions[index].installedFingerprint = installed
+        }
         transaction.actions[index].status = .replacementInstalled
         try persist(&transaction)
     }
@@ -321,20 +323,31 @@ final class ProfileTransactionExecutor: @unchecked Sendable {
             return
         }
 
-        if try fileSystem.state(at: stage).exists {
+        let stageState = try fileSystem.state(at: stage)
+        if stageState.exists {
+            guard let installed = record.installedFingerprint,
+                  fingerprintsMatch(stageState.fingerprint, installed) else {
+                throw FileSystemClientError.stalePath(stage.path)
+            }
+            if action.kind == .createDirectory,
+               !(try fileSystem.contentsOfDirectory(at: stage)).isEmpty {
+                throw FileSystemClientError.stalePath(stage.path)
+            }
             try fileSystem.removeItem(at: stage)
         }
 
         let backupExists = try fileSystem.state(at: backup).exists
+        let current = try fileSystem.state(at: destination)
 
         if record.status == .intentRecorded,
            record.installedFingerprint == nil,
            !backupExists {
+            guard statesMatch(current, action.beforeState) else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
             try markRestored(at: index, transaction: &transaction, status: finalStatus)
             return
         }
-
-        let current = try fileSystem.state(at: destination)
 
         if let installed = record.installedFingerprint {
             if action.beforeState.exists && !backupExists {

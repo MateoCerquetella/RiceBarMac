@@ -65,6 +65,47 @@ final class RiceBarMacUITests: XCTestCase {
         attachScreenshot("failure")
     }
 
+    func testRecoveryRequiredStateIsVisibleAndRetryable() throws {
+        let generatedDirectory = temporaryHome.appendingPathComponent(".config/generated", isDirectory: true)
+        let destination = generatedDirectory.appendingPathComponent("recovery.conf")
+        try createProfile(name: "Recovery Test", destination: destination, valid: true)
+        launch()
+
+        let window = app.windows["RiceBarMac Settings"]
+        XCTAssertTrue(window.waitForExistence(timeout: 8))
+        openPreview()
+        let apply = app.buttons["confirm-profile-apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 8))
+        apply.click()
+
+        let status = window.descendants(matching: .any)["profile-operation-status"]
+        XCTAssertTrue(waitForPath(destination, exists: true, timeout: 8))
+        XCTAssertTrue(waitForValue(status, value: "Recovery Test applied successfully", timeout: 8))
+
+        let userFile = generatedDirectory.appendingPathComponent("user-created.txt")
+        try Data("preserve-me".utf8).write(to: userFile)
+        let undo = window.descendants(matching: .any)["undo-last-apply"]
+        XCTAssertTrue(reveal(undo, in: window))
+        undo.click()
+
+        let acknowledge = app.buttons["OK"]
+        XCTAssertTrue(acknowledge.waitForExistence(timeout: 8))
+        acknowledge.click()
+
+        let heading = window.descendants(matching: .any)["recovery-required-heading"]
+        XCTAssertTrue(reveal(heading, in: window))
+        XCTAssertEqual(try String(contentsOf: userFile, encoding: .utf8), "preserve-me")
+        attachScreenshot("recovery")
+
+        try FileManager.default.removeItem(at: userFile)
+        let recover = window.descendants(matching: .any)["recover-previous-state"]
+        XCTAssertTrue(reveal(recover, in: window))
+        recover.click()
+
+        XCTAssertTrue(waitForValue(status, value: "Recovery completed", timeout: 8))
+        XCTAssertTrue(waitForPath(generatedDirectory, exists: false, timeout: 8))
+    }
+
     private func launch() {
         app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]

@@ -29,7 +29,7 @@ enum SystemServiceError: LocalizedError {
         case .launchAtLoginNotFound:
             return "App not found for launch at login"
         case .unsupportedVersion:
-            return "Launch at login requires macOS 13.0 or later"
+            return "Launch at login requires macOS 14.0 or later"
         }
     }
     

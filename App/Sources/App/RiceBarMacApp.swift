@@ -393,6 +393,7 @@ struct SettingsGeneralTabView: View {
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
                                     .foregroundColor(.red)
+                                    .accessibilityIdentifier("recovery-required-heading")
                                 ForEach(viewModel.recoveryTransactions) { transaction in
                                     HStack {
                                         Text(transaction.plan.profileName)
@@ -402,6 +403,7 @@ struct SettingsGeneralTabView: View {
                                             viewModel.recover(transaction)
                                         }
                                         .accessibilityLabel("Recover \(transaction.plan.profileName)")
+                                        .accessibilityIdentifier("recover-previous-state")
                                     }
                                 }
                             }
@@ -437,7 +439,7 @@ struct SettingsGeneralTabView: View {
         if let systemError = error as? SystemServiceError {
             switch systemError {
             case .unsupportedVersion:
-                return "Requires macOS 13.0 or later"
+                return "Requires macOS 14.0 or later"
             case .launchAtLoginFailed:
                 return "Failed to enable launch at login"
             case .launchAtLoginDisableFailed:
