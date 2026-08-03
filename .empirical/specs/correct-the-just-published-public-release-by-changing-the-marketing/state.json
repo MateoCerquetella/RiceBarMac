@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 4,
+  "revision": 5,
+  "activeFeature": "correct-the-just-published-public-release-by-changing-the-marketing",
+  "request": "Correct the just-published public release by changing the marketing version from 1.2.0 to the literal version 0.20 with tag v0.20, keeping build 120 unless repository evidence requires a different monotonic build; remove the quoted unsigned security-notice paragraph from repository release documentation and the published GitHub release notes; remove emoji characters from every tracked text file including README without changing binary assets or program semantics; run all existing validation; publish and publicly verify the corrected unsigned v0.20 release and checksum; only after that succeeds, delete the mistaken v1.2.0 GitHub release and tag. Leave Homebrew and the normal signed release workflow untouched, and preserve the pre-existing untracked CLAUDE.md.",
+  "profile": "complex",
+  "phase": "verify",
+  "status": "waiting",
+  "repairAttempts": 0,
+  "message": "Implemented literal v0.20/build 120 metadata, current-copy and notes correction, requested warning removal, ASCII built-in presentation with legacy custom-icon compatibility, a Unicode-aware tracked-text emoji gate wired into CI and both release paths, and preserved normal signing/Homebrew controls; local version, emoji, Actionlint, shell, JSON, and diff checks pass.",
+  "implementationActor": "agent",
+  "specDigest": "943b32f85dba89bb67bb7a9dcf832e28b33026b18f4431674634e1b93a98f278",
+  "capabilityArchiveRequired": true,
+  "capabilityDeltaDigest": "dde75dfc8eea1bc23f9e29f5f5b984c4299cf9a2cf48dbcf4a9e47cc2b0d0f7c",
+  "evidence": [],
+  "updatedAt": "2026-08-03T13:59:15.138Z"
+}

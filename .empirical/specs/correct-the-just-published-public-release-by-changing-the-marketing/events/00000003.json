@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "revision": 3,
+  "previousRevision": 2,
+  "actor": "agent",
+  "summary": "Designed a narrow v0.20 metadata and presentation correction, a tracked-text emoji gate, exact-head CI and release validation, factual unsigned labeling without the requested warning, and publish-before-delete rollback safety; accepted four evidence-backed decisions.",
+  "createdAt": "2026-08-03T13:51:31.249Z",
+  "state": {
+    "schemaVersion": 4,
+    "revision": 3,
+    "activeFeature": "correct-the-just-published-public-release-by-changing-the-marketing",
+    "request": "Correct the just-published public release by changing the marketing version from 1.2.0 to the literal version 0.20 with tag v0.20, keeping build 120 unless repository evidence requires a different monotonic build; remove the quoted unsigned security-notice paragraph from repository release documentation and the published GitHub release notes; remove emoji characters from every tracked text file including README without changing binary assets or program semantics; run all existing validation; publish and publicly verify the corrected unsigned v0.20 release and checksum; only after that succeeds, delete the mistaken v1.2.0 GitHub release and tag. Leave Homebrew and the normal signed release workflow untouched, and preserve the pre-existing untracked CLAUDE.md.",
+    "profile": "complex",
+    "phase": "plan",
+    "status": "waiting",
+    "repairAttempts": 0,
+    "message": "Designed a narrow v0.20 metadata and presentation correction, a tracked-text emoji gate, exact-head CI and release validation, factual unsigned labeling without the requested warning, and publish-before-delete rollback safety; accepted four evidence-backed decisions.",
+    "implementationActor": null,
+    "specDigest": "943b32f85dba89bb67bb7a9dcf832e28b33026b18f4431674634e1b93a98f278",
+    "capabilityArchiveRequired": true,
+    "capabilityDeltaDigest": "dde75dfc8eea1bc23f9e29f5f5b984c4299cf9a2cf48dbcf4a9e47cc2b0d0f7c",
+    "evidence": [],
+    "updatedAt": "2026-08-03T13:51:31.249Z"
+  }
+}

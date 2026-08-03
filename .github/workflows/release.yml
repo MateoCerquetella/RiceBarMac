@@ -60,6 +60,7 @@ jobs:
           brew install xcodegen
           xcodegen --version
           EXPECTED_TAG="${GITHUB_REF_NAME}" scripts/verify-version.sh
+          scripts/verify-no-emoji.sh
           xcodegen generate
           git diff --exit-code -- RiceBarMac.xcodeproj
 
@@ -196,7 +197,7 @@ jobs:
               "${{ steps.asset.outputs.asset_name }}#RiceBarMac ${{ steps.asset.outputs.version }}" \
               --verify-tag \
               --title "RiceBarMac ${GITHUB_REF_NAME}" \
-              --notes-file RELEASE_NOTES_1.2.0.md \
+              --notes-file RELEASE_NOTES_0.20.md \
               --latest
           fi
           gh release download "${GITHUB_REF_NAME}" \

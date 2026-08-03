@@ -1,10 +1,8 @@
-# RiceBarMac 1.2.0 — Unsigned build
+# RiceBarMac 0.20
 
-> **Security notice:** `RiceBarMac-1.2.0-unsigned.zip` is intentionally unsigned and unnotarized. It does not have an Apple Developer ID signature, notarization ticket, or Gatekeeper approval. macOS may block it. Install it only if you trust this repository and accept that risk.
-
-This one-time unsigned publication was explicitly authorized by the project owner because Apple signing credentials are not configured. The normal tag-triggered release workflow remains fail-closed and will publish only a Developer ID signed, hardened, notarized, stapled, and Gatekeeper-verified build.
-
-The Homebrew cask is not updated to this unsigned build. Download the explicitly labeled asset from this release, verify it against the attached `.sha256` file, extract it, and move `RiceBarMac.app` to `/Applications`. If macOS blocks the first launch, review the warning in **System Settings → Privacy & Security** and use **Open Anyway** only if you choose to trust the app.
+RiceBarMac 0.20 focuses on predictable and recoverable profile changes. The
+manually published asset is identified as unsigned in its release title and
+filename. The Homebrew cask is unchanged.
 
 ## Highlights
 
@@ -20,7 +18,7 @@ The Homebrew cask is not updated to this unsigned build. Download the explicitly
 
 ## Build verification
 
-- Version `1.2.0`, build `120`
+- Version `0.20`, build `120`
 - macOS 14 Sonoma or later
 - Universal `arm64` and `x86_64` application
 - Debug and Release analysis, 38 unit/integration tests, and 3 native UI tests run before publication

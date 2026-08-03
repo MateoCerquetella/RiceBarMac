@@ -197,7 +197,7 @@ final class StatusBarController {
             heading.isEnabled = false
             result.append(heading)
             for invalid in viewModel.invalidProfiles {
-                let item = NSMenuItem(title: "⚠︎ \(invalid.directory.lastPathComponent)", action: nil, keyEquivalent: "")
+                let item = NSMenuItem(title: "Invalid: \(invalid.directory.lastPathComponent)", action: nil, keyEquivalent: "")
                 item.toolTip = invalid.message
                 item.isEnabled = false
                 result.append(item)

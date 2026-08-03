@@ -10,8 +10,13 @@ final class ConfigurationCompatibilityTests: XCTestCase {
         XCTAssertTrue(config.general.launchAtLogin)
         XCTAssertTrue(config.general.autoReloadProfiles)
         XCTAssertTrue(config.general.showNotifications)
-        XCTAssertEqual(config.appearance.menuBarIcon, "🍚")
+        XCTAssertEqual(config.appearance.menuBarIcon, "RB")
         XCTAssertEqual(config.shortcuts.profileShortcuts.count, 9)
+
+        let existingIcon = String(UnicodeScalar(0x1F35A)!)
+        let customData = Data(#"{"appearance":{"menuBarIcon":"\#(existingIcon)"}}"#.utf8)
+        let customConfig = try JSONDecoder().decode(RiceBarConfig.self, from: customData)
+        XCTAssertEqual(customConfig.appearance.menuBarIcon, existingIcon)
     }
 
     func testMalformedConfigurationIsNeverOverwrittenDuringInitialization() throws {

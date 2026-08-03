@@ -4,9 +4,9 @@ Generated from repository metadata. Topic pages are maintained by the current
 agent from inspected evidence; refresh never overwrites them.
 
 - Repository: RiceBarMac
-- Inventory digest: 636c5a0981374a0251e99f4fc806dfbb37d22a4484628ed7bb2cd609049eee79
-- Included files: 32
-- Roots: .codex, .cursor, .gemini, .github, ., App, RiceBarMac.xcodeproj
+- Inventory digest: c0efb013ae9ecc9100fecb8f08b19838e5c37fe11f0c79bd06b0f904b50bce91
+- Included files: 51
+- Roots: .codex, .cursor, .gemini, .github, ., App, RiceBarMac.xcodeproj, scripts
 - Manifests: none
 - Primary docs: CONTRIBUTING.md, README.md
 

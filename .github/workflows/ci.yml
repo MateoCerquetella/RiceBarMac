@@ -34,6 +34,9 @@ jobs:
       - name: Verify version source
         run: scripts/verify-version.sh
 
+      - name: Verify tracked text is emoji-free
+        run: scripts/verify-no-emoji.sh
+
       - name: Generate Xcode project
         run: xcodegen generate
 

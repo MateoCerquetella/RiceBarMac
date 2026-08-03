@@ -6,7 +6,7 @@ on:
       tag:
         description: Version tag matching project.yml
         required: true
-        default: v1.2.0
+        default: v0.20
         type: string
       acknowledge_unsigned:
         description: I authorize a public unsigned and unnotarized macOS release
@@ -65,6 +65,7 @@ jobs:
           xcodebuild -version
           brew install xcodegen
           xcodegen --version
+          scripts/verify-no-emoji.sh
           xcodegen generate
           git diff --exit-code -- RiceBarMac.xcodeproj
 
@@ -154,7 +155,7 @@ jobs:
             [[ "${release_tag}" == "${RELEASE_TAG}" ]]
             echo "Verifying existing ${RELEASE_TAG} release without replacing its asset."
           else
-            create_args=(--title "RiceBarMac ${RELEASE_TAG} (Unsigned)" --notes-file UNSIGNED_RELEASE_NOTES_1.2.0.md --latest)
+            create_args=(--title "RiceBarMac ${RELEASE_TAG} (Unsigned)" --notes-file UNSIGNED_RELEASE_NOTES_0.20.md --latest)
             if git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"; then
               create_args+=(--verify-tag)
             else
