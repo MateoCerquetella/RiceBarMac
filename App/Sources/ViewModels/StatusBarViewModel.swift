@@ -194,7 +194,7 @@ final class StatusBarViewModel: ObservableObject {
                 guard plan.isValid else {
                     throw ProfilePlanningError(issues: plan.issues)
                 }
-                guard self.confirmApply(plan) else {
+                guard await self.confirmApply(plan) else {
                     self.previewPlan = nil
                     return
                 }
@@ -417,7 +417,7 @@ final class StatusBarViewModel: ObservableObject {
     }
 
     @MainActor
-    private func confirmApply(_ plan: ProfileApplyPlan) -> Bool {
+    private func confirmApply(_ plan: ProfileApplyPlan) async -> Bool {
         let alert = NSAlert()
         alert.messageText = "Preview \(plan.profileName)"
         alert.informativeText = "Review the exact plan below. No files have been changed. Replaced items will be moved to the listed backups."
@@ -442,6 +442,14 @@ final class StatusBarViewModel: ObservableObject {
         scrollView.hasHorizontalScroller = true
         scrollView.borderType = .bezelBorder
         alert.accessoryView = scrollView
+
+        if let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow {
+            return await withCheckedContinuation { continuation in
+                alert.beginSheetModal(for: parentWindow) { response in
+                    continuation.resume(returning: response == .alertFirstButtonReturn)
+                }
+            }
+        }
 
         return alert.runModal() == .alertFirstButtonReturn
     }

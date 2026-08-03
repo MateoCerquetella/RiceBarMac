@@ -29,13 +29,13 @@ final class RiceBarMacUITests: XCTestCase {
 
         openPreview()
         let status = window.descendants(matching: .any)["profile-operation-status"]
-        XCTAssertTrue(waitForEnabled(window, enabled: false, timeout: 8))
+        let apply = app.buttons["confirm-profile-apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 8))
+        XCTAssertTrue(apply.isEnabled)
         XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         attachScreenshot("preview")
 
-        // AppKit hosts this modal alert outside the target's XCUI hierarchy on
-        // macOS 14. Return activates its accessible default Apply action.
-        app.typeKey(.return, modifierFlags: [])
+        apply.click()
         attachScreenshot("applying")
         XCTAssertTrue(waitForPath(destination, exists: true, timeout: 8))
         XCTAssertTrue(waitForValue(status, value: "UI Test applied successfully", timeout: 8))
@@ -137,12 +137,6 @@ final class RiceBarMacUITests: XCTestCase {
 
     private func waitForValue(_ element: XCUIElement, value: String, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(format: "value == %@", value)
-        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
-        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
-    }
-
-    private func waitForEnabled(_ element: XCUIElement, enabled: Bool, timeout: TimeInterval) -> Bool {
-        let predicate = NSPredicate(format: "enabled == %@", NSNumber(value: enabled))
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
