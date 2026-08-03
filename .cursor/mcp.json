@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "empirical": {
+      "command": "empirical",
+      "args": [
+        "mcp"
+      ]
+    }
+  }
+}

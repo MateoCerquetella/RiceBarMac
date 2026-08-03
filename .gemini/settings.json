@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "empirical": {
+      "command": "empirical",
+      "args": [
+        "mcp"
+      ],
+      "cwd": "."
+    }
+  }
+}

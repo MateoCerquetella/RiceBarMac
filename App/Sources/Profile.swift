@@ -1,7 +1,7 @@
 import Foundation
 
 
-enum ProfileValidationError: LocalizedError {
+enum ProfileValidationError: LocalizedError, Sendable {
     case invalidProfileName
     case invalidHotkey
     case directoryNotFound(String)
@@ -18,7 +18,7 @@ enum ProfileValidationError: LocalizedError {
     }
 }
 
-struct Profile: Codable, Equatable, Hashable {
+struct Profile: Codable, Equatable, Hashable, Sendable {
     var name: String {
         didSet {
             name = name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -30,8 +30,8 @@ struct Profile: Codable, Equatable, Hashable {
 
     var wallpaper: String? // relative path
 
-    struct Terminal: Codable, Equatable, Hashable {
-        enum Kind: String, Codable, Equatable, Hashable, CaseIterable { 
+    struct Terminal: Codable, Equatable, Hashable, Sendable {
+        enum Kind: String, Codable, Equatable, Hashable, CaseIterable, Sendable {
             case alacritty, terminalApp, iterm2 
             
             var displayName: String {
@@ -43,7 +43,7 @@ struct Profile: Codable, Equatable, Hashable {
             }
         }
         
-        enum ThemeSource: String, Codable, Equatable, Hashable {
+        enum ThemeSource: String, Codable, Equatable, Hashable, Sendable {
             case builtin = "builtin"      // Built-in theme name
             case file = "file"            // Relative path to config file
             case url = "url"              // URL to download theme from
@@ -71,8 +71,8 @@ struct Profile: Codable, Equatable, Hashable {
     }
     var terminal: Terminal?
     
-    struct IDE: Codable, Equatable, Hashable {
-        enum Kind: String, Codable, Equatable, Hashable { 
+    struct IDE: Codable, Equatable, Hashable, Sendable {
+        enum Kind: String, Codable, Equatable, Hashable, Sendable {
             case vscode, cursor 
             
             var displayName: String {
@@ -83,7 +83,7 @@ struct Profile: Codable, Equatable, Hashable {
             }
         }
         
-        enum ThemeSource: String, Codable, Equatable, Hashable {
+        enum ThemeSource: String, Codable, Equatable, Hashable, Sendable {
             case builtin = "builtin"      // Built-in theme name
             case extensionTheme = "extension"  // Extension-provided theme
             case file = "file"            // Relative path to custom theme
@@ -112,7 +112,7 @@ struct Profile: Codable, Equatable, Hashable {
     }
     var ide: IDE?
 
-    struct Replacement: Codable, Equatable, Hashable {
+    struct Replacement: Codable, Equatable, Hashable, Sendable {
         var source: String // relative path within profile dir
         var destination: String // absolute path, supports ~ expansion
     }
@@ -120,8 +120,8 @@ struct Profile: Codable, Equatable, Hashable {
 
     var startupScript: String? // relative path
     
-    struct SystemTheme: Codable, Equatable, Hashable {
-        enum Appearance: String, Codable, CaseIterable {
+    struct SystemTheme: Codable, Equatable, Hashable, Sendable {
+        enum Appearance: String, Codable, CaseIterable, Sendable {
             case light = "light"
             case dark = "dark"
             case auto = "auto"
@@ -146,6 +146,25 @@ struct Profile: Codable, Equatable, Hashable {
         }
     }
     var systemTheme: SystemTheme?
+
+    private enum CodingKeys: String, CodingKey {
+        case name, order, hotkey, wallpaper, terminal, ide, replacements, startupScript, systemTheme
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        name = try container.decode(String.self, forKey: .name)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+        order = try container.decodeIfPresent(Int.self, forKey: .order) ?? 0
+        hotkey = try container.decodeIfPresent(String.self, forKey: .hotkey)
+        wallpaper = try container.decodeIfPresent(String.self, forKey: .wallpaper)
+        terminal = try container.decodeIfPresent(Terminal.self, forKey: .terminal)
+        ide = try container.decodeIfPresent(IDE.self, forKey: .ide)
+        replacements = try container.decodeIfPresent([Replacement].self, forKey: .replacements) ?? []
+        startupScript = try container.decodeIfPresent(String.self, forKey: .startupScript)
+        systemTheme = try container.decodeIfPresent(SystemTheme.self, forKey: .systemTheme)
+    }
     
     func validate() throws {
         guard !name.isEmpty else {
@@ -192,7 +211,7 @@ struct Profile: Codable, Equatable, Hashable {
     }
 }
 
-struct ProfileDescriptor: Hashable, Equatable {
+struct ProfileDescriptor: Hashable, Equatable, Sendable {
     let profile: Profile
     let directory: URL
     

@@ -18,18 +18,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     private let profileService = ProfileService.shared
     private let systemService = SystemService.shared
-    private let fileSystemService = FileSystemService.shared
     private let configService = ConfigService.shared
     
     
-    private lazy var statusBarViewModel = StatusBarViewModel(
-        profileService: profileService,
-        systemService: systemService,
-        fileSystemService: fileSystemService
-    )
+    private let statusBarViewModel = StatusBarViewModel.shared
     
     
     private var statusBarController: StatusBarController?
+    private var uiTestWindow: NSWindow?
     
     
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -44,10 +40,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     
     private func setupServices() {
-        do {
-            try Constants.ensureDirectoriesExist()
-        } catch {
-        }
+        // Service construction is intentionally read-only. Managed directories
+        // are created only by an explicit profile-management or Apply action.
     }
     
     
@@ -57,19 +51,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     private func setupInitialState() {
         statusBarViewModel.refreshData()
-        
+
         // Ensure app never appears in dock
         systemService.setDockVisibility()
-        
-        // Initialize launch at login based on config if different from system
-        let config = configService.config
-        if config.general.launchAtLogin != systemService.isLaunchAtLoginEnabled {
-            try? systemService.setLaunchAtLogin(enabled: config.general.launchAtLogin)
+
+        if Constants.isUITesting {
+            NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.async {
+                let controller = NSHostingController(rootView: SettingsWindowView())
+                let window = NSWindow(contentViewController: controller)
+                window.title = "RiceBarMac Settings"
+                window.setContentSize(NSSize(width: 700, height: 500))
+                window.center()
+                window.makeKeyAndOrderFront(nil)
+                self.uiTestWindow = window
+            }
         }
+
     }
     
     private func cleanupServices() {
         systemService.clearHotKeys()
+        uiTestWindow?.close()
     }
 }
 
@@ -85,11 +88,7 @@ struct SettingsView: View {
 struct SettingsWindowView: View {
     @StateObject private var configService = ConfigService.shared
     @StateObject private var systemService = SystemService.shared
-    @StateObject private var viewModel = StatusBarViewModel(
-        profileService: ProfileService.shared,
-        systemService: SystemService.shared,
-        fileSystemService: FileSystemService.shared
-    )
+    @ObservedObject private var viewModel = StatusBarViewModel.shared
     
     @State private var selectedTab = SettingsTab.general
     
@@ -287,6 +286,85 @@ struct SettingsGeneralTabView: View {
                             }
                             .buttonStyle(.bordered)
                         }
+
+                        HStack(spacing: 12) {
+                            Menu("Preview Profile…") {
+                                ForEach(viewModel.sortedProfiles, id: \.id) { descriptor in
+                                    Button(descriptor.displayName) {
+                                        viewModel.applyProfile(descriptor)
+                                    }
+                                }
+                            }
+                            .disabled(viewModel.sortedProfiles.isEmpty || viewModel.isApplying)
+                            .accessibilityLabel("Preview a profile before applying")
+
+                            Button("Undo Last Apply") {
+                                viewModel.undoLastApply()
+                            }
+                            .disabled(!viewModel.canUndo || viewModel.isApplying)
+                            .keyboardShortcut("z", modifiers: [.command, .option])
+                            .accessibilityLabel("Undo the last completed profile apply")
+
+                            if viewModel.hasLegacyMigration {
+                                Button("Migrate Legacy Configuration…") {
+                                    viewModel.migrateLegacyConfiguration()
+                                }
+                                .disabled(viewModel.isApplying)
+                                .accessibilityLabel("Migrate legacy ricebar configuration")
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(viewModel.operationState.message)
+                                .font(.caption)
+                                .foregroundColor(operationColor)
+                                .accessibilityLabel("Profile operation status")
+                                .accessibilityValue(viewModel.operationState.message)
+                            if viewModel.isApplying || viewModel.operationState.phase == .undoing {
+                                ProgressView(value: viewModel.operationState.progress)
+                                    .accessibilityLabel("Profile operation progress")
+                            }
+                            if let position = viewModel.operationState.queuePosition {
+                                Text("Queue position: \(position)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        if !viewModel.invalidProfiles.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Invalid Profiles")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                ForEach(viewModel.invalidProfiles) { invalid in
+                                    Text("\(invalid.directory.lastPathComponent): \(invalid.message)")
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                            .accessibilityElement(children: .contain)
+                        }
+
+                        if !viewModel.recoveryTransactions.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Recovery Required")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.red)
+                                ForEach(viewModel.recoveryTransactions) { transaction in
+                                    HStack {
+                                        Text(transaction.plan.profileName)
+                                            .font(.caption)
+                                        Spacer()
+                                        Button("Restore Previous State") {
+                                            viewModel.recover(transaction)
+                                        }
+                                        .accessibilityLabel("Recover \(transaction.plan.profileName)")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -294,6 +372,19 @@ struct SettingsGeneralTabView: View {
             Spacer()
         }
         .padding(.top, 8)
+    }
+
+    private var operationColor: Color {
+        switch viewModel.operationState.phase {
+        case .failed, .recoveryRequired:
+            return .red
+        case .warning:
+            return .orange
+        case .committed, .undone:
+            return .green
+        default:
+            return .secondary
+        }
     }
     
     private func userFriendlyErrorMessage(for error: Error) -> String {

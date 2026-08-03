@@ -11,7 +11,7 @@ final class StatusBarController {
     private var cancellables = Set<AnyCancellable>()
     private let configService = ConfigService.shared
 
-    init(viewModel: StatusBarViewModel = StatusBarViewModel()) {
+    init(viewModel: StatusBarViewModel = .shared) {
         self.viewModel = viewModel
         statusItem = NSStatusBar.system.statusItem(withLength: Constants.StatusBarIcon.menuBarLength)
         updateMenuBarIcon()
@@ -48,6 +48,23 @@ final class StatusBarController {
             .sink { [weak self] _ in
                 self?.updateLaunchAtLoginCheckmark()
             }
+            .store(in: &cancellables)
+
+        Publishers.CombineLatest4(
+            viewModel.$operationState,
+            viewModel.$canUndo,
+            viewModel.$invalidProfiles,
+            viewModel.$recoveryTransactions
+        )
+        .debounce(for: .milliseconds(75), scheduler: DispatchQueue.main)
+        .sink { [weak self] _, _, _, _ in
+            self?.constructMenu()
+        }
+        .store(in: &cancellables)
+
+        viewModel.$migrationAvailability
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.constructMenu() }
             .store(in: &cancellables)
         
         // Listen for appearance config changes
@@ -127,16 +144,18 @@ final class StatusBarController {
     
     private func updateMenuBarIcon() {
         statusItem.button?.title = configService.config.appearance.menuBarIcon
+        statusItem.button?.setAccessibilityLabel("RiceBarMac profile switcher")
     }
     
     private func createProfileMenuItems() -> [NSMenuItem] {
+        var result: [NSMenuItem] = []
         if viewModel.profiles.isEmpty {
-            let empty = NSMenuItem(title: "No profiles found", action: nil, keyEquivalent: "")
+            let empty = NSMenuItem(title: viewModel.invalidProfiles.isEmpty ? "No profiles found" : "No valid profiles found", action: nil, keyEquivalent: "")
             empty.isEnabled = false
-            return [empty]
+            result.append(empty)
         }
-        
-        return viewModel.sortedProfiles.enumerated().map { (index, descriptor) in
+
+        result.append(contentsOf: viewModel.sortedProfiles.enumerated().map { (index, descriptor) in
             let title = descriptor.profile.name
             let profileKey = "profile\(index + 1)"
             let configShortcut = configService.config.shortcuts.profileShortcuts[profileKey] ?? ""
@@ -172,17 +191,38 @@ final class StatusBarController {
             item.submenu = submenu
             
             return item
+        })
+
+        if !viewModel.invalidProfiles.isEmpty {
+            result.append(.separator())
+            let heading = NSMenuItem(title: "Invalid Profiles", action: nil, keyEquivalent: "")
+            heading.isEnabled = false
+            result.append(heading)
+            for invalid in viewModel.invalidProfiles {
+                let item = NSMenuItem(title: "⚠︎ \(invalid.directory.lastPathComponent)", action: nil, keyEquivalent: "")
+                item.toolTip = invalid.message
+                item.isEnabled = false
+                result.append(item)
+            }
         }
+        return result
     }
     
     private func createProfileSubmenu(for descriptor: ProfileDescriptor, isActive: Bool) -> NSMenu {
         let submenu = NSMenu()
+
+        let preview = NSMenuItem(
+            title: isActive ? "Preview Reapply…" : "Preview and Apply…",
+            action: #selector(applyProfileMenu(_:)),
+            keyEquivalent: ""
+        )
+        preview.target = self
+        preview.representedObject = descriptor
+        preview.isEnabled = !viewModel.isApplying
+        submenu.addItem(preview)
+        submenu.addItem(.separator())
         
         if isActive {
-            let reapply = NSMenuItem(title: "Reapply", action: #selector(reapplyActive), keyEquivalent: "")
-            reapply.target = self
-            submenu.addItem(reapply)
-            
             let setWallpaper = NSMenuItem(title: "Set Wallpaper…", action: #selector(pickWallpaperForActive), keyEquivalent: "")
             setWallpaper.target = self
             submenu.addItem(setWallpaper)
@@ -215,6 +255,38 @@ final class StatusBarController {
     
     private func createActionMenuItems() -> [NSMenuItem] {
         var items: [NSMenuItem] = []
+
+        let operation = NSMenuItem(title: viewModel.operationState.message, action: nil, keyEquivalent: "")
+        operation.isEnabled = false
+        items.append(operation)
+
+        if let position = viewModel.operationState.queuePosition {
+            let queued = NSMenuItem(title: "Queue position: \(position)", action: nil, keyEquivalent: "")
+            queued.isEnabled = false
+            items.append(queued)
+        }
+
+        let undo = NSMenuItem(title: "Undo Last Apply", action: #selector(undoLastApply), keyEquivalent: "")
+        undo.target = self
+        undo.isEnabled = viewModel.canUndo && !viewModel.isApplying
+        items.append(undo)
+
+        if viewModel.hasLegacyMigration {
+            let migrate = NSMenuItem(title: "Migrate Legacy Configuration…", action: #selector(migrateLegacyConfiguration), keyEquivalent: "")
+            migrate.target = self
+            migrate.isEnabled = !viewModel.isApplying
+            items.append(migrate)
+        }
+
+        for transaction in viewModel.recoveryTransactions {
+            let recovery = NSMenuItem(title: "Recover \(transaction.plan.profileName)…", action: #selector(recoverTransaction(_:)), keyEquivalent: "")
+            recovery.target = self
+            recovery.representedObject = transaction
+            recovery.isEnabled = !viewModel.isApplying
+            items.append(recovery)
+        }
+
+        items.append(.separator())
         
         let createProfileMenu = NSMenuItem(title: "Create Profile", action: nil, keyEquivalent: "")
         let createSubmenu = NSMenu()
@@ -307,10 +379,19 @@ final class StatusBarController {
         
         
         viewModel.applyProfile(descriptor)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            self.updateActiveProfileCheckmarks()
-        }
+    }
+
+    @objc private func undoLastApply() {
+        viewModel.undoLastApply()
+    }
+
+    @objc private func migrateLegacyConfiguration() {
+        viewModel.migrateLegacyConfiguration()
+    }
+
+    @objc private func recoverTransaction(_ sender: NSMenuItem) {
+        guard let transaction = sender.representedObject as? ApplyTransaction else { return }
+        viewModel.recover(transaction)
     }
 
     @objc private func openProfilesFolder() {
@@ -362,34 +443,8 @@ final class StatusBarController {
     }
     
     @objc private func openSettings() {
-        // For SwiftUI Apps, we need to use the proper pattern
         NSApp.activate(ignoringOtherApps: true)
-        
-        // Try keyboard shortcut first (Cmd+,) which is the standard settings shortcut
-        let event = CGEvent(keyboardEventSource: nil, virtualKey: 43, keyDown: true) // Comma key
-        event?.flags = .maskCommand
-        event?.post(tap: .cghidEventTap)
-        
-        // Release the key
-        let keyUpEvent = CGEvent(keyboardEventSource: nil, virtualKey: 43, keyDown: false)
-        keyUpEvent?.flags = .maskCommand
-        keyUpEvent?.post(tap: .cghidEventTap)
-        
-        // If that doesn't work, try opening via menu bar
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            if let mainMenu = NSApp.mainMenu {
-                // Look for app menu (first menu)
-                if let appMenu = mainMenu.items.first?.submenu {
-                    // Find "Preferences..." or "Settings..." item
-                    for item in appMenu.items {
-                        if item.title.contains("Preferences") || item.title.contains("Settings") {
-                            item.target?.perform(item.action, with: item)
-                            return
-                        }
-                    }
-                }
-            }
-        }
+        _ = NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 
     @objc private func promptCopyCurrentProfile() {

@@ -7,6 +7,17 @@ enum Constants {
     
     static let appName = "RiceBarMac"
     static let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.ricebar.RiceBarMac"
+
+    static let isUITesting = ProcessInfo.processInfo.arguments.contains("--ui-testing")
+
+    static let userHome: URL = {
+        if isUITesting,
+           let path = ProcessInfo.processInfo.environment["RICEBARMAC_TEST_HOME"],
+           !path.isEmpty {
+            return URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        }
+        return FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+    }()
     
     
     static let profileFileCandidates: [String] = [
@@ -24,7 +35,7 @@ enum Constants {
     ]
     
     
-    private static let ricebarRoot = URL(fileURLWithPath: NSHomeDirectory())
+    static let ricebarRoot = userHome
         .appendingPathComponent(".ricebarmac", isDirectory: true)
     
     static let profilesRoot = ricebarRoot

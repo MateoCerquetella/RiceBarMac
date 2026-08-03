@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import SwiftUI
 import Combine
+import UserNotifications
 #if canImport(UniformTypeIdentifiers)
 import UniformTypeIdentifiers
 #endif
@@ -16,31 +17,35 @@ final class StatusBarViewModel: ObservableObject {
     @Published private(set) var isLaunchAtLoginEnabled = false
     @Published private(set) var launchAtLoginError: Error?
     @Published private(set) var registeredHotKeys: [String] = []
+    @Published private(set) var invalidProfiles: [InvalidProfileDescriptor] = []
+    @Published private(set) var operationState: ProfileOperationSnapshot = .idle
+    @Published private(set) var previewPlan: ProfileApplyPlan?
+    @Published private(set) var recoveryTransactions: [ApplyTransaction] = []
+    @Published private(set) var canUndo = false
+    @Published private(set) var migrationAvailability: LegacyMigrationAvailability = .none
+    @Published private(set) var configError: ConfigServiceError?
     
     
     private let profileService: ProfileService
     private let systemService: SystemService
-    private let fileSystemService: FileSystemService
     private let configService: ConfigService
     
     
     private var cancellables = Set<AnyCancellable>()
+
+    static let shared = StatusBarViewModel()
     
     
     init(
         profileService: ProfileService = .shared,
         systemService: SystemService = .shared,
-        fileSystemService: FileSystemService = .shared,
         configService: ConfigService = .shared
     ) {
         self.profileService = profileService
         self.systemService = systemService
-        self.fileSystemService = fileSystemService
         self.configService = configService
         
         setupBindings()
-        refreshData()
-        registerHotKeys()
     }
     
     
@@ -59,6 +64,36 @@ final class StatusBarViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .assign(to: \.isApplying, on: self)
             .store(in: &cancellables)
+
+        profileService.$invalidProfiles
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.invalidProfiles, on: self)
+            .store(in: &cancellables)
+
+        profileService.$operationState
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.operationState, on: self)
+            .store(in: &cancellables)
+
+        profileService.$recoveryTransactions
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.recoveryTransactions, on: self)
+            .store(in: &cancellables)
+
+        profileService.$canUndo
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.canUndo, on: self)
+            .store(in: &cancellables)
+
+        profileService.$migrationAvailability
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.migrationAvailability, on: self)
+            .store(in: &cancellables)
+
+        configService.$lastError
+            .receive(on: DispatchQueue.main)
+            .assign(to: \.configError, on: self)
+            .store(in: &cancellables)
         
         systemService.$isLaunchAtLoginEnabled
             .receive(on: DispatchQueue.main)
@@ -76,8 +111,9 @@ final class StatusBarViewModel: ObservableObject {
             .store(in: &cancellables)
         
         profileService.$profiles
-            .sink { [weak self] _ in
-                self?.registerHotKeys()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] profiles in
+                self?.registerHotKeys(profiles: profiles)
             }
             .store(in: &cancellables)
         
@@ -87,24 +123,25 @@ final class StatusBarViewModel: ObservableObject {
                 self?.registerHotKeys()
             }
             .store(in: &cancellables)
+
+        configService.$config
+            .map { $0.general.autoReloadProfiles }
+            .removeDuplicates()
+            .sink { [weak self] enabled in
+                self?.profileService.configureWatching(enabled: enabled)
+            }
+            .store(in: &cancellables)
     }
     
     
     func refreshData() {
         profileService.reload()
         systemService.updateLaunchAtLoginStatus()
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            if let active = self.activeProfile {
-                if let updatedProfile = self.profiles.first(where: { $0.directory == active.directory }) {
-                    self.applyProfile(updatedProfile)
-                }
-            }
-        }
     }
     
-    private func registerHotKeys() {
-        systemService.registerHotKeys(profiles: profiles) { [weak self] descriptor in
+    private func registerHotKeys(profiles: [ProfileDescriptor]? = nil) {
+        let profilesToRegister = profiles ?? self.profiles
+        systemService.registerHotKeys(profiles: profilesToRegister) { [weak self] descriptor in
             self?.applyProfile(descriptor)
         }
         
@@ -148,36 +185,68 @@ final class StatusBarViewModel: ObservableObject {
     }
     
     
-    private var currentApplicationTask: Task<Void, Never>?
-    
     func applyProfile(_ descriptor: ProfileDescriptor) {
-        if let current = activeProfile, current.directory == descriptor.directory {
-            if ApplyActivity.recentlyApplied(within: 2.0) {
-                return
-            }
-        }
-        
-        currentApplicationTask?.cancel()
-        
-        profileService.setActiveProfile(descriptor)
-        
-        DispatchQueue.main.async {
-            self.objectWillChange.send()
-        }
-        
-        
-        currentApplicationTask = Task.detached(priority: .userInitiated) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
             do {
-                try await self.profileService.applyProfileAsync(descriptor, cleanConfig: false)
+                let plan = try await self.profileService.previewProfile(descriptor)
+                self.previewPlan = plan
+                guard plan.isValid else {
+                    throw ProfilePlanningError(issues: plan.issues)
+                }
+                guard self.confirmApply(plan) else {
+                    self.previewPlan = nil
+                    return
+                }
+                let outcome = try await self.profileService.applyPlan(plan)
+                self.previewPlan = nil
+                if outcome.warnings.isEmpty {
+                    self.postNotification(title: "Profile Applied", body: "\(plan.profileName) is now active.")
+                } else {
+                    await self.showWarning(title: "Applied with Warnings", message: outcome.warnings.joined(separator: "\n"))
+                }
             } catch {
                 if Task.isCancelled {
-                } else {
+                    self.previewPlan = nil
+                } else if self.operationState.phase != .recoveryRequired {
+                    self.previewPlan = nil
                     await self.showError(error)
                 }
             }
-            
-            await MainActor.run {
-                self.currentApplicationTask = nil
+        }
+    }
+
+    func undoLastApply() {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await self.profileService.undoLastApply()
+                self.postNotification(title: "Profile Restored", body: "The previous filesystem state was restored.")
+            } catch {
+                await self.showError(error)
+            }
+        }
+    }
+
+    func migrateLegacyConfiguration() {
+        Task { @MainActor [weak self] in
+            guard let self, self.confirmLegacyMigration() else { return }
+            do {
+                _ = try self.profileService.migrateLegacyConfiguration()
+                self.postNotification(title: "Migration Complete", body: "Legacy .ricebar data was copied safely. The original remains available.")
+            } catch {
+                await self.showError(error)
+            }
+        }
+    }
+
+    func recover(_ transaction: ApplyTransaction) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await self.profileService.recover(transactionID: transaction.id)
+            } catch {
+                await self.showError(error)
             }
         }
     }
@@ -192,7 +261,6 @@ final class StatusBarViewModel: ObservableObject {
             Task {
                 do {
                     let descriptor = try profileService.createProfileFromCurrent(name: name)
-                    profileService.setActiveProfile(descriptor)
                     continuation.resume(returning: descriptor)
                 } catch {
                     continuation.resume(throwing: error)
@@ -206,7 +274,6 @@ final class StatusBarViewModel: ObservableObject {
             Task {
                 do {
                     let descriptor = try profileService.createEmptyProfile(name: name)
-                    profileService.setActiveProfile(descriptor)
                     continuation.resume(returning: descriptor)
                 } catch {
                     continuation.resume(throwing: error)
@@ -265,7 +332,8 @@ final class StatusBarViewModel: ObservableObject {
     
     func toggleLaunchAtLogin() async {
         do {
-            try systemService.toggleLaunchAtLogin()
+            let enabled = try systemService.toggleLaunchAtLogin()
+            configService.updateGeneralSetting(\.launchAtLogin, to: enabled)
         } catch {
             // Error is already tracked in systemService.launchAtLoginError
             // Don't show additional dialog - UI will display the error state
@@ -295,6 +363,11 @@ final class StatusBarViewModel: ObservableObject {
     
     var menuTitle: String {
         return activeProfileName ?? "Select a profile"
+    }
+
+    var hasLegacyMigration: Bool {
+        if case .none = migrationAvailability { return false }
+        return true
     }
     
     
@@ -331,6 +404,80 @@ final class StatusBarViewModel: ObservableObject {
         alert.alertStyle = .warning
         alert.addButton(withTitle: "OK")
         alert.runModal()
+    }
+
+    @MainActor
+    private func showWarning(title: String, message: String) async {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
+    @MainActor
+    private func confirmApply(_ plan: ProfileApplyPlan) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = "Preview \(plan.profileName)"
+        alert.informativeText = "Review the exact plan below. No files have been changed. Replaced items will be moved to the listed backups."
+        alert.alertStyle = plan.warnings.isEmpty ? .informational : .warning
+        alert.addButton(withTitle: "Apply")
+        alert.addButton(withTitle: "Cancel")
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 640, height: 280))
+        textView.string = plan.previewText
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        textView.setAccessibilityLabel("Profile apply plan")
+
+        let scrollView = NSScrollView(frame: textView.frame)
+        scrollView.documentView = textView
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = true
+        scrollView.borderType = .bezelBorder
+        alert.accessoryView = scrollView
+
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    @MainActor
+    private func confirmLegacyMigration() -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        switch migrationAvailability {
+        case .none:
+            alert.messageText = "No Legacy Configuration"
+            alert.informativeText = "No usable ~/.ricebar configuration was found."
+            alert.addButton(withTitle: "OK")
+            _ = alert.runModal()
+            return false
+        case .available(let source):
+            alert.messageText = "Migrate Legacy Configuration?"
+            alert.informativeText = "RiceBarMac will validate and copy \(source.path) into the current format. The original remains untouched."
+            alert.addButton(withTitle: "Migrate")
+            alert.addButton(withTitle: "Cancel")
+            return alert.runModal() == .alertFirstButtonReturn
+        case .conflict(let source, let destination, let entries):
+            alert.messageText = "Migration Conflict"
+            alert.informativeText = "Both \(source.path) and \(destination.path) contain data. Nothing was changed. Conflicting current entries: \(entries.joined(separator: ", "))."
+            alert.addButton(withTitle: "OK")
+            _ = alert.runModal()
+            return false
+        }
+    }
+
+    private func postNotification(title: String, body: String) {
+        guard configService.config.general.showNotifications else { return }
+        let center = UNUserNotificationCenter.current()
+        center.getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }
+            let content = UNMutableNotificationContent()
+            content.title = title
+            content.body = body
+            center.add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+        }
     }
     
     @MainActor

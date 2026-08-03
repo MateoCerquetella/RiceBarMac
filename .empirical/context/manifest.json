@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "digest": "636c5a0981374a0251e99f4fc806dfbb37d22a4484628ed7bb2cd609049eee79",
+  "files": [
+    {
+      "path": ".codex/config.toml",
+      "size": 111,
+      "digest": "f5740bba08f992d4a5fe9f5b9f8a2c191f6922a16b5f9ac61695da88b6131d82"
+    },
+    {
+      "path": ".cursor/mcp.json",
+      "size": 119,
+      "digest": "a4d50e5110c610d398e04657e81a2c2db9328cd131f5c28995aaf4e213a9c90b"
+    },
+    {
+      "path": ".gemini/settings.json",
+      "size": 137,
+      "digest": "58b7bc1fef265b214425ef17eeb67f9f9ad687e049cc8d65c368c01ef5bb8780"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "size": 5768,
+      "digest": "d046adc3fcae2bafdace01fd60ce2d7cf478bfa03f2857b49e975e3e3a9c44c5"
+    },
+    {
+      "path": ".gitignore",
+      "size": 1671,
+      "digest": "4d31d495c3815e22735ed67b23154a190863ef76f625f8d68850ec8513800e9e"
+    },
+    {
+      "path": ".mcp.json",
+      "size": 119,
+      "digest": "a4d50e5110c610d398e04657e81a2c2db9328cd131f5c28995aaf4e213a9c90b"
+    },
+    {
+      "path": "App/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "size": 1358,
+      "digest": "6bc723be4b30bdad5cdb455b50637a3bc341959b0ef919d543edcb486fe6d69b"
+    },
+    {
+      "path": "App/Entitlements/RiceBarMac_Debug.entitlements",
+      "size": 385,
+      "digest": "d42ba8461c4366429563cd19ca82f1d34644320e7a622d6922c64068db69c36e"
+    },
+    {
+      "path": "App/Entitlements/RiceBarMac_Release.entitlements",
+      "size": 508,
+      "digest": "bbd039a2025a48300f787260a7620e679fa43b37baeae827fcc1bb6e5e722c42"
+    },
+    {
+      "path": "App/Info.plist",
+      "size": 1112,
+      "digest": "5db792be9a7d0b20eab707e1df74685319d8ece1f8d8897d9c83b9129d07802e"
+    },
+    {
+      "path": "App/Sources/App/RiceBarMacApp.swift",
+      "size": 44570,
+      "digest": "e29549015483919cac89908e272f9141f297e2ba4193bc00b0792fec48b225c1"
+    },
+    {
+      "path": "App/Sources/App/StatusBarController.swift",
+      "size": 22909,
+      "digest": "dcc4c866fb477cddecc3f6cb655af7c784037539bf35cde5c8c9d17640c339b9"
+    },
+    {
+      "path": "App/Sources/Models/ApplyRecord.swift",
+      "size": 971,
+      "digest": "9cfd8b3b534165261936c5bc3ce379964bd3c3a3693c0c8f62e784df52a5afca"
+    },
+    {
+      "path": "App/Sources/Models/RiceBarConfig.swift",
+      "size": 2458,
+      "digest": "67e6226967f8802af1e0a9bca1e03856a9b1d157209087d9637635e045b96fbb"
+    },
+    {
+      "path": "App/Sources/Profile.swift",
+      "size": 6931,
+      "digest": "b358142bae8ea2d7ebf7533b40dee4ccd4843fb6a953888665b1e6f0f1682d3e"
+    },
+    {
+      "path": "App/Sources/Services/ConfigService.swift",
+      "size": 4220,
+      "digest": "902a68584fd670c84f6ad7665a742dbcd28afcbbf5b278b637e493c83a1ea1e2"
+    },
+    {
+      "path": "App/Sources/Services/FileSystemService.swift",
+      "size": 23598,
+      "digest": "28ee172fef153e52a0c72319d25ae779f34fadc2ff80baf5e6c7285f6330d7e1"
+    },
+    {
+      "path": "App/Sources/Services/ProfileService.swift",
+      "size": 76756,
+      "digest": "b9a67bc06f526e5539185e1f0b97aae6301daa0344abb4875574f5da8a01db32"
+    },
+    {
+      "path": "App/Sources/Services/SystemService.swift",
+      "size": 17244,
+      "digest": "f699db10aea5d4a4395590289a6c004615e0da7fb12a811135b89c2e13c27f10"
+    },
+    {
+      "path": "App/Sources/Services/ThemeService.swift",
+      "size": 16133,
+      "digest": "0c4ee3db875752c6ca3b722de86b3b297d79e834b2df5bf958f590cbc7f760fe"
+    },
+    {
+      "path": "App/Sources/Utils/ApplyActivity.swift",
+      "size": 797,
+      "digest": "9d1f79eed87ad61e6133a7667be607fd74c009129486012394fac1ceb93586a8"
+    },
+    {
+      "path": "App/Sources/Utils/Constants.swift",
+      "size": 10377,
+      "digest": "f73f046603625ecce89c09dce8f2e6311b57f21c8e505b540a6fbd267781fa8a"
+    },
+    {
+      "path": "App/Sources/ViewModels/StatusBarViewModel.swift",
+      "size": 17281,
+      "digest": "e13c9bea4b9a81a4b513fc9f4d32dcc3a2397b6ef63b2f6b1d3a4ea9b0379939"
+    },
+    {
+      "path": "CLAUDE.md",
+      "size": 1207,
+      "digest": "e121e1d3e4e0b263db5d8dc5076cc11fd25754b7227b5b0dee716937a59b89e1"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "size": 5040,
+      "digest": "9a9ca85b97f63d3932b4dd67d1bd0d7611fd98f6a7232b648facc87ca0eaca0a"
+    },
+    {
+      "path": "LICENSE",
+      "size": 1074,
+      "digest": "0686e75f59c01e82aecb48aa2e12a0363edf69f4f6b5929b353a083f51ae61f3"
+    },
+    {
+      "path": "README.md",
+      "size": 13133,
+      "digest": "9e48595efc7b35474ee04d91641f2cb7140f03dcc911aedff68ec27bdf2b05f7"
+    },
+    {
+      "path": "RiceBarMac.xcodeproj/project.pbxproj",
+      "size": 24839,
+      "digest": "e72bec8c743d8f305e2ccb724e04aca079a1394aaec00e300df0047802fc444f"
+    },
+    {
+      "path": "RiceBarMac.xcodeproj/project.xcworkspace/contents.xcworkspacedata",
+      "size": 135,
+      "digest": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+    },
+    {
+      "path": "RiceBarMac.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+      "size": 633,
+      "digest": "c0c1722d71e521b06c278eac253b4b342676bca8448a93b9ab8168293f024f32"
+    },
+    {
+      "path": "RiceBarMac.xcodeproj/xcshareddata/xcschemes/RiceBarMac.xcscheme",
+      "size": 3880,
+      "digest": "7e239d2712adb2b108726d5283a8ff18499ea9ade5eb82d9cd3d49034238072c"
+    },
+    {
+      "path": "project.yml",
+      "size": 2536,
+      "digest": "8a618ab08cb53b6f1751a895939452a09ae26f816ecd976623d63610e6bad2cf"
+    }
+  ],
+  "truncated": false
+}

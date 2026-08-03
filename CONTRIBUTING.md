@@ -53,6 +53,8 @@ Thank you for your interest in contributing to RiceBarMac! This document provide
 - Test on multiple macOS versions when possible
 - Verify backwards compatibility
 - Test with different profile configurations
+- Run the generated-project, unit-test, UI-test, analysis, and universal-archive CI gates
+- Treat `project.yml` as the source of truth and commit the regenerated `RiceBarMac.xcodeproj`
 
 ## 🐛 Bug Reports
 
@@ -173,15 +175,15 @@ Any other context or screenshots about the feature request.
 - Use Activity Monitor for performance issues
 
 ### Testing Profiles
-Create test profiles in `~/.ricebar/profiles/` for development:
+Create test profiles in `~/.ricebarmac/profiles/` for manual development. Do not use a home directory containing important configuration for destructive test cases:
 ```bash
-mkdir -p ~/.ricebar/profiles/TestProfile/home/.config
-echo "Test content" > ~/.ricebar/profiles/TestProfile/home/.config/test.txt
+mkdir -p ~/.ricebarmac/profiles/TestProfile/home/.config
+echo "Test content" > ~/.ricebarmac/profiles/TestProfile/home/.config/test.txt
 ```
 
 ### Common Issues
 - **Permissions**: Ensure proper entitlements are set
-- **Sandboxing**: Release builds have different permissions
+- **Signing**: Official Release builds require hardened runtime, Developer ID signing, notarization, and stapling
 - **File Watching**: FSEvents may need debugging
 - **UI Updates**: SwiftUI state management quirks
 
