@@ -111,7 +111,9 @@ final class RiceBarMacUITests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["--ui-testing"]
         app.launchEnvironment["RICEBARMAC_TEST_HOME"] = temporaryHome.path
-        app.launchEnvironment["RICEBARMAC_TEST_EFFECT_DELAY_MS"] = "1200"
+        // Keep the post-commit effect visible long enough for XCTest's accessibility
+        // polling to observe the real applying state on a loaded hosted runner.
+        app.launchEnvironment["RICEBARMAC_TEST_EFFECT_DELAY_MS"] = "3000"
         app.launch()
     }
 
@@ -185,10 +187,11 @@ final class RiceBarMacUITests: XCTestCase {
 
     private func waitForApplyingState(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         let predicate = NSPredicate(
-            format: "value == %@ OR value BEGINSWITH %@ OR value BEGINSWITH %@",
+            format: "value == %@ OR value BEGINSWITH %@ OR value BEGINSWITH %@ OR value BEGINSWITH %@",
             "Applying UI Test",
             "Create directory ",
-            "Link "
+            "Link ",
+            "Set wallpaper to "
         )
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
