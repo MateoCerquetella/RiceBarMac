@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'release/**'
+      - 'feature/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-verification:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Toolchain
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          brew install xcodegen
+          xcodegen --version
+
+      - name: Verify version source
+        run: scripts/verify-version.sh
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Check generated project drift
+        id: generated_drift
+        continue-on-error: true
+        run: git diff --exit-code -- RiceBarMac.xcodeproj
+
+      - name: Resolve packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac
+
+      - name: Build Debug
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tee build-debug.log
+
+      - name: Analyze Debug
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/debug-analyze \
+            CODE_SIGNING_ALLOWED=NO \
+            analyze | tee analyze-debug.log
+
+      - name: Unit tests
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/tests \
+            -resultBundlePath build/RiceBarMacTests.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            -only-testing:RiceBarMacTests \
+            test | tee test-unit.log
+
+      - name: UI tests
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/ui-tests \
+            -resultBundlePath build/RiceBarMacUITests.xcresult \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            -only-testing:RiceBarMacUITests \
+            test | tee test-ui.log
+
+      - name: Build and analyze Release
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/release \
+            CODE_SIGNING_ALLOWED=NO \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            build analyze | tee build-release.log
+
+      - name: Archive universal verification build
+        run: |
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Release \
+            -archivePath build/RiceBarMac.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            archive
+          app='build/RiceBarMac.xcarchive/Products/Applications/RiceBarMac.app'
+          APP_PATH="${app}" scripts/verify-version.sh
+          architectures="$(lipo -archs "${app}/Contents/MacOS/RiceBarMac")"
+          [[ " ${architectures} " == *' arm64 '* ]]
+          [[ " ${architectures} " == *' x86_64 '* ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "${app}/Contents/Info.plist")" == '14.0' ]]
+
+      - name: Upload native evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-verification-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            *.log
+            build/*.xcresult
+            RiceBarMac.xcodeproj
+
+      - name: Enforce generated project consistency
+        if: steps.generated_drift.outcome != 'success'
+        run: |
+          echo 'RiceBarMac.xcodeproj differs from project.yml. Regenerate and commit it.' >&2
+          exit 1

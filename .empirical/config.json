@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 4,
+  "profile": "complex",
+  "maxRepairAttempts": 2,
+  "evidence": {
+    "required": true,
+    "browserForUi": true,
+    "screenshotForUi": true,
+    "codeReview": true
+  },
+  "isolation": {
+    "mode": "ask",
+    "baseBranch": "auto",
+    "worktreePath": "../RiceBarMac-{feature}",
+    "branchPattern": "{type}/{feature}"
+  },
+  "decisions": {
+    "complexRecords": "required"
+  },
+  "setupComplete": true,
+  "legacySource": null
+}

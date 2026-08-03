@@ -7,178 +7,279 @@ on:
 
 permissions:
   contents: write
-  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
-    runs-on: macos-latest
-    
+  signed-release:
+    runs-on: macos-14
+    timeout-minutes: 60
+    env:
+      DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+      DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+      APPLE_API_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_API_PRIVATE_KEY_BASE64 }}
+      HOMEBREW_GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: latest-stable
-    
-    - name: Generate Xcode project
-      run: |
-        # Install XcodeGen if needed
-        if ! command -v xcodegen &> /dev/null; then
+      - name: Checkout exact tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Fail closed when release credentials are missing
+        run: |
+          set -euo pipefail
+          required=(
+            DEVELOPER_ID_CERTIFICATE_BASE64
+            DEVELOPER_ID_CERTIFICATE_PASSWORD
+            KEYCHAIN_PASSWORD
+            APPLE_TEAM_ID
+            APPLE_API_KEY_ID
+            APPLE_API_ISSUER_ID
+            APPLE_API_PRIVATE_KEY_BASE64
+            HOMEBREW_GITHUB_TOKEN
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Required release secret is not configured: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Toolchain and version gate
+        run: |
+          set -euo pipefail
+          xcodebuild -version
           brew install xcodegen
-        fi
-        xcodegen generate
-    
-    - name: Build app
-      run: |
-        xcodebuild -project RiceBarMac.xcodeproj \
-          -scheme RiceBarMac \
-          -configuration Release \
-          -derivedDataPath build \
-          -archivePath build/RiceBarMac.xcarchive \
-          archive \
-          CODE_SIGNING_ALLOWED=NO
-    
-    - name: Export app from archive
-      run: |
-        # Create export options plist
-        cat > ExportOptions.plist << EOF
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>method</key>
-            <string>mac-application</string>
-            <key>signingStyle</key>
-            <string>none</string>
-        </dict>
-        </plist>
-        EOF
-        
-        # Export the app
-        xcodebuild -exportArchive \
-          -archivePath build/RiceBarMac.xcarchive \
-          -exportOptionsPlist ExportOptions.plist \
-          -exportPath build/export
-    
-    - name: Create zip
-      run: |
-        # Check if the app exists and list contents
-        echo "Contents of build/export:"
-        ls -la build/export/
-        
-        # Verify the app bundle exists
-        if [ ! -d "build/export/RiceBarMac.app" ]; then
-          echo "Error: RiceBarMac.app not found in build/export/"
-          echo "Available files:"
-          find build/export -name "*.app" -type d
-          exit 1
-        fi
-        
-        # Create the zip file
-        cd build/export
-        zip -r ../../RiceBarMac.zip RiceBarMac.app
-        cd ../..
-        
-        # Verify zip contents
-        echo "Zip file contents:"
-        unzip -l RiceBarMac.zip
-    
-    - name: Calculate checksum
-      id: checksum
-      run: |
-        checksum=$(shasum -a 256 RiceBarMac.zip | cut -d ' ' -f 1)
-        echo "sha256=$checksum" >> $GITHUB_OUTPUT
-        echo "Checksum: $checksum"
-    
-    - name: Get version from tag
-      id: version
-      run: |
-        version=${GITHUB_REF#refs/tags/v}
-        echo "version=$version" >> $GITHUB_OUTPUT
-        echo "Version: $version"
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ github.ref_name }}
-        name: "🍚 RiceBarMac ${{ github.ref_name }}"
-        body: |
-          ## 🍚 RiceBarMac ${{ github.ref_name }}
-          
-          Lightning-fast macOS menu bar app for effortless desktop profile switching.
-          
-          ### ✨ What's New
-          - Improved stability and performance
-          - Bug fixes and enhancements
-          
-          ### 📦 Installation
-          1. Download `RiceBarMac.zip`
-          2. Extract and move to Applications folder
-          3. Run the app and grant necessary permissions
-          
-          ### 🔍 Verification
-          **SHA256 Checksum:** `${{ steps.checksum.outputs.sha256 }}`
-          
-          ### 📋 Requirements
-          - macOS 14.0 or later
-          - Administrator permissions for first setup
-          
-          Full documentation available in the [README](https://github.com/MateoCerquetella/RiceBarMac/blob/main/README.md).
-        files: |
-          RiceBarMac.zip
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-    
-    - name: Update Homebrew Formula
-      env:
-        HOMEBREW_GITHUB_TOKEN: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
-      run: |
-        # Clone the homebrew tap repository
-        git clone https://github.com/mateocerquetella/homebrew-ricebarmac.git homebrew-repo
-        cd homebrew-repo
-        
-        # Configure git
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        
-        # Update the cask
-        cat > Casks/ricebarmac.rb << EOF
-        cask "ricebarmac" do
-          version "${{ steps.version.outputs.version }}"
-          sha256 "${{ steps.checksum.outputs.sha256 }}"
-          
-          url "https://github.com/mateocerquetella/RiceBarMac/releases/download/v${{ steps.version.outputs.version }}/RiceBarMac.zip"
-          name "RiceBarMac"
-          desc "macOS menu bar app for managing rice configurations"
-          homepage "https://github.com/mateocerquetella/RiceBarMac"
+          xcodegen --version
+          EXPECTED_TAG="${GITHUB_REF_NAME}" scripts/verify-version.sh
+          xcodegen generate
+          git diff --exit-code -- RiceBarMac.xcodeproj
 
-          depends_on macos: ">= :big_sur"
+      - name: Build, analyze, and run native tests
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/release-tests \
+            -resultBundlePath build/ReleaseTests.xcresult \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGNING_REQUIRED=YES \
+            test | tee release-tests.log
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            -derivedDataPath build/release-analyze \
+            CODE_SIGNING_ALLOWED=NO \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            analyze | tee release-analyze.log
 
-          app "RiceBarMac.app"
+      - name: Import Developer ID certificate
+        run: |
+          set -euo pipefail
+          certificate_path="${RUNNER_TEMP}/developer-id.p12"
+          keychain_path="${RUNNER_TEMP}/ricebarmac-signing.keychain-db"
+          printf '%s' "${DEVELOPER_ID_CERTIFICATE_BASE64}" | /usr/bin/base64 -D >"${certificate_path}"
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${keychain_path}"
+          security set-keychain-settings -lut 21600 "${keychain_path}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${keychain_path}"
+          security import "${certificate_path}" -P "${DEVELOPER_ID_CERTIFICATE_PASSWORD}" -A -t cert -f pkcs12 -k "${keychain_path}"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${keychain_path}"
+          security list-keychains -d user -s "${keychain_path}" login.keychain-db
+          signing_identity="$(security find-identity -v -p codesigning "${keychain_path}" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -n 1)"
+          if [[ -z "${signing_identity}" ]]; then
+            echo 'A Developer ID Application identity was not imported.' >&2
+            exit 1
+          fi
+          echo "SIGNING_IDENTITY=${signing_identity}" >>"${GITHUB_ENV}"
+          echo "SIGNING_KEYCHAIN=${keychain_path}" >>"${GITHUB_ENV}"
+          rm -f "${certificate_path}"
 
-          zap trash: [
-            "~/.ricebarmac",
-            "~/Library/Preferences/com.mateocerquetella.RiceBarMac.plist",
-          ]
+      - name: Archive signed universal app
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project RiceBarMac.xcodeproj \
+            -scheme RiceBarMac \
+            -configuration Release \
+            -archivePath build/RiceBarMac.xcarchive \
+            DEVELOPMENT_TEAM="${APPLE_TEAM_ID}" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="${SIGNING_IDENTITY}" \
+            OTHER_CODE_SIGN_FLAGS='--timestamp' \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            archive
+          app='build/RiceBarMac.xcarchive/Products/Applications/RiceBarMac.app'
+          codesign --verify --deep --strict --verbose=2 "${app}"
+          EXPECTED_TAG="${GITHUB_REF_NAME}" APP_PATH="${app}" scripts/verify-version.sh
 
-          caveats <<~EOS
-            RiceBarMac is a menu bar application.
-            
-            The app will appear in your menu bar (top right) with a rice bowl icon 🍚
-            
-            To start automatically on login:
-              - Open the app and go to Settings
-              - Enable "Launch at Login"
-            
-            Note: You may need to grant accessibility permissions when first launched.
-          EOS
-        end
-        EOF
-        
-        # Commit and push changes
-        git add Casks/ricebarmac.rb
-        git commit -m "Update cask to version ${{ steps.version.outputs.version }}"
-        git push https://x-access-token:${{ secrets.HOMEBREW_GITHUB_TOKEN }}@github.com/mateocerquetella/homebrew-ricebarmac.git main
+      - name: Notarize and staple the exact app
+        id: notarization
+        run: |
+          set -euo pipefail
+          app='build/RiceBarMac.xcarchive/Products/Applications/RiceBarMac.app'
+          api_key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY_ID}.p8"
+          printf '%s' "${APPLE_API_PRIVATE_KEY_BASE64}" | /usr/bin/base64 -D >"${api_key_path}"
+          ditto -c -k --keepParent "${app}" build/RiceBarMac-notarization.zip
+          xcrun notarytool submit build/RiceBarMac-notarization.zip \
+            --key "${api_key_path}" \
+            --key-id "${APPLE_API_KEY_ID}" \
+            --issuer "${APPLE_API_ISSUER_ID}" \
+            --wait \
+            --output-format json > build/notarization-result.json
+          status="$(jq -r '.status' build/notarization-result.json)"
+          submission_id="$(jq -r '.id' build/notarization-result.json)"
+          if [[ "${status}" != 'Accepted' ]]; then
+            xcrun notarytool log "${submission_id}" \
+              --key "${api_key_path}" \
+              --key-id "${APPLE_API_KEY_ID}" \
+              --issuer "${APPLE_API_ISSUER_ID}" \
+              build/notarization-log.json || true
+            echo "Notarization was not accepted: ${status}" >&2
+            exit 1
+          fi
+          xcrun notarytool log "${submission_id}" \
+            --key "${api_key_path}" \
+            --key-id "${APPLE_API_KEY_ID}" \
+            --issuer "${APPLE_API_ISSUER_ID}" \
+            build/notarization-log.json
+          xcrun stapler staple "${app}"
+          xcrun stapler validate "${app}"
+          rm -f "${api_key_path}"
+
+      - name: Verify and package release asset
+        id: asset
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          app='build/RiceBarMac.xcarchive/Products/Applications/RiceBarMac.app'
+          EXPECTED_TAG="${GITHUB_REF_NAME}" scripts/verify-release.sh "${app}"
+          asset_name="RiceBarMac-${version}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "${app}" "${asset_name}"
+          unzip -t "${asset_name}"
+          checksum="$(shasum -a 256 "${asset_name}" | awk '{print $1}')"
+          echo "version=${version}" >>"${GITHUB_OUTPUT}"
+          echo "asset_name=${asset_name}" >>"${GITHUB_OUTPUT}"
+          echo "sha256=${checksum}" >>"${GITHUB_OUTPUT}"
+
+      - name: Publish GitHub release
+        run: |
+          set -euo pipefail
+          mkdir -p build/public-download
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            existing_tag="$(gh release view "${GITHUB_REF_NAME}" --json tagName --jq '.tagName')"
+            existing_draft="$(gh release view "${GITHUB_REF_NAME}" --json isDraft --jq '.isDraft')"
+            existing_prerelease="$(gh release view "${GITHUB_REF_NAME}" --json isPrerelease --jq '.isPrerelease')"
+            [[ "${existing_tag}" == "${GITHUB_REF_NAME}" ]]
+            [[ "${existing_draft}" == 'false' ]]
+            [[ "${existing_prerelease}" == 'false' ]]
+            echo "Verifying the immutable asset from the existing ${GITHUB_REF_NAME} release."
+          else
+            gh release create "${GITHUB_REF_NAME}" \
+              "${{ steps.asset.outputs.asset_name }}#RiceBarMac ${{ steps.asset.outputs.version }}" \
+              --verify-tag \
+              --title "RiceBarMac ${GITHUB_REF_NAME}" \
+              --notes-file RELEASE_NOTES_1.2.0.md \
+              --latest
+          fi
+          gh release download "${GITHUB_REF_NAME}" \
+            --pattern "${{ steps.asset.outputs.asset_name }}" \
+            --dir build/public-download
+          downloaded_checksum="$(shasum -a 256 "build/public-download/${{ steps.asset.outputs.asset_name }}" | awk '{print $1}')"
+          [[ "${downloaded_checksum}" == '${{ steps.asset.outputs.sha256 }}' ]]
+
+      - name: Update and verify Homebrew cask
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          gh repo clone MateoCerquetella/homebrew-ricebarmac build/homebrew-ricebarmac
+          cd build/homebrew-ricebarmac
+          mkdir -p Casks
+          ruby - '${{ steps.asset.outputs.version }}' '${{ steps.asset.outputs.sha256 }}' '${{ steps.asset.outputs.asset_name }}' <<'RUBY'
+          version, checksum, asset = ARGV
+          content = <<~CASK
+            cask "ricebarmac" do
+              version "#{version}"
+              sha256 "#{checksum}"
+
+              url "https://github.com/MateoCerquetella/RiceBarMac/releases/download/v#{version}/#{asset}"
+              name "RiceBarMac"
+              desc "Safe macOS menu bar profile switcher"
+              homepage "https://github.com/MateoCerquetella/RiceBarMac"
+
+              depends_on macos: ">= :sonoma"
+
+              app "RiceBarMac.app"
+
+              zap trash: [
+                "~/.ricebarmac",
+                "~/Library/Preferences/com.mateocerquetella.RiceBarMac.plist",
+              ]
+            end
+          CASK
+          File.write("Casks/ricebarmac.rb", content)
+          RUBY
+          brew style Casks/ricebarmac.rb
+          brew audit --cask --strict Casks/ricebarmac.rb
+          brew fetch --cask ./Casks/ricebarmac.rb
+          mkdir -p "${HOME}/.ricebarmac"
+          printf 'preserve-me\n' >"${HOME}/.ricebarmac/upgrade-sentinel"
+          brew install --cask ./Casks/ricebarmac.rb
+          open -a RiceBarMac
+          for attempt in {1..20}; do
+            pgrep -x RiceBarMac >/dev/null && break
+            sleep 1
+          done
+          pgrep -x RiceBarMac >/dev/null
+          [[ "$(cat "${HOME}/.ricebarmac/upgrade-sentinel")" == 'preserve-me' ]]
+          pkill -x RiceBarMac || true
+          brew reinstall --cask ./Casks/ricebarmac.rb
+          [[ "$(cat "${HOME}/.ricebarmac/upgrade-sentinel")" == 'preserve-me' ]]
+          git config user.name 'RiceBarMac Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add Casks/ricebarmac.rb
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo 'Homebrew cask already matches the verified release asset.'
+          else
+            git commit -m "Update RiceBarMac cask to ${{ steps.asset.outputs.version }}"
+            git push origin HEAD:main
+          fi
+          echo "HOMEBREW_COMMIT=$(git rev-parse HEAD)" >>"${GITHUB_ENV}"
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-evidence-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            release-*.log
+            build/*.json
+            build/*.xcresult
+
+      - name: Remove ephemeral keychain
+        if: always()
+        run: |
+          if [[ -n "${SIGNING_KEYCHAIN:-}" && -f "${SIGNING_KEYCHAIN}" ]]; then
+            security delete-keychain "${SIGNING_KEYCHAIN}"
+          fi

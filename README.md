@@ -1,291 +1,196 @@
 <div align="center">
-  
+
   <img src="docs/assets/ricebarmac-icon.png" alt="RiceBarMac Icon" width="128" height="128">
-  
+
   # RiceBarMac
-  
-  ### Lightning-fast macOS menu bar app for effortless desktop profile switching
-  
+
+  ### Safe, reversible macOS desktop-profile switching from the menu bar
+
   [![macOS](https://img.shields.io/badge/macOS-14.0+-blue.svg)](https://www.apple.com/macos/)
   [![Swift](https://img.shields.io/badge/Swift-5.9+-orange.svg)](https://swift.org/)
   [![Xcode](https://img.shields.io/badge/Xcode-15.0+-blue.svg)](https://developer.apple.com/xcode/)
   [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-  [![Platform](https://img.shields.io/badge/Platform-macOS-lightgrey.svg)](https://www.apple.com/macos/)
-  
+
 </div>
 
-> **⚠️ BETA WARNING**: RiceBarMac is currently in beta. Please backup your `.config` directory and any important configuration files before use. The author is not responsible for any data loss or system damage. Use at your own risk.
+RiceBarMac is a menu bar app for switching developer and desktop configurations. Profiles live under `~/.ricebarmac/profiles/` and map files from a profile into locations inside your home directory.
 
-## 🚀 Overview
+Version 1.2.0 makes profile changes previewable, transactional, and reversible. Launching the app or reloading the profile list never applies a profile automatically.
 
-RiceBarMac is a powerful macOS menu bar application that manages your **desktop rice configurations** by creating symbolic links from profile directories to your actual system locations. It's designed for developers and power users who maintain multiple aesthetic setups and want to switch between them instantly using keyboard shortcuts.
+## What v1.2 supports
 
-## 📺 Demo
+- Read-only Preview with every destination, source, backup, warning, and post-commit effect.
+- Explicit Apply confirmation from the menu bar or Settings.
+- Serialized profile operations with visible progress and queue depth.
+- Unique adjacent backups for replaced files, directories, and symbolic links.
+- Reverse-order rollback when a filesystem action fails.
+- Undo that restores the previous object and refuses to overwrite later user changes.
+- Persistent transaction journals and explicit recovery controls after an interrupted operation.
+- JSON and YAML profiles; malformed profiles stay visible with their validation error.
+- Home overlays and explicit replacement mappings.
+- Wallpaper, Alacritty, VS Code, Cursor, extension installation, and startup-script integrations.
+- Explicit, staged migration from legacy `~/.ricebar` data without deleting the original.
+- Config compatibility: missing fields receive defaults, unknown fields are ignored, and malformed `config.json` is never silently replaced.
+- Configurable global shortcuts and launch-at-login support.
 
-### Terminal Configuration Switching
-See how RiceBarMac instantly switches terminal configurations and themes:
+Terminal.app, iTerm2, and `systemTheme` declarations are accepted for profile compatibility but are not applied in v1.2.0; Preview reports them as unsupported. Kitty, WezTerm, remote theme downloads, palette extraction, and template substitution are not implemented.
 
-https://github.com/user-attachments/assets/551ad0a6-b659-47d8-8258-45d515670210
+## Safety model
 
-### IDE Integration with VS Code and Cursor
-Watch RiceBarMac seamlessly manage IDE settings and themes:
+Selecting a profile follows this sequence:
 
-https://github.com/user-attachments/assets/cbc52f71-27c8-44df-b107-6598f8562a0f
+1. RiceBarMac validates the profile and builds a plan without writing to disk.
+2. Preview shows the exact plan and requires Apply or Cancel.
+3. Apply enters a single FIFO operation queue.
+4. Each action records intent, stages its replacement, preserves the existing object at the displayed backup path, and installs the replacement.
+5. A failure triggers reverse-order rollback. Any path that cannot be restored is shown in Recovery.
+6. Wallpaper changes, editor extension installation, Alacritty reload, and startup scripts run only after the reversible filesystem commit. Their failures are warnings and do not undo committed files.
+7. Undo verifies fingerprints before restoring backups, so a file changed after Apply is left untouched.
 
-## 🔧 How It Works
+Destinations must be strictly inside the current user’s home directory. RiceBarMac rejects unsafe parent symlinks, recursive mappings, duplicate or conflicting destinations, collisions with reserved staging paths, and changes to its own `.ricebar`/`.ricebarmac` storage.
 
-RiceBarMac operates as a **symlink-based overlay system** that manages your rice configurations:
+Transaction journals are stored in `~/.ricebarmac/transactions/`. Backups use unique `.ricebarmac-backup-…` names beside the affected path. If Recovery is shown, keep both the journal and backups until the issue is resolved.
 
-### 🎯 **Core Functionality**
+## Profile layout
 
--   **Menu Bar Integration**: Runs silently in your menu bar with a rice bowl icon
--   **Profile Management**: Stores rice configurations in `~/.ricebarmac/profiles/`
--   **Symlink Management**: Creates symbolic links from profile files to your actual system locations
--   **Hotkey Registration**: Uses macOS global hotkey system for instant switching
+Each profile contains `profile.json`, `profile.yml`, or `profile.yaml`:
 
-### 📁 **Profile Structure**
-
-```
+```text
 ~/.ricebarmac/profiles/
 ├── Work/
-│   ├── home/                    # Overlays your home directory
-│   │   └── .config/            # Symlinked to ~/.config/
-│   │       ├── alacritty/
+│   ├── home/
+│   │   └── .config/
 │   │       ├── nvim/
 │   │       └── tmux/
-│   ├── vscode/                 # VS Code settings
+│   ├── vscode/
 │   │   ├── settings.json
 │   │   ├── keybindings.json
-│   │   └── extensions.txt
+│   │   └── snippets/
+│   ├── alacritty.toml
 │   ├── wallpaper.jpg
-│   ├── profile.json            # Profile configuration
-│   └── startup.sh              # Script to run when profile is applied
-└── Gaming/
-    ├── home/.config/...
-    ├── wallpaper.png
-    └── profile.json
-```
-
-### ⚡ **Profile Application Process**
-
-1. **User triggers shortcut** (e.g., ⌘+1)
-2. **RiceBarMac loads profile** from `~/.ricebarmac/profiles/`
-3. **Applies wallpaper** using macOS APIs
-4. **Creates symbolic links** from profile files to your actual system locations
-5. **Symlinks IDE settings** (VS Code, Cursor, etc.)
-6. **Runs startup scripts** if configured
-7. **Provides visual feedback** in menu bar
-
-### 🔄 **File Replacement Methods**
-
--   **Direct Symlinks**: Specific file mappings defined in `profile.json`
--   **Home Overlay**: Automatic symlinking of `home/` directory contents
--   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 support
--   **Backup System**: Creates backups of existing files before creating symlinks
-
-## ✨ Features
-
-### 🎨 **Profile Management**
-
--   **Menu Bar Interface**: Clean, accessible menu bar app with rice bowl icon
--   **Multiple Profiles**: Create and manage unlimited rice profiles
--   **Instant Switching**: Switch between profiles with keyboard shortcuts or menu clicks
--   **Profile Ordering**: Customize the order of profiles in the menu via `order` property
-
-### 🔧 **File Management**
-
--   **Config File Symlinking**: Create symbolic links from `.config` directories and files to your system
--   **Home Directory Overlay**: Automatic symlinking of `home/` directory contents
--   **IDE Integration**: VS Code, Cursor, Alacritty, iTerm2 configuration support
-
-### 🖼️ **Visual Customization**
-
--   **Wallpaper Switching**: Change desktop wallpapers instantly with drag-and-drop or file picker
--   **Multiple Formats**: Support for PNG, JPG, HEIC, GIF, BMP, TIFF formats
--   **Terminal Themes**: Alacritty, Terminal.app, iTerm2 theme switching
--   **IDE Themes**: VS Code and Cursor theme management via settings.json
-
-### ⌨️ **Keyboard Shortcuts**
-
--   **Profile Shortcuts**: Direct profile switching (⌘+1, ⌘+2, etc.) for up to 9 profiles
--   **Navigation Shortcuts**: Next/Previous profile cycling, reload profiles, open folder
-
-## 📦 Installation
-
-### Prerequisites
-
--   macOS 14.0 or later
--   Xcode 15.0+ (for development)
-
-### Quick Install via Homebrew (Recommended)
-
-```bash
-# Add the tap first
-brew tap mateocerquetella/ricebarmac
-
-# Install RiceBarMac
-brew install --cask ricebarmac
-```
-
-### Manual Installation
-
-#### Option 1: Download Pre-built Release
-
-1. Download the latest `RiceBarMac.zip` from [Releases](https://github.com/MateoCerquetella/RiceBarMac/releases)
-2. Extract and move `RiceBarMac.app` to `/Applications/`
-3. Launch the app - it will appear in your menu bar
-
-#### Option 2: Build from Source
-
-1. **Clone the repository**
-
-    ```bash
-    git clone https://github.com/MateoCerquetella/RiceBarMac.git
-    cd RiceBarMac
-    ```
-
-2. **Install dependencies**
-
-    ```bash
-    # Install XcodeGen if you don't have it
-    brew install xcodegen
-
-    # Generate Xcode project
-    xcodegen generate
-    ```
-
-3. **Build and run**
-
-    ```bash
-    # Build the project
-    xcodebuild -project RiceBarMac.xcodeproj -scheme RiceBarMac -configuration Release build
-
-    # Open the app
-    open /Users/$(whoami)/Library/Developer/Xcode/DerivedData/RiceBarMac-*/Build/Products/Release/RiceBarMac.app
-    ```
-
-### Development Setup
-
-1. **Open in Xcode**
-
-    ```bash
-    open RiceBarMac.xcodeproj
-    ```
-
-2. **Run the project**
-    - Select your target device (macOS)
-    - Press ⌘+R to build and run
-
-## 🛠️ Configuration
-
-### 📁 Profile Structure
-
-Profiles are stored at `~/.ricebarmac/profiles/<ProfileName>/` with this structure:
-
-```
-~/.ricebarmac/profiles/
-├── Work/
-│   ├── wallpaper.jpg
+│   ├── startup.sh
 │   └── profile.json
-└── Gaming/
-    ├── wallpaper.png
-    └── profile.json
+└── Minimal/
+    ├── home/.config/...
+    └── profile.yml
 ```
 
-### Profile Configuration
+When `replacements` is absent or empty, files below the profile’s `home/` directory overlay the corresponding paths below `~`. Explicit replacements take precedence when present.
+
+### Example profile
 
 ```json
 {
-    "name": "Work Setup",
-    "wallpaper": "wallpaper.jpg",
-    "order": 1,
-    "hotkey": "cmd+1",
-    "terminal": {
-        "kind": "alacritty",
-        "theme": "alacritty.yml"
+  "name": "Work Setup",
+  "order": 1,
+  "hotkey": "cmd+1",
+  "wallpaper": "wallpaper.jpg",
+  "terminal": {
+    "kind": "alacritty",
+    "theme": "alacritty.toml",
+    "themeSource": "file",
+    "fontSize": 14,
+    "fontFamily": "JetBrains Mono",
+    "opacity": 0.95
+  },
+  "ide": {
+    "kind": "vscode",
+    "theme": "@id:Default Dark Modern",
+    "themeSource": "builtin",
+    "extensions": ["ms-vscode.vscode-typescript-next"],
+    "fontSize": 14,
+    "fontFamily": "JetBrains Mono",
+    "wordWrap": true
+  },
+  "replacements": [
+    {
+      "source": "home/.config/nvim",
+      "destination": "~/.config/nvim"
     },
-    "ide": {
-        "kind": "vscode",
-        "theme": "vscode/settings.json",
-        "extensions": ["ms-vscode.vscode-typescript-next"]
-    },
-    "replacements": [
-        {
-            "source": "home/.config/nvim",
-            "destination": "~/.config/nvim"
-        },
-        {
-            "source": "home/.config/tmux",
-            "destination": "~/.config/tmux"
-        }
-    ],
-    "startupScript": "startup.sh"
+    {
+      "source": "home/.config/tmux",
+      "destination": "~/.config/tmux"
+    }
+  ],
+  "startupScript": "startup.sh"
 }
 ```
 
-## 🐛 Troubleshooting
+Replacement sources are relative to the profile directory. Destinations may be absolute paths or start with `~/`, but must resolve safely inside the user’s home directory.
 
-### Common Issues
+For VS Code or Cursor, a theme beginning with `@id:` updates `workbench.colorTheme` while preserving the rest of `settings.json`. A relative theme path is treated as profile content. Recognized editor directories can contain `settings.json`, `keybindings.json`, and `snippets/`.
 
-**Shortcuts not working?**
+## Installation
 
--   Check if the shortcut conflicts with other apps
--   Ensure the app has accessibility permissions
--   Try restarting the app
+RiceBarMac 1.2.0 requires macOS 14 Sonoma or later and ships as a universal Intel/Apple Silicon app.
 
-**Profiles not switching?**
+### Homebrew
 
--   Verify file paths in your configuration
--   Check console logs for error messages
--   Ensure proper file permissions
+```bash
+brew tap mateocerquetella/ricebarmac
+brew install --cask ricebarmac
+```
 
-**App not launching?**
+### Download
 
--   Check if it's blocked by Gatekeeper
--   Verify macOS version compatibility (requires macOS 14.0+)
--   Try building from source with Xcode 15.0+
+Download the versioned `RiceBarMac-<version>.zip` asset from [GitHub Releases](https://github.com/MateoCerquetella/RiceBarMac/releases), extract it, and move `RiceBarMac.app` to `/Applications`.
 
-**Launch at Login not working?**
+Official release assets are Developer ID signed, hardened, notarized, stapled, and verified by Gatekeeper. The release workflow does not publish an unsigned fallback.
 
--   Requires macOS 13.0 or later for automatic registration
--   On older versions, manually add to System Preferences > Users & Groups > Login Items
--   Check if the toggle is properly enabled in Settings
+## Build and test
 
-## 🤝 Contributing
+Development requires Xcode 15 or later and XcodeGen.
 
-We welcome contributions! Here's how you can help:
+```bash
+brew install xcodegen
+xcodegen generate
+xcodebuild -project RiceBarMac.xcodeproj -scheme RiceBarMac \
+  -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project RiceBarMac.xcodeproj -scheme RiceBarMac \
+  -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO \
+  -only-testing:RiceBarMacTests test
+```
 
-1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Commit your changes** (`git commit -m 'Add amazing feature'`)
-4. **Push to the branch** (`git push origin feature/amazing-feature`)
-5. **Open a Pull Request**
+CI additionally runs static analysis, UI tests against an isolated temporary home, a Release build, and a universal archive check. `project.yml` is the source of truth for the generated Xcode project.
 
-### Development Guidelines
+## Configuration and migration
 
--   Follow Swift style guidelines
--   Add tests for new features
--   Update documentation
--   Ensure compatibility with both Intel and Apple Silicon
+Global settings are stored at `~/.ricebarmac/config.json`. Editing settings uses a staged write and preserves the previous file at a unique backup path. If the file is malformed, RiceBarMac keeps its bytes unchanged and shows the parse error.
 
-## 📄 License
+If `~/.ricebar` exists and `~/.ricebarmac` is not already populated, Settings offers an explicit migration. Migration validates links, copies into a staging directory, journals the operation, and leaves `~/.ricebar` intact. If both roots contain data, RiceBarMac reports a conflict instead of merging them automatically.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Troubleshooting
 
-## 🙏 Acknowledgments
+### A profile cannot be applied
 
--   **HotKey Library**: For global keyboard shortcut support
--   **Yams**: For YAML parsing capabilities
--   **macOS Community**: For inspiration and feedback
+Open Preview and read the “Cannot apply” section. Common causes are a missing source, an invalid destination, a parent symlink that escapes the home directory, or two mappings targeting the same path. Invalid profiles remain listed with their parsing or validation error.
 
-## 📞 Support
+### Undo reports a changed path
 
--   **Issues**: [GitHub Issues](https://github.com/MateoCerquetella/RiceBarMac/issues)
--   **Discussions**: [GitHub Discussions](https://github.com/MateoCerquetella/RiceBarMac/discussions)
+RiceBarMac detected a post-Apply user change and intentionally did not overwrite it. Preserve the displayed backup and transaction journal, then reconcile the current file manually.
 
----
+### Recovery is required
 
-<div align="center">
-  <p>Made with ❤️ by Mateo Cerquetella for the macOS community</p>
-  <p>If you find this project helpful, please give it a ⭐️</p>
-</div>
+Do not rename or delete affected paths, `.ricebarmac-backup-…` files, or the transaction journal. Open Settings, inspect the recovery entry, and retry recovery after resolving permissions or filesystem availability.
+
+### Global shortcuts do not work
+
+Check for conflicts with other apps and review the shortcuts in Settings. macOS may require Accessibility approval for global interaction.
+
+### Launch at Login requires approval
+
+Open System Settings → General → Login Items and approve RiceBarMac. The app does not silently change this setting during launch.
+
+## Demo
+
+- [Terminal configuration switching](https://github.com/user-attachments/assets/551ad0a6-b659-47d8-8258-45d515670210)
+- [VS Code and Cursor integration](https://github.com/user-attachments/assets/cbc52f71-27c8-44df-b107-6598f8562a0f)
+
+## Contributing and support
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development and pull-request guidance.
+
+- [GitHub Issues](https://github.com/MateoCerquetella/RiceBarMac/issues)
+- [GitHub Discussions](https://github.com/MateoCerquetella/RiceBarMac/discussions)
+
+RiceBarMac is licensed under the [MIT License](LICENSE).

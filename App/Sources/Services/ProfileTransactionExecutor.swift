@@ -1,0 +1,550 @@
+import Foundation
+
+enum TransactionExecutionError: LocalizedError {
+    case invalidPlan([ProfilePlanIssue])
+    case noUndoAvailable
+    case transactionNotFound(UUID)
+    case recoveryRequired(paths: [String], cause: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidPlan(let issues):
+            return issues.map(\.message).joined(separator: "\n")
+        case .noUndoAvailable:
+            return "There is no completed profile transaction available to undo."
+        case .transactionNotFound(let id):
+            return "Transaction \(id.uuidString) was not found."
+        case .recoveryRequired(let paths, let cause):
+            let pathList = paths.isEmpty ? "unknown paths" : paths.joined(separator: ", ")
+            return "Recovery is required for \(pathList). \(cause)"
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .recoveryRequired:
+            return "Keep the transaction journal and .ricebarmac-backup files. Open the recovery details before changing the affected paths."
+        default:
+            return nil
+        }
+    }
+}
+
+final class ProfileTransactionExecutor: @unchecked Sendable {
+    typealias ProgressHandler = @Sendable (_ completed: Int, _ total: Int, _ message: String) -> Void
+
+    private let fileSystem: FileSystemClient
+    private let transactionStore: TransactionStoring
+    private let activeProfileStore: ActiveProfilePersisting
+    private let externalEffects: ExternalEffectClient
+    private let now: @Sendable () -> Date
+
+    init(
+        fileSystem: FileSystemClient,
+        transactionStore: TransactionStoring,
+        activeProfileStore: ActiveProfilePersisting,
+        externalEffects: ExternalEffectClient,
+        now: @escaping @Sendable () -> Date = { Date() }
+    ) {
+        self.fileSystem = fileSystem
+        self.transactionStore = transactionStore
+        self.activeProfileStore = activeProfileStore
+        self.externalEffects = externalEffects
+        self.now = now
+    }
+
+    func apply(
+        _ plan: ProfileApplyPlan,
+        progress: @escaping ProgressHandler = { _, _, _ in }
+    ) async throws -> ProfileApplyOutcome {
+        guard plan.isValid else { throw TransactionExecutionError.invalidPlan(plan.issues) }
+        var transaction = ApplyTransaction(plan: plan, now: now())
+        try persist(&transaction, status: .executing)
+
+        do {
+            for index in transaction.actions.indices {
+                try Task.checkCancellation()
+                progress(index, transaction.actions.count, transaction.actions[index].action.displaySummary)
+                try executeAction(at: index, transaction: &transaction)
+            }
+            try persist(&transaction, status: .committed)
+            activeProfileStore.saveActiveProfilePath(plan.profileDirectoryPath)
+        } catch {
+            let original = error
+            do {
+                try restoreActions(in: &transaction, actionStatus: .rolledBack)
+                try persist(&transaction, status: .rolledBack, error: original.localizedDescription)
+            } catch let rollbackError {
+                let paths = transaction.unresolvedPaths
+                try? persist(&transaction, status: .recoveryRequired, error: rollbackError.localizedDescription)
+                throw TransactionExecutionError.recoveryRequired(
+                    paths: paths,
+                    cause: "Apply failed with '\(original.localizedDescription)'; rollback failed with '\(rollbackError.localizedDescription)'."
+                )
+            }
+            throw original
+        }
+
+        var warnings: [String] = []
+        var checkpointWarning: String?
+        for effect in plan.externalEffects {
+            if Task.isCancelled {
+                let warning = "Skipped \(effect.displaySummary) because cancellation was requested after commit."
+                warnings.append(warning)
+                transaction.externalEffects.append(
+                    ExternalEffectResult(id: effect.id, effect: effect, succeeded: false, errorDescription: warning)
+                )
+                continue
+            }
+            do {
+                try await externalEffects.perform(effect)
+                transaction.externalEffects.append(
+                    ExternalEffectResult(id: effect.id, effect: effect, succeeded: true, errorDescription: nil)
+                )
+            } catch {
+                let warning = "\(effect.displaySummary): \(error.localizedDescription)"
+                warnings.append(warning)
+                transaction.externalEffects.append(
+                    ExternalEffectResult(id: effect.id, effect: effect, succeeded: false, errorDescription: error.localizedDescription)
+                )
+            }
+            transaction.updatedAt = now()
+            do {
+                try transactionStore.save(transaction)
+            } catch {
+                checkpointWarning = "A post-commit journal checkpoint could not be written: \(error.localizedDescription)"
+            }
+        }
+
+        if let checkpointWarning {
+            warnings.append(checkpointWarning)
+        }
+
+        transaction.status = warnings.isEmpty ? .committed : .committedWithWarnings
+        transaction.errorDescription = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
+        transaction.updatedAt = now()
+        do {
+            try transactionStore.save(transaction)
+        } catch {
+            let warning = "The profile was committed, but its final transaction journal could not be updated: \(error.localizedDescription)"
+            warnings.append(warning)
+            transaction.status = .committedWithWarnings
+            transaction.errorDescription = warnings.joined(separator: "\n")
+        }
+        progress(transaction.actions.count, transaction.actions.count, warnings.isEmpty ? "Profile applied" : "Profile applied with warnings")
+        return ProfileApplyOutcome(transaction: transaction, warnings: warnings)
+    }
+
+    func undoLatest(progress: @escaping ProgressHandler = { _, _, _ in }) throws -> ApplyTransaction {
+        guard var transaction = try transactionStore.latestUndoable() else {
+            throw TransactionExecutionError.noUndoAvailable
+        }
+        try persist(&transaction, status: .undoing)
+        progress(0, transaction.actions.count, "Preparing Undo")
+
+        do {
+            try restoreActions(in: &transaction, actionStatus: .restored) { completed, total, message in
+                progress(completed, total, message)
+            }
+            activeProfileStore.saveActiveProfilePath(transaction.plan.formerActiveProfilePath)
+            try persist(&transaction, status: .undone)
+            progress(transaction.actions.count, transaction.actions.count, "Undo complete")
+            return transaction
+        } catch {
+            let recoveryError = normalizedRecoveryError(error, transaction: transaction)
+            try? persist(&transaction, status: .recoveryRequired, error: recoveryError.localizedDescription)
+            throw recoveryError
+        }
+    }
+
+    func recover(transactionID: UUID, progress: @escaping ProgressHandler = { _, _, _ in }) throws -> ApplyTransaction {
+        guard var transaction = try transactionStore.load(id: transactionID) else {
+            throw TransactionExecutionError.transactionNotFound(transactionID)
+        }
+        do {
+            try restoreActions(in: &transaction, actionStatus: .rolledBack) { completed, total, message in
+                progress(completed, total, message)
+            }
+            activeProfileStore.saveActiveProfilePath(transaction.plan.formerActiveProfilePath)
+            try persist(&transaction, status: .rolledBack)
+            return transaction
+        } catch {
+            let recoveryError = normalizedRecoveryError(error, transaction: transaction)
+            try? persist(&transaction, status: .recoveryRequired, error: recoveryError.localizedDescription)
+            throw recoveryError
+        }
+    }
+
+    func incompleteTransactions() throws -> [ApplyTransaction] {
+        try transactionStore.incompleteTransactions()
+    }
+
+    func latestUndoable() throws -> ApplyTransaction? {
+        try transactionStore.latestUndoable()
+    }
+
+    private func executeAction(at index: Int, transaction: inout ApplyTransaction) throws {
+        let action = transaction.actions[index].action
+        transaction.actions[index].status = .intentRecorded
+        try persist(&transaction)
+
+        let safety = try validateDestinationParents(for: action, transaction: transaction)
+        try validateSource(for: action, transaction: transaction, safety: safety)
+
+        let destination = URL(fileURLWithPath: action.destinationPath)
+        let backup = URL(fileURLWithPath: action.backupPath)
+        let stage = URL(fileURLWithPath: action.stagingPath)
+        let currentDestination = try fileSystem.state(at: destination)
+        guard statesMatch(currentDestination, action.beforeState) else {
+            throw FileSystemClientError.stalePath(destination.path)
+        }
+        guard try fileSystem.state(at: backup).kind == .absent,
+              try fileSystem.state(at: stage).kind == .absent else {
+            throw FileSystemClientError.collision(destination.path)
+        }
+
+        if action.kind != .remove {
+            switch action.kind {
+            case .createDirectory:
+                try fileSystem.createDirectory(at: stage)
+            case .replaceWithSymlink:
+                guard let sourcePath = action.sourcePath else {
+                    throw FileSystemClientError.unsupportedObject(destination.path)
+                }
+                try fileSystem.createSymbolicLink(at: stage, pointingTo: URL(fileURLWithPath: sourcePath))
+            case .replaceWithCopy:
+                guard let sourcePath = action.sourcePath else {
+                    throw FileSystemClientError.unsupportedObject(destination.path)
+                }
+                try fileSystem.copyItem(at: URL(fileURLWithPath: sourcePath), to: stage)
+            case .writeData:
+                guard let data = action.data else {
+                    throw FileSystemClientError.unsupportedObject(destination.path)
+                }
+                try fileSystem.writeDataAtomically(data, to: stage)
+                if let permissions = action.beforeState.permissions {
+                    try fileSystem.setPermissions(permissions, at: stage)
+                }
+            case .remove:
+                break
+            }
+            transaction.actions[index].installedFingerprint = try fileSystem.state(at: stage).fingerprint
+            transaction.actions[index].status = .staged
+            try persist(&transaction)
+        }
+
+        let commitSafety = try validateDestinationParents(for: action, transaction: transaction)
+        try validateSource(for: action, transaction: transaction, safety: commitSafety)
+        let commitDestination = try fileSystem.state(at: destination)
+        guard statesMatch(commitDestination, action.beforeState) else {
+            throw FileSystemClientError.stalePath(destination.path)
+        }
+
+        if action.beforeState.exists {
+            try fileSystem.moveItem(at: destination, to: backup)
+            let movedBackup = try fileSystem.state(at: backup)
+            guard statesMatch(movedBackup, action.beforeState),
+                  try fileSystem.state(at: destination).kind == .absent else {
+                throw FileSystemClientError.stalePath(backup.path)
+            }
+            transaction.actions[index].status = .backupCreated
+            try persist(&transaction)
+        }
+
+        if action.kind != .remove {
+            let installSafety = try validateDestinationParents(for: action, transaction: transaction)
+            try validateSource(for: action, transaction: transaction, safety: installSafety)
+            guard try fileSystem.state(at: destination).kind == .absent else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+            if action.beforeState.exists {
+                guard statesMatch(try fileSystem.state(at: backup), action.beforeState) else {
+                    throw FileSystemClientError.stalePath(backup.path)
+                }
+            }
+            guard let staged = transaction.actions[index].installedFingerprint,
+                  fingerprintsMatch(try fileSystem.state(at: stage).fingerprint, staged) else {
+                throw FileSystemClientError.stalePath(stage.path)
+            }
+            try fileSystem.moveItem(at: stage, to: destination)
+        } else {
+            guard try fileSystem.state(at: destination).kind == .absent else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+        }
+        let installed = try fileSystem.state(at: destination).fingerprint
+        if let staged = transaction.actions[index].installedFingerprint {
+            guard fingerprintsMatch(installed, staged) else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+        } else {
+            transaction.actions[index].installedFingerprint = installed
+        }
+        transaction.actions[index].status = .replacementInstalled
+        try persist(&transaction)
+    }
+
+    private func restoreActions(
+        in transaction: inout ApplyTransaction,
+        actionStatus: TransactionActionRecord.Status,
+        progress: ProgressHandler = { _, _, _ in }
+    ) throws {
+        transaction.status = actionStatus == .restored ? .undoing : .rollingBack
+        transaction.updatedAt = now()
+        try transactionStore.save(transaction)
+
+        var failures: [String] = []
+        let indices = Array(transaction.actions.indices.reversed())
+
+        for (offset, index) in indices.enumerated() {
+            let action = transaction.actions[index].action
+            progress(offset, indices.count, "Restoring \(action.destinationPath)")
+            do {
+                try restoreAction(at: index, transaction: &transaction, finalStatus: actionStatus)
+            } catch {
+                transaction.actions[index].errorDescription = error.localizedDescription
+                if !transaction.unresolvedPaths.contains(action.destinationPath) {
+                    transaction.unresolvedPaths.append(action.destinationPath)
+                }
+                failures.append("\(action.destinationPath): \(error.localizedDescription)")
+                transaction.updatedAt = now()
+                try? transactionStore.save(transaction)
+            }
+        }
+
+        guard failures.isEmpty else {
+            throw TransactionExecutionError.recoveryRequired(
+                paths: transaction.unresolvedPaths,
+                cause: failures.joined(separator: "\n")
+            )
+        }
+    }
+
+    private func restoreAction(
+        at index: Int,
+        transaction: inout ApplyTransaction,
+        finalStatus: TransactionActionRecord.Status
+    ) throws {
+        let record = transaction.actions[index]
+        let action = record.action
+        let destination = URL(fileURLWithPath: action.destinationPath)
+        let backup = URL(fileURLWithPath: action.backupPath)
+        let stage = URL(fileURLWithPath: action.stagingPath)
+
+        if record.status == .restored || record.status == .rolledBack {
+            try markRestored(at: index, transaction: &transaction, status: finalStatus)
+            return
+        }
+
+        if record.status == .pending {
+            try markRestored(at: index, transaction: &transaction, status: finalStatus)
+            return
+        }
+
+        let stageState = try fileSystem.state(at: stage)
+        let stageWasPresent = stageState.exists
+        if stageState.exists {
+            guard let installed = record.installedFingerprint,
+                  fingerprintsMatch(stageState.fingerprint, installed) else {
+                throw FileSystemClientError.stalePath(stage.path)
+            }
+            if action.kind == .createDirectory,
+               !(try fileSystem.contentsOfDirectory(at: stage)).isEmpty {
+                throw FileSystemClientError.stalePath(stage.path)
+            }
+            try fileSystem.removeItem(at: stage)
+        }
+
+        let backupExists = try fileSystem.state(at: backup).exists
+        let current = try fileSystem.state(at: destination)
+
+        if backupExists, action.beforeState.exists {
+            guard statesMatch(try fileSystem.state(at: backup), action.beforeState) else {
+                throw FileSystemClientError.stalePath(backup.path)
+            }
+        }
+
+        if record.status == .intentRecorded,
+           record.installedFingerprint == nil,
+           !backupExists {
+            // Non-removal actions touch only their reserved stage while the
+            // durable record is at intentRecorded. A changed destination is
+            // therefore external state that must be preserved. Remove has no
+            // stage, so a missing backup can still represent an interrupted
+            // destination-to-backup move and remains ambiguous.
+            if action.kind == .remove,
+               !statesMatch(current, action.beforeState) {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+            try markRestored(at: index, transaction: &transaction, status: finalStatus)
+            return
+        }
+
+        if record.status == .staged,
+           stageWasPresent,
+           !backupExists {
+            // The staged replacement was still at its reserved path, so this
+            // action never touched the destination. Preserve any concurrent
+            // destination change and roll back only the stage we identified.
+            try markRestored(at: index, transaction: &transaction, status: finalStatus)
+            return
+        }
+
+        if let installed = record.installedFingerprint {
+            if action.beforeState.exists && !backupExists {
+                if statesMatch(current, action.beforeState) {
+                    try markRestored(at: index, transaction: &transaction, status: finalStatus)
+                    return
+                }
+                throw FileSystemClientError.stalePath(backup.path)
+            }
+
+            if current.exists {
+                guard fingerprintsMatch(current.fingerprint, installed) else {
+                    throw FileSystemClientError.stalePath(destination.path)
+                }
+                if action.kind == .createDirectory,
+                   !(try fileSystem.contentsOfDirectory(at: destination)).isEmpty {
+                    throw FileSystemClientError.stalePath(destination.path)
+                }
+                try fileSystem.removeItem(at: destination)
+            }
+        } else if backupExists {
+            guard current.kind == .absent else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+        } else if !statesMatch(current, action.beforeState) {
+            throw FileSystemClientError.stalePath(destination.path)
+        }
+
+        if backupExists {
+            guard try fileSystem.state(at: destination).kind == .absent else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+            try fileSystem.moveItem(at: backup, to: destination)
+            let restored = try fileSystem.state(at: destination)
+            guard statesMatch(restored, action.beforeState) else {
+                throw FileSystemClientError.stalePath(destination.path)
+            }
+        }
+
+        try markRestored(at: index, transaction: &transaction, status: finalStatus)
+    }
+
+    private func validateDestinationParents(
+        for action: PlannedFileAction,
+        transaction: ApplyTransaction
+    ) throws -> PathSafetyValidator {
+        let home = URL(fileURLWithPath: transaction.plan.userHomePath, isDirectory: true)
+        let safety = PathSafetyValidator(home: home, fileSystem: fileSystem)
+        let destination = URL(fileURLWithPath: action.destinationPath)
+
+        _ = try safety.validateDestination(destination)
+        guard try safety.parentFingerprintsStillMatch(action.parentFingerprints) else {
+            throw FileSystemClientError.stalePath(action.destinationPath)
+        }
+
+        let parentKind = try fileSystem.state(at: destination.deletingLastPathComponent()).kind
+        guard parentKind == .directory || parentKind == .symbolicLink else {
+            throw FileSystemClientError.stalePath(destination.deletingLastPathComponent().path)
+        }
+
+        for record in transaction.actions where
+            record.action.kind == .createDirectory &&
+            action.destinationPath.hasPrefix(record.action.destinationPath + "/") {
+            guard let installed = record.installedFingerprint else {
+                throw FileSystemClientError.stalePath(record.action.destinationPath)
+            }
+            let current = try fileSystem.state(at: URL(fileURLWithPath: record.action.destinationPath))
+            guard fingerprintsMatch(current.fingerprint, installed) else {
+                throw FileSystemClientError.stalePath(record.action.destinationPath)
+            }
+        }
+
+        return safety
+    }
+
+    private func normalizedRecoveryError(
+        _ error: Error,
+        transaction: ApplyTransaction
+    ) -> TransactionExecutionError {
+        if let executionError = error as? TransactionExecutionError,
+           case .recoveryRequired = executionError {
+            return executionError
+        }
+        return TransactionExecutionError.recoveryRequired(
+            paths: transaction.unresolvedPaths,
+            cause: error.localizedDescription
+        )
+    }
+
+    private func validateSource(
+        for action: PlannedFileAction,
+        transaction: ApplyTransaction,
+        safety: PathSafetyValidator
+    ) throws {
+        guard let sourcePath = action.sourcePath,
+              let expectedSource = action.sourceState else { return }
+        let source = URL(fileURLWithPath: sourcePath)
+        try safety.validateSource(
+            source,
+            profileDirectory: URL(fileURLWithPath: transaction.plan.profileDirectoryPath, isDirectory: true)
+        )
+        let currentSource = try fileSystem.state(at: source)
+        guard statesMatch(currentSource, expectedSource) else {
+            throw FileSystemClientError.stalePath(sourcePath)
+        }
+    }
+
+    private func markRestored(
+        at index: Int,
+        transaction: inout ApplyTransaction,
+        status: TransactionActionRecord.Status
+    ) throws {
+        let path = transaction.actions[index].action.destinationPath
+        transaction.actions[index].status = status
+        transaction.actions[index].errorDescription = nil
+        transaction.unresolvedPaths.removeAll(where: { $0 == path })
+        transaction.updatedAt = now()
+        try transactionStore.save(transaction)
+    }
+
+    private func persist(
+        _ transaction: inout ApplyTransaction,
+        status: ApplyTransaction.Status? = nil,
+        error: String? = nil
+    ) throws {
+        if let status { transaction.status = status }
+        transaction.errorDescription = error
+        transaction.updatedAt = now()
+        try transactionStore.save(transaction)
+    }
+
+    private func statesMatch(_ current: FileObjectState, _ expected: FileObjectState) -> Bool {
+        guard fingerprintsMatch(current.fingerprint, expected.fingerprint),
+              current.permissions == expected.permissions else {
+            return false
+        }
+        if expected.kind == .directory {
+            return current.size == expected.size && current.modificationDate == expected.modificationDate
+        }
+        return true
+    }
+
+    private func fingerprintsMatch(_ current: PathFingerprint, _ expected: PathFingerprint) -> Bool {
+        guard current.kind == expected.kind,
+              current.device == expected.device,
+              current.inode == expected.inode,
+              current.symlinkTarget == expected.symlinkTarget else {
+            return false
+        }
+        switch expected.kind {
+        case .directory, .absent:
+            return true
+        case .symbolicLink:
+            return current.symlinkTarget == expected.symlinkTarget
+        case .regularFile, .other:
+            return current.size == expected.size && current.modificationDate == expected.modificationDate
+        }
+    }
+}

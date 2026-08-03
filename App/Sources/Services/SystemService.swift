@@ -29,7 +29,7 @@ enum SystemServiceError: LocalizedError {
         case .launchAtLoginNotFound:
             return "App not found for launch at login"
         case .unsupportedVersion:
-            return "Launch at login requires macOS 13.0 or later"
+            return "Launch at login requires macOS 14.0 or later"
         }
     }
     
@@ -59,7 +59,6 @@ final class SystemService: ObservableObject {
     
     private init() {
         updateLaunchAtLoginStatus()
-        syncConfigWithSystem()
         
         // Initialize error state on startup
         if #unavailable(macOS 13.0) {
@@ -72,6 +71,7 @@ final class SystemService: ObservableObject {
     
     func registerHotKeys(profiles: [ProfileDescriptor], onTrigger: @escaping (ProfileDescriptor) -> Void) {
         clearHotKeys()
+        guard !Constants.isUITesting else { return }
         
         var registeredKeys: [String] = []
         let config = ConfigService.shared.config
@@ -130,6 +130,7 @@ final class SystemService: ObservableObject {
     }
     
     func registerNavigationHotKeys(onNextProfile: @escaping () -> Void, onPreviousProfile: @escaping () -> Void, onReloadProfiles: @escaping () -> Void) {
+        guard !Constants.isUITesting else { return }
         let config = ConfigService.shared.config
         
         // Register Next Profile hotkey
@@ -235,23 +236,20 @@ final class SystemService: ObservableObject {
         }
         
         DispatchQueue.main.async {
-            let wasEnabled = self.isLaunchAtLoginEnabled
             self.isLaunchAtLoginEnabled = enabled
             self.launchAtLoginError = error
-            
-            // Sync config if status changed
-            if wasEnabled != enabled {
-                ConfigService.shared.updateGeneralSetting(\.launchAtLogin, to: enabled)
-            }
         }
     }
     
-    func toggleLaunchAtLogin() throws {
-        if isLaunchAtLoginEnabled {
-            try disableLaunchAtLogin()
-        } else {
+    @discardableResult
+    func toggleLaunchAtLogin() throws -> Bool {
+        let shouldEnable = !isLaunchAtLoginEnabled
+        if shouldEnable {
             try enableLaunchAtLogin()
+        } else {
+            try disableLaunchAtLogin()
         }
+        return shouldEnable
     }
     
     func enableLaunchAtLogin() throws {
@@ -302,18 +300,12 @@ final class SystemService: ObservableObject {
     
     func setLaunchAtLogin(enabled: Bool) throws {
         if enabled != isLaunchAtLoginEnabled {
-            try toggleLaunchAtLogin()
+            _ = try toggleLaunchAtLogin()
         }
     }
     
-    private func syncConfigWithSystem() {
-        // Sync the config with the actual system status
-        ConfigService.shared.updateGeneralSetting(\.launchAtLogin, to: isLaunchAtLoginEnabled)
-    }
-    
     func setDockVisibility() {
-        // Always set as accessory app (menu bar only, never shows in dock)
-        NSApp.setActivationPolicy(.accessory)
+        NSApp.setActivationPolicy(Constants.isUITesting ? .regular : .accessory)
     }
 }
 

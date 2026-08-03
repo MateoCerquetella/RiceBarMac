@@ -1,6 +1,8 @@
 name: RiceBarMac
 options:
-    minimumXcodeGenVersion: 2.37.0
+    minimumXcodeGenVersion: 2.45.4
+    xcodeVersion: '15.4'
+    projectFormat: xcode15_3
     bundleIdPrefix: com.mateocerquetella
     developmentLanguage: en
     deploymentTarget:
@@ -15,15 +17,17 @@ packages:
 settings:
     base:
         DEVELOPMENT_TEAM: ''
+        MARKETING_VERSION: '1.2.0'
+        CURRENT_PROJECT_VERSION: '120'
         ARCHS: 'x86_64 arm64'
-        VALID_ARCHS: 'x86_64 arm64'
 targets:
     RiceBarMac:
         type: application
         platform: macOS
         deploymentTarget: '14.0'
         sources:
-            - path: App
+            - path: App/Sources
+            - path: App/Assets.xcassets
         settings:
             base:
                 PRODUCT_NAME: RiceBarMac
@@ -34,13 +38,11 @@ targets:
                 ENABLE_HARDENED_RUNTIME: YES
                 ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
                 ARCHS: 'x86_64 arm64'
-                VALID_ARCHS: 'x86_64 arm64'
                 ONLY_ACTIVE_ARCH: NO
             configs:
                 Debug:
                     CODE_SIGN_ENTITLEMENTS: App/Entitlements/RiceBarMac_Debug.entitlements
                     ENABLE_HARDENED_RUNTIME: NO
-                    CODE_SIGNING_ALLOWED: NO
                     ONLY_ACTIVE_ARCH: YES
                 Release:
                     CODE_SIGN_ENTITLEMENTS: App/Entitlements/RiceBarMac_Release.entitlements
@@ -52,17 +54,42 @@ targets:
                 CFBundleName: RiceBarMac
                 CFBundleDisplayName: RiceBarMac
                 CFBundleIdentifier: com.mateocerquetella.RiceBarMac
-                CFBundleVersion: '1'
-                CFBundleShortVersionString: '0.1.0'
+                CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+                CFBundleShortVersionString: $(MARKETING_VERSION)
+                LSApplicationCategoryType: public.app-category.utilities
                 LSMinimumSystemVersion: '14.0'
                 LSUIElement: true
-                NSAppleEventsUsageDescription: RiceBarMac uses Apple Events to control Terminal/Alacritty and apply themes.
                 NSDesktopFolderUsageDescription: RiceBarMac needs access to change your desktop wallpaper.
         dependencies:
             - package: HotKey
               product: HotKey
             - package: Yams
               product: Yams
+    RiceBarMacTests:
+        type: bundle.unit-test
+        platform: macOS
+        deploymentTarget: '14.0'
+        sources:
+            - path: App/Tests
+        dependencies:
+            - target: RiceBarMac
+        settings:
+            base:
+                PRODUCT_BUNDLE_IDENTIFIER: com.mateocerquetella.RiceBarMacTests
+                GENERATE_INFOPLIST_FILE: YES
+    RiceBarMacUITests:
+        type: bundle.ui-testing
+        platform: macOS
+        deploymentTarget: '14.0'
+        sources:
+            - path: App/UITests
+        dependencies:
+            - target: RiceBarMac
+        settings:
+            base:
+                PRODUCT_BUNDLE_IDENTIFIER: com.mateocerquetella.RiceBarMacUITests
+                GENERATE_INFOPLIST_FILE: YES
+                TEST_TARGET_NAME: RiceBarMac
 schemes:
     RiceBarMac:
         build:
@@ -70,5 +97,11 @@ schemes:
                 RiceBarMac: all
         run:
             config: Debug
+        test:
+            config: Debug
+            gatherCoverageData: true
+            targets:
+                - name: RiceBarMacTests
+                - name: RiceBarMacUITests
         archive:
             config: Release
