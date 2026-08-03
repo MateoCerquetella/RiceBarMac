@@ -84,6 +84,24 @@ private extension ProfilePlanner {
 
         private var plannedDestinations: [String: PlannedFileAction] = [:]
 
+        init(
+            transactionID: UUID,
+            descriptor: ProfileDescriptor,
+            formerActiveProfilePath: String?,
+            home: URL,
+            fileSystem: FileSystemClient,
+            safety: PathSafetyValidator,
+            nextID: @escaping @Sendable () -> UUID
+        ) {
+            self.transactionID = transactionID
+            self.descriptor = descriptor
+            self.formerActiveProfilePath = formerActiveProfilePath
+            self.home = home
+            self.fileSystem = fileSystem
+            self.safety = safety
+            self.nextID = nextID
+        }
+
         mutating func planProfile() {
             let profile = descriptor.profile
 
