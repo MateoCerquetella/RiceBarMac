@@ -297,6 +297,7 @@ struct SettingsGeneralTabView: View {
                             }
                             .disabled(viewModel.sortedProfiles.isEmpty || viewModel.isApplying)
                             .accessibilityLabel("Preview a profile before applying")
+                            .accessibilityIdentifier("preview-profile-menu")
 
                             Button("Undo Last Apply") {
                                 viewModel.undoLastApply()
@@ -304,6 +305,7 @@ struct SettingsGeneralTabView: View {
                             .disabled(!viewModel.canUndo || viewModel.isApplying)
                             .keyboardShortcut("z", modifiers: [.command, .option])
                             .accessibilityLabel("Undo the last completed profile apply")
+                            .accessibilityIdentifier("undo-last-apply")
 
                             if viewModel.hasLegacyMigration {
                                 Button("Migrate Legacy Configuration…") {
@@ -320,6 +322,7 @@ struct SettingsGeneralTabView: View {
                                 .foregroundColor(operationColor)
                                 .accessibilityLabel("Profile operation status")
                                 .accessibilityValue(viewModel.operationState.message)
+                                .accessibilityIdentifier("profile-operation-status")
                             if viewModel.isApplying || viewModel.operationState.phase == .undoing {
                                 ProgressView(value: viewModel.operationState.progress)
                                     .accessibilityLabel("Profile operation progress")
@@ -336,11 +339,14 @@ struct SettingsGeneralTabView: View {
                                 Text("Invalid Profiles")
                                     .font(.subheadline)
                                     .fontWeight(.semibold)
+                                    .accessibilityIdentifier("invalid-profiles-heading")
                                 ForEach(viewModel.invalidProfiles) { invalid in
                                     Text("\(invalid.directory.lastPathComponent): \(invalid.message)")
                                         .font(.caption)
                                         .foregroundColor(.red)
                                         .textSelection(.enabled)
+                                        .accessibilityLabel("Invalid profile \(invalid.directory.lastPathComponent): \(invalid.message)")
+                                        .accessibilityIdentifier("invalid-profile-\(invalid.directory.lastPathComponent)")
                                 }
                             }
                             .accessibilityElement(children: .contain)

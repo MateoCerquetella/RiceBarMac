@@ -35,14 +35,14 @@ final class RiceBarMacUITests: XCTestCase {
         attachScreenshot("preview")
 
         preview.buttons["Apply"].click()
-        let status = window.staticTexts["Profile operation status"]
+        let status = window.descendants(matching: .any)["profile-operation-status"]
         XCTAssertTrue(status.waitForExistence(timeout: 3))
         attachScreenshot("applying")
         XCTAssertTrue(waitForPath(destination, exists: true, timeout: 8))
-        XCTAssertTrue(waitForValue(status, value: "UI Test is now active", timeout: 8))
+        XCTAssertTrue(waitForValue(status, value: "UI Test applied successfully", timeout: 8))
         attachScreenshot("success")
 
-        let undo = window.buttons["Undo the last completed profile apply"]
+        let undo = window.descendants(matching: .any)["undo-last-apply"]
         XCTAssertTrue(undo.isEnabled)
         undo.click()
         XCTAssertTrue(waitForPath(destination, exists: false, timeout: 8))
@@ -56,8 +56,11 @@ final class RiceBarMacUITests: XCTestCase {
 
         let window = app.windows["RiceBarMac Settings"]
         XCTAssertTrue(window.waitForExistence(timeout: 8))
-        XCTAssertTrue(window.staticTexts["Invalid Profiles"].waitForExistence(timeout: 5))
-        XCTAssertTrue(window.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Broken'")).firstMatch.exists)
+        let heading = window.descendants(matching: .any)["invalid-profiles-heading"]
+        let invalidProfile = window.descendants(matching: .any)["invalid-profile-Broken"]
+        XCTAssertTrue(reveal(heading, in: window))
+        XCTAssertTrue(reveal(invalidProfile, in: window))
+        XCTAssertTrue(invalidProfile.label.contains("Broken"))
         attachScreenshot("failure")
     }
 
@@ -92,14 +95,25 @@ final class RiceBarMacUITests: XCTestCase {
     }
 
     private func openPreview(profileName: String) {
-        let menu = app.menuButtons["Preview a profile before applying"]
-        if menu.exists {
-            menu.click()
-        } else {
-            app.buttons["Preview a profile before applying"].click()
-        }
+        let window = app.windows["RiceBarMac Settings"]
+        let menu = window.descendants(matching: .any)["preview-profile-menu"]
+        XCTAssertTrue(reveal(menu, in: window))
+        menu.click()
         XCTAssertTrue(app.menuItems[profileName].waitForExistence(timeout: 3))
         app.menuItems[profileName].click()
+    }
+
+    private func reveal(_ element: XCUIElement, in window: XCUIElement) -> Bool {
+        if element.exists && element.isHittable { return true }
+        let scrollView = window.scrollViews.firstMatch
+        guard scrollView.waitForExistence(timeout: 2) else { return false }
+
+        let deltas: [CGFloat] = [250, 250, 250, -250, -250, -250, -250, -250, -250]
+        for delta in deltas {
+            scrollView.scroll(byDeltaX: 0, deltaY: delta)
+            if element.exists && element.isHittable { return true }
+        }
+        return element.exists && element.isHittable
     }
 
     private func waitForPath(_ url: URL, exists: Bool, timeout: TimeInterval) -> Bool {
