@@ -458,6 +458,7 @@ final class StatusBarController {
                 _ = try await viewModel.copyProfile(current, to: name)
                 await viewModel.showSuccess(title: "Profile Copied", message: "Profile copied successfully.")
             } catch {
+                await viewModel.showError(error)
             }
         }
     }
@@ -474,6 +475,7 @@ final class StatusBarController {
                 _ = try await viewModel.createProfileFromCurrent(name: name)
                 await viewModel.showSuccess(title: "Profile Created", message: "Profile created from current configuration.")
             } catch {
+                await viewModel.showError(error)
             }
         }
     }
@@ -495,10 +497,10 @@ final class StatusBarController {
             
             Task { @MainActor [self] in
                 do {
-                    let updated = try await viewModel.updateWallpaper(for: active, from: url)
-                    viewModel.applyProfile(updated)
+                    let updated = try await self.viewModel.updateWallpaper(for: active, from: url)
+                    self.viewModel.applyProfile(updated)
                 } catch {
-                    await viewModel.showError(error)
+                    await self.viewModel.showError(error)
                 }
             }
         }
@@ -551,6 +553,7 @@ final class StatusBarController {
                     message: "The profile '\(descriptor.profile.name)' has been moved to the Trash."
                 )
             } catch {
+                await viewModel.showError(error)
             }
         }
     }
